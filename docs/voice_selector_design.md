@@ -1,6 +1,6 @@
 # 音色选择器设计文档
 
-> 版本：v1.0 | 日期：2026-07-12 | 状态：设计阶段
+> 版本：v2.0 | 日期：2026-07-13 | 状态：设计阶段
 
 ---
 
@@ -9,13 +9,13 @@
 ### 现状
 
 - 4 个任务类型（simple / creative / manuscript / artistic）各有一份硬编码的 `<select>` 下拉框，仅含 4 个中文普通话音色
-- 项目实际支持 7 种语言 i18n（zh / en / ja / ko / ru / ms / id），edge-tts 对应音色 323 个
+- 项目实际支持 13 种语言 i18n（zh / en / ru / ja / ko / ms / id / de / fr / nl / es / pt / it），edge-tts 总计 323 个音色，其中与项目语言相关的约 100+ 个
 - 无试听能力、无语言筛选、无搜索
 
 ### 目标
 
 - 统一的音色选择组件，4 个任务类型共享
-- 支持按语言筛选，覆盖项目 7 种 i18n 语言
+- 支持按语言筛选，覆盖项目 13 种 i18n 语言
 - 支持音色试听预览，带服务端缓存
 - 跨语言使用时给出明确提示，避免静默失败
 
@@ -25,35 +25,52 @@
 
 ### 2.1 测试方法
 
-用 edge-tts 实测各语言音色读取不同语言文本，覆盖项目 7 种语言的全部交叉组合。
+用 edge-tts 实测各语言音色读取不同体系文本，覆盖项目 13 种语言的交叉组合。
 
-### 2.2 兼容性矩阵
+### 2.2 兼容性矩阵（按文字体系简化）
 
-| 音色 \ 文本 | zh 中文 | en 英文 | ja 日文 | ko 韩文 | id 印尼 | ms 马来 | ru 俄文 |
-|:----------:|:------:|:------:|:------:|:------:|:------:|:------:|:------:|
-| **zh-CN** 中文 | OK | OK | **ERR** | — | — | — | — |
-| **en-US** 英文 | **ERR** | OK | **ERR** | **ERR** | OK | — | — |
-| **ja-JP** 日文 | OK | OK | OK | **ERR** | — | — | — |
-| **ko-KR** 韩文 | OK | OK | — | OK | — | — | — |
-| **id-ID** 印尼 | **ERR** | OK | — | — | OK | — | — |
-| **ms-MY** 马来 | **ERR** | OK | — | — | — | OK | — |
-| **ru-RU** 俄文 | **ERR** | — | — | — | — | — | OK |
+实测发现 edge-tts 的跨语言兼容性**完全取决于文字体系**，而非语言本身。项目 13 种语言分属三个体系：
 
-> 标 `—` 的组合未实测（项目语言之外无意义），标 **ERR** 的组合会直接抛出 `No audio was received` 异常。
+| 文字体系 | 包含语言 | 可互读？ |
+|----------|---------|---------|
+| **CJK** | zh, ja, ko | zh ⇄ en 可互读；ja ⇄ zh 可互读；ko ⇄ zh 可互读。但 zh→ja / zh→ko / ja→ko 不可 |
+| **拉丁 (Latin)** | en, de, fr, nl, es, pt, it, id, ms | **完全互通**，任一个拉丁音色可读任意拉丁文本 |
+| **西里尔 (Cyrillic)** | ru | **完全隔离**，只能读俄文 |
 
-### 2.3 结论
+**精确兼容性表**：
 
-| 规则 | 说明 |
-|------|------|
-| **CJK 音色（zh/ja/ko）兼容性最好** | 可读中文和英文。日文音色可读中文，韩文音色也可读中文+英文 |
-| **英文音色最严格** | 仅能读拉丁字母体系语言（en/id/ms），CJK + 西里尔全失败 |
-| **俄语音色完全隔离** | 只能读俄文，其他全失败 |
-| **印尼/马来音色中等** | 可读英文，不能读中文 |
+| 音色体系 | 能读的文本语言 | 不能读 |
+|----------|--------------|--------|
+| **zh-CN** (CJK) | zh, en | ja, ko, ru, 所有拉丁非 en |
+| **ja-JP** (CJK) | ja, zh, en | ko, ru, 所有拉丁非 en |
+| **ko-KR** (CJK) | ko, zh, en | ja, ru, 所有拉丁非 en |
+| **ru-RU** (Cyrillic) | ru | **所有其他 12 种语言** |
+| **en-US** (Latin) | en, de, fr, nl, es, pt, it, id, ms | zh, ja, ko, ru |
+| **de/fr/nl/es/pt/it/id/ms** | 所有 9 种拉丁语言 (en + de + fr + nl + es + pt + it + id + ms) | zh, ja, ko, ru |
 
-**关键设计决策**：音色和文本的语言不匹配时 edge-tts 会**直接抛异常**（无降级），因此系统必须：
+### 2.3 实测数据
 
-1. **试听文本**：必须与音色语言匹配，不能所有音色共用一个试听文本
-2. **视频生成时**：用户选择的音色必须能读目标语言文本，否则任务会失败。需要在提交任务前做兼容性校验
+| 测试 | 结果 | 测试 | 结果 | 测试 | 结果 |
+|------|:----:|------|:----:|------|:----:|
+| zh + zh | OK | en + zh | ERR | ru + zh | ERR |
+| zh + en | OK | en + en | OK | ru + en | — |
+| zh + ja | ERR | en + ja | ERR | ru + ru | OK |
+| ja + zh | OK | en + ko | ERR | de + en | OK |
+| ja + en | OK | en + id | OK | de + zh | ERR |
+| ja + ko | ERR | en + fr | OK | de + ru | ERR |
+| ko + zh | OK | en + es | OK | fr + en | OK |
+| ko + en | OK | en + de | OK | es + en | OK |
+| id + zh | ERR | id + en | OK | ms + zh | ERR |
+| ms + en | OK | it + en | OK | pt + en | OK |
+
+### 2.4 结论
+
+**核心规则**：同一文字体系内互通，跨体系基本不通（CJK→en 是唯一例外）。edge-tts 跨体系调用直接抛异常，无降级。
+
+系统必须：
+1. **试听文本**：强制与音色语言匹配，每种语言预设独立试听句
+2. **任务校验**：提交时校验 voice 能否读取目标文本语言，不兼容直接拒绝
+3. **拉丁语言简化**：de/fr/nl/es/pt/it/id/ms 所有拉丁音色共享同一套兼容语言列表（共 9 种），减少冗余维护
 
 ---
 
@@ -66,7 +83,7 @@
 │  │ VoiceSelector│───▶│    VoicePicker Modal  │ │
 │  │  (表单入口)   │    │  ┌────────────────┐  │ │
 │  └─────────────┘    │  │ LanguageTabs    │  │ │
-│                      │  │ (7 种语言筛选)   │  │ │
+│                      │  │ (13 种语言筛选)  │  │ │
 │                      │  ├────────────────┤  │ │
 │                      │  │ SearchBar       │  │ │
 │                      │  ├────────────────┤  │ │
@@ -122,27 +139,37 @@
   ],
   "compat_hint": {
     "zh": ["zh", "en"],
-    "en": ["en", "id", "ms"],
     "ja": ["ja", "zh", "en"],
     "ko": ["ko", "zh", "en"],
     "ru": ["ru"],
-    "id": ["id", "en"],
-    "ms": ["ms", "en"]
+    "_latin": ["en", "de", "fr", "nl", "es", "pt", "it", "id", "ms"]
   }
 }
 ```
 
 **语言分组规则**：
 
-| code | Tab 名 | 匹配 region | 音色数 |
-|------|--------|-------------|--------|
-| `zh` | 中文 | zh-CN, zh-HK, zh-TW | 16 |
-| `en` | English | en-US, en-GB | 18 |
-| `ja` | 日本語 | ja-JP | 2 |
-| `ko` | 한국어 | ko-KR | 3 |
-| `ru` | Русский | ru-RU | 2 |
-| `id` | Bahasa | id-ID | 2 |
-| `ms` | Melayu | ms-MY | 2 |
+| code | Tab 名 | 匹配 region | 文字体系 | 音色数 |
+|------|--------|-------------|----------|--------|
+| `zh` | 中文 | zh-CN, zh-HK, zh-TW | CJK | 16 |
+| `en` | English | en-US, en-GB | Latin | 18 |
+| `ja` | 日本語 | ja-JP | CJK | 2 |
+| `ko` | 한국어 | ko-KR | CJK | 3 |
+| `ru` | Русский | ru-RU | Cyrillic | 2 |
+| `de` | Deutsch | de-AT, de-CH, de-DE | Latin | 10 |
+| `fr` | Français | fr-BE, fr-CA, fr-CH, fr-FR | Latin | 13 |
+| `nl` | Nederlands | nl-BE, nl-NL | Latin | 5 |
+| `es` | Español | es-AR, es-BO, es-CL, es-CO, es-CR, es-CU, es-DO, es-EC, es-ES, es-GQ, es-GT, es-HN, es-MX, es-NI, es-PA, es-PE, es-PR, es-PY, es-SV, es-US, es-UY, es-VE | Latin | 55 |
+| `pt` | Português | pt-BR, pt-PT | Latin | 5 |
+| `it` | Italiano | it-IT | Latin | 4 |
+| `id` | Bahasa Indonesia | id-ID | Latin | 2 |
+| `ms` | Bahasa Melayu | ms-MY | Latin | 2 |
+
+> 总计项目可用音色：约 **137 个**，西班牙语音色最为丰富（55 个，覆盖 22 个西语国家/地区）。
+
+**Tab 展示优化**：13 个 Tab 在移动端可能过宽。采用"常用 + 更多"折叠模式：
+- 首行展示 6 个高频 Tab：中文 / English / 日本語 / Русский / Español / Français
+- 其余通过"更多语言 ▼"下拉或第二行展开
 
 **实现方式**：后端启动时执行一次 `edge-tts --list-voices` 并缓存结果到内存。每个音色附带一段预置的 `preview_text`（与音色语言匹配的试听句）。
 
@@ -185,6 +212,12 @@
 | ja | こんにちは、{name}です。これはボイスプレビューです。 |
 | ko | 안녕하세요, 저는 {name}입니다. 이것은 음성 미리보기입니다. |
 | ru | Здравствуйте, я {name}, это образец голоса. |
+| de | Hallo, ich bin {name}, dies ist eine Sprachvorschau. |
+| fr | Bonjour, je suis {name}, ceci est un aperçu vocal. |
+| nl | Hallo, ik ben {name}, dit is een stemvoorbeeld. |
+| es | Hola, soy {name}, esta es una muestra de voz. |
+| pt | Olá, eu sou {name}, esta é uma amostra de voz. |
+| it | Ciao, sono {name}, questo è un esempio vocale. |
 | id | Halo, saya {name}, ini adalah sampel suara. |
 | ms | Helo, saya {name}, ini adalah sampel suara. |
 
@@ -219,7 +252,7 @@ VoiceSelector (入口组件 — 替换原有 <select>)
 └── VoicePicker (弹窗组件)
     ├── Header：标题"选择语音角色" + 关闭按钮
     ├── SearchBar：搜索框（200ms debounce）
-    ├── LanguageTabs：7 个 Tab（横向滚动，超出可左右箭头）
+    ├── LanguageTabs：13 个 Tab，移动端折叠为"常用 + 更多语言 ▼"
     ├── VoiceGrid（可滚动区域）
     │   └── VoiceCard × N
     │       ├── 名称 + 本地名
@@ -332,6 +365,12 @@ voiceRegionPutonghua: '普通话'
 voiceRegionCantonese: '粤语'
 voiceRegionTaiwan: '台湾'
 voiceRegionDialect: '方言'
+voiceRegionDeutsch: 'Deutsch'
+voiceRegionFrancais: 'Français'
+voiceRegionNederlands: 'Nederlands'
+voiceRegionEspanol: 'Español'
+voiceRegionPortugues: 'Português'
+voiceRegionItaliano: 'Italiano'
 ```
 
 ---
@@ -384,8 +423,9 @@ async def get_or_generate_preview(voice_id: str, text: str) -> str:
 ### 8.4 缓存大小估算
 
 ```
-323 个音色 × 1 条试听文本 × ~20KB ≈ 6.5 MB
+137 个项目音色 × 1 条试听文本 × ~20KB ≈ 2.7 MB
 ```
+> 如果全量缓存 323 个音色，约 6.5 MB。实际只缓存用户试听过的，按需增长。
 
 磁盘占用可忽略，无需 TTL 淘汰策略。
 

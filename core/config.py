@@ -288,13 +288,31 @@ def set_active_workspace(path: str) -> str:
 # D3：默认语音角色
 DEFAULT_VOICE = "zh-CN-XiaoxiaoNeural"
 
-# D3：可选中文语音角色列表
-AVAILABLE_VOICES = [
-    {"id": "zh-CN-XiaoxiaoNeural", "label": "Xiaoxiao（温柔女声）"},
-    {"id": "zh-CN-YunyangNeural", "label": "Yunyang（沉稳男声）"},
-    {"id": "zh-CN-XiaoyiNeural", "label": "Xiaoyi（活泼女声）"},
-    {"id": "zh-CN-YunxiNeural", "label": "Yunxi（年轻男声）"},
-]
+# D3：可选语音角色列表（v4.0 起改为运行时从 edge_tts 动态加载，见 core.audio.voices）。
+# 保留 AVAILABLE_VOICES 作为向后兼容的别名（返回扁平列表），新代码请使用 get_voice_catalog()。
+from core.audio.voices import (
+    get_voice_catalog,
+    get_voice_by_id,
+    get_voice_lang,
+    is_voice_compatible,
+    is_voice_compatible_with_text,
+    load_voice_catalog,
+    VOICE_PREVIEW_TEXTS,
+    LANG_COMPAT,
+    PROJECT_LANGUAGES,
+)
+
+def AVAILABLE_VOICES() -> list:
+    """向后兼容：返回扁平化的 [{id, label}, ...] 列表。
+
+    原接口签名是模块级列表，升级为函数以保证与旧调用方兼容。
+    """
+    cat = get_voice_catalog()
+    result = []
+    for group in cat.get("languages", []):
+        for v in group.get("voices", []):
+            result.append({"id": v["id"], "label": f"{v['name']}（{v['region']}）"})
+    return result
 
 
 def get_default_subtitle_style() -> SubtitleStyle:
