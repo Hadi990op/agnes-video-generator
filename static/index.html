@@ -229,11 +229,67 @@
     .vp-modal { max-width: 100%; max-height: 100vh; height: 100vh; border-radius: 0; }
     .vp-grid { grid-template-columns: repeat(2, 1fr); }
   }
+
+  /* ── Sidebars (lg+) ── */
+  .sidebar-card {
+    background: rgba(17,24,39,0.4);
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    border: 1px solid rgba(255,255,255,0.05);
+    border-radius: 0.75rem;
+    padding: 0.75rem;
+    margin-bottom: 0.5rem;
+    font-size: 0.75rem;
+  }
+  .sidebar-card:hover { border-color: rgba(59,130,246,0.12); }
+  .sidebar-card a {
+    display: flex;
+    align-items: center;
+    gap: 0.35rem;
+    padding: 0.3rem 0.25rem;
+    color: #9ca3af;
+    text-decoration: none;
+    transition: color 0.2s;
+    border-radius: 0.25rem;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .sidebar-card a:hover { color: #e5e7eb; background: rgba(255,255,255,0.03); }
+  .sidebar-card .stitle {
+    font-size: 0.7rem;
+    font-weight: 600;
+    color: #6b7280;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    margin-bottom: 0.4rem;
+    padding-bottom: 0.4rem;
+    border-bottom: 1px solid rgba(255,255,255,0.04);
+    white-space: nowrap;
+  }
 </style>
 </head>
 <body class="text-gray-100 min-h-screen font-sans" style="background: radial-gradient(ellipse at 50% 0%, rgba(30,64,175,0.12) 0%, transparent 60%), radial-gradient(ellipse at 80% 100%, rgba(245,158,11,0.06) 0%, transparent 50%), #030712;">
 
-<div class="max-w-4xl mx-auto px-4 py-8">
+<div class="flex justify-center gap-3 px-4">
+
+<!-- Left sidebar -->
+<aside class="hidden lg:block sticky top-[120px] self-start w-[130px] shrink-0 mt-8">
+  <div class="sidebar-card">
+    <div class="stitle">⭐ 支持项目</div>
+    <p class="text-gray-500 text-xs leading-relaxed mb-2">完全免费开源，永不收费。支持项目持续发展：</p>
+    <a href="https://github.com/lcy362/agnes-video-generator" target="_blank" rel="noopener">⭐ 给个 Star</a>
+    <p class="text-gray-600 text-xs px-1 -mt-0.5 mb-1">让更多人发现这个工具</p>
+    <a href="https://video.lichuanyang.top" target="_blank" rel="noopener">🔓 关 AdBlock</a>
+    <p class="text-gray-600 text-xs px-1 -mt-0.5 mb-1">在官网关闭去广告插件</p>
+    <a href="https://video.lichuanyang.top" target="_blank" rel="noopener">👆 点下广告</a>
+    <p class="text-gray-600 text-xs px-1 -mt-0.5 mb-1">举手之劳，实实在在</p>
+    <p class="text-gray-600 text-xs mt-2 leading-relaxed">谢谢你的支持 ❤️</p>
+  </div>
+</aside>
+
+<!-- Main content -->
+<div class="max-w-4xl flex-1 min-w-0 py-8">
 
   <!-- Header -->
   <div class="text-center mb-10 relative">
@@ -259,6 +315,19 @@
     </h1>
     <p class="text-gray-500 mt-2 text-sm tracking-wide" data-i18n="subtitle">AI 视频，一键生成</p>
   </div>
+
+  <!-- Resource links -->
+  <nav class="flex justify-center items-center gap-4 mb-8 text-xs tracking-wide">
+    <a href="https://video.lichuanyang.top/demo" target="_blank" rel="noopener" class="flex items-center gap-1 text-amber-400/70 hover:text-amber-300 transition-colors">🎬 Demo</a>
+    <span class="text-white/5 select-none">·</span>
+    <a href="https://video.lichuanyang.top" target="_blank" rel="noopener" class="flex items-center gap-1 text-gray-500 hover:text-gray-300 transition-colors">🏠 Home</a>
+    <span class="text-white/5 select-none">·</span>
+    <a href="https://video.lichuanyang.top/guides/prompt-tips" target="_blank" rel="noopener" class="flex items-center gap-1 text-gray-500 hover:text-gray-300 transition-colors">📖 Guides</a>
+    <span class="text-white/5 select-none">·</span>
+    <a href="https://video.lichuanyang.top/faq" target="_blank" rel="noopener" class="flex items-center gap-1 text-gray-500 hover:text-gray-300 transition-colors">❓ FAQ</a>
+    <span class="text-white/5 select-none">·</span>
+    <a href="https://github.com/lcy362/agnes-video-generator" target="_blank" rel="noopener" class="flex items-center gap-1 text-gray-500 hover:text-gray-300 transition-colors">📖 GitHub</a>
+  </nav>
 
   <!-- API Key -->
   <div id="apikey-section" class="glass-card rounded-2xl mb-6 overflow-hidden transition-all duration-300">
@@ -1356,6 +1425,36 @@
       <video id="result-video" controls class="w-full rounded-lg max-h-96"></video>
     </div>
   </div>
+
+<footer class="text-center pb-8">
+  <div class="border-t border-white/[0.04] pt-8 mt-4">
+    <p class="text-xs text-gray-600 mb-3">更多资源</p>
+    <div class="flex justify-center flex-wrap gap-x-5 gap-y-2 text-xs">
+      <a href="https://video.lichuanyang.top" target="_blank" rel="noopener" class="text-gray-500 hover:text-gray-300 transition-colors">🏠 项目主页</a>
+      <a href="https://video.lichuanyang.top/demo" target="_blank" rel="noopener" class="text-amber-400/70 hover:text-amber-300 transition-colors">🎬 在线体验</a>
+      <a href="https://video.lichuanyang.top/guides/prompt-tips" target="_blank" rel="noopener" class="text-gray-500 hover:text-gray-300 transition-colors">📖 使用指南</a>
+      <a href="https://video.lichuanyang.top/faq" target="_blank" rel="noopener" class="text-gray-500 hover:text-gray-300 transition-colors">❓ 常见问题</a>
+      <a href="https://video.lichuanyang.top/api-docs" target="_blank" rel="noopener" class="text-gray-500 hover:text-gray-300 transition-colors">📋 API 文档</a>
+      <a href="https://video.lichuanyang.top/use-cases" target="_blank" rel="noopener" class="text-gray-500 hover:text-gray-300 transition-colors">🎯 应用场景</a>
+      <a href="https://github.com/lcy362/agnes-video-generator" target="_blank" rel="noopener" class="text-gray-500 hover:text-gray-300 transition-colors">📖 GitHub</a>
+    </div>
+  </div>
+</footer>
+</div>
+
+<!-- Right sidebar -->
+<aside class="hidden lg:block sticky top-[120px] self-start w-[115px] shrink-0 mt-8">
+  <div class="sidebar-card">
+    <div class="stitle">🔗 快速入口</div>
+    <a href="https://video.lichuanyang.top/demo" target="_blank" rel="noopener">🎬 在线体验</a>
+    <a href="https://video.lichuanyang.top/guides/prompt-tips" target="_blank" rel="noopener">📖 Prompt 技巧</a>
+    <a href="https://video.lichuanyang.top/guides/model-overview" target="_blank" rel="noopener">📚 模型概览</a>
+    <a href="https://video.lichuanyang.top/guides/api-call" target="_blank" rel="noopener">📘 API 调用</a>
+    <a href="https://video.lichuanyang.top/faq" target="_blank" rel="noopener">❓ 常见问题</a>
+    <a href="https://video.lichuanyang.top/api-docs" target="_blank" rel="noopener">📋 API 文档</a>
+    <a href="https://video.lichuanyang.top/use-cases" target="_blank" rel="noopener">🎯 应用场景</a>
+  </div>
+</aside>
 
 </div>
 
