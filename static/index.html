@@ -105,11 +105,191 @@
 
   /* ── Selection ── */
   ::selection { background: rgba(59,130,246,0.3); color: white; }
+
+  /* ── Voice Selector Chip ── */
+  .voice-selector {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    width: 100%;
+    padding: 0.625rem 0.75rem;
+    border-radius: 0.5rem;
+    background: rgba(31,41,55,0.5);
+    border: 1px solid rgba(255,255,255,0.08);
+    cursor: pointer;
+    transition: all 0.3s ease;
+    text-align: left;
+  }
+  .voice-selector:hover { border-color: rgba(59,130,246,0.5); box-shadow: 0 0 12px rgba(59,130,246,0.15); }
+  .voice-selector:focus { outline: none; border-color: rgba(59,130,246,0.6); }
+  .vs-main { display: flex; flex-direction: column; flex: 1; min-width: 0; }
+  .vs-name { font-size: 0.875rem; color: #f3f4f6; font-weight: 500; line-height: 1.2; }
+  .vs-desc { font-size: 0.72rem; color: #9ca3af; line-height: 1.2; margin-top: 2px;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .vs-arrow { color: #9ca3af; font-size: 0.7rem; flex-shrink: 0; }
+
+  /* ── Voice Picker Modal ── */
+  .vp-overlay {
+    position: fixed; inset: 0; z-index: 1000;
+    background: rgba(0,0,0,0.7);
+    backdrop-filter: blur(4px);
+    display: flex; align-items: center; justify-content: center;
+    padding: 1rem;
+  }
+  .vp-modal {
+    width: 100%; max-width: 720px; max-height: 88vh;
+    display: flex; flex-direction: column;
+    background: rgba(17,24,39,0.96);
+    border: 1px solid rgba(255,255,255,0.1);
+    border-radius: 1rem;
+    box-shadow: 0 20px 60px rgba(0,0,0,0.5);
+    overflow: hidden;
+  }
+  .vp-header {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 1rem 1.25rem; border-bottom: 1px solid rgba(255,255,255,0.07);
+  }
+  .vp-header h3 { font-size: 1rem; font-weight: 600; color: #f3f4f6; }
+  .vp-close { background: none; border: none; color: #9ca3af; font-size: 1.25rem; cursor: pointer; line-height: 1; }
+  .vp-close:hover { color: #fff; }
+  .vp-search { padding: 0.75rem 1.25rem 0.25rem; }
+  .vp-search input {
+    width: 100%; padding: 0.55rem 0.85rem; border-radius: 0.5rem;
+    background: rgba(31,41,55,0.6); border: 1px solid rgba(255,255,255,0.08);
+    color: #f3f4f6; font-size: 0.85rem;
+  }
+  .vp-search input:focus { outline: none; border-color: rgba(59,130,246,0.5); }
+  .vp-tabs {
+    display: flex; gap: 0.4rem; padding: 0.6rem 1.25rem; overflow-x: auto;
+    border-bottom: 1px solid rgba(255,255,255,0.06); flex-shrink: 0;
+  }
+  .vp-tab {
+    flex-shrink: 0; padding: 0.35rem 0.8rem; border-radius: 999px;
+    font-size: 0.78rem; cursor: pointer; white-space: nowrap;
+    background: rgba(31,41,55,0.4); color: #9ca3af;
+    border: 1px solid rgba(255,255,255,0.05); transition: all 0.2s ease;
+  }
+  .vp-tab:hover { background: rgba(55,65,81,0.5); color: #e5e7eb; }
+  .vp-tab.active { background: linear-gradient(135deg, #2563eb, #0ea5e9); color: #fff; border-color: transparent; }
+  .vp-count { font-size: 0.72rem; color: #6b7280; margin-left: 4px; }
+  .vp-grid {
+    flex: 1; overflow-y: auto; padding: 1rem 1.25rem;
+    display: grid; grid-template-columns: repeat(auto-fill, minmax(210px, 1fr)); gap: 0.6rem;
+  }
+  .vp-card {
+    position: relative; padding: 0.7rem 0.8rem; border-radius: 0.6rem;
+    background: rgba(31,41,55,0.45); border: 1px solid rgba(255,255,255,0.07);
+    cursor: pointer; transition: all 0.2s ease;
+  }
+  .vp-card:hover { border-color: rgba(59,130,246,0.4); background: rgba(55,65,81,0.45); }
+  .vp-card.selected { border-color: #6366f1; box-shadow: 0 0 0 1px #6366f1, 0 0 16px rgba(99,102,241,0.25); }
+  .vp-card-top { display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; }
+  .vp-card-name { font-size: 0.85rem; font-weight: 600; color: #f3f4f6; }
+  .vp-card-region { font-size: 0.7rem; color: #9ca3af; }
+  .vp-tags { display: flex; flex-wrap: wrap; gap: 0.25rem; margin-top: 0.4rem; }
+  .vp-tag {
+    font-size: 0.65rem; padding: 0.1rem 0.45rem; border-radius: 999px;
+    background: rgba(59,130,246,0.12); color: #93c5fd; border: 1px solid rgba(59,130,246,0.2);
+  }
+  .vp-tag.gender-female { background: rgba(236,72,153,0.12); color: #f9a8d4; border-color: rgba(236,72,153,0.2); }
+  .vp-tag.gender-male { background: rgba(59,130,246,0.12); color: #93c5fd; border-color: rgba(59,130,246,0.2); }
+  .vp-preview-btn {
+    margin-top: 0.5rem; width: 100%; padding: 0.35rem; border-radius: 0.4rem;
+    background: rgba(17,24,39,0.6); border: 1px solid rgba(255,255,255,0.1);
+    color: #d1d5db; font-size: 0.72rem; cursor: pointer; display: flex;
+    align-items: center; justify-content: center; gap: 0.35rem; transition: all 0.2s ease;
+  }
+  .vp-preview-btn:hover { background: rgba(59,130,246,0.2); color: #fff; }
+  .vp-preview-btn.playing { background: rgba(59,130,246,0.3); color: #fff; border-color: rgba(59,130,246,0.5); }
+  .vp-preview-btn.loading { opacity: 0.7; cursor: wait; }
+  .vp-selection {
+    display: flex; align-items: center; justify-content: space-between; gap: 0.75rem;
+    padding: 0.85rem 1.25rem; border-top: 1px solid rgba(255,255,255,0.07);
+    background: rgba(0,0,0,0.2); flex-shrink: 0;
+  }
+  .vp-current { font-size: 0.8rem; color: #9ca3af; min-width: 0; }
+  .vp-current b { color: #e5e7eb; font-weight: 500; }
+  .vp-actions { display: flex; gap: 0.5rem; flex-shrink: 0; }
+  .vp-btn {
+    padding: 0.5rem 1rem; border-radius: 0.5rem; font-size: 0.8rem; cursor: pointer; border: none; transition: all 0.2s ease;
+  }
+  .vp-btn-cancel { background: rgba(55,65,81,0.5); color: #d1d5db; }
+  .vp-btn-cancel:hover { background: rgba(75,85,99,0.6); }
+  .vp-btn-confirm { background: linear-gradient(135deg, #2563eb, #0ea5e9); color: #fff; }
+  .vp-btn-confirm:hover { box-shadow: 0 0 16px rgba(37,99,235,0.4); }
+  .vp-warning {
+    margin: 0 1.25rem 0.5rem; padding: 0.6rem 0.8rem; border-radius: 0.5rem;
+    background: rgba(245,158,11,0.12); border: 1px solid rgba(245,158,11,0.3);
+    color: #fcd34d; font-size: 0.76rem; line-height: 1.4;
+  }
+  .vp-empty { grid-column: 1 / -1; text-align: center; color: #6b7280; font-size: 0.85rem; padding: 2rem 0; }
+
+  /* ── Mobile: fullscreen modal ── */
+  @media (max-width: 640px) {
+    .vp-modal { max-width: 100%; max-height: 100vh; height: 100vh; border-radius: 0; }
+    .vp-grid { grid-template-columns: repeat(2, 1fr); }
+  }
+
+  /* ── Sidebars (lg+) ── */
+  .sidebar-card {
+    background: rgba(17,24,39,0.4);
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    border: 1px solid rgba(255,255,255,0.05);
+    border-radius: 0.75rem;
+    padding: 0.75rem;
+    margin-bottom: 0.5rem;
+    font-size: 0.75rem;
+  }
+  .sidebar-card:hover { border-color: rgba(59,130,246,0.12); }
+  .sidebar-card a {
+    display: flex;
+    align-items: center;
+    gap: 0.35rem;
+    padding: 0.3rem 0.25rem;
+    color: #9ca3af;
+    text-decoration: none;
+    transition: color 0.2s;
+    border-radius: 0.25rem;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .sidebar-card a:hover { color: #e5e7eb; background: rgba(255,255,255,0.03); }
+  .sidebar-card .stitle {
+    font-size: 0.7rem;
+    font-weight: 600;
+    color: #6b7280;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    margin-bottom: 0.4rem;
+    padding-bottom: 0.4rem;
+    border-bottom: 1px solid rgba(255,255,255,0.04);
+    white-space: nowrap;
+  }
 </style>
 </head>
 <body class="text-gray-100 min-h-screen font-sans" style="background: radial-gradient(ellipse at 50% 0%, rgba(30,64,175,0.12) 0%, transparent 60%), radial-gradient(ellipse at 80% 100%, rgba(245,158,11,0.06) 0%, transparent 50%), #030712;">
 
-<div class="max-w-4xl mx-auto px-4 py-8">
+<div class="flex justify-center gap-3 px-4">
+
+<!-- Left sidebar -->
+<aside class="hidden lg:block sticky top-[120px] self-start w-[130px] shrink-0 mt-8">
+  <div class="sidebar-card">
+    <div class="stitle">⭐ 支持项目</div>
+    <p class="text-gray-500 text-xs leading-relaxed mb-2">完全免费开源，永不收费。支持项目持续发展：</p>
+    <a href="https://github.com/lcy362/agnes-video-generator" target="_blank" rel="noopener">⭐ 给个 Star</a>
+    <p class="text-gray-600 text-xs px-1 -mt-0.5 mb-1">让更多人发现这个工具</p>
+    <a href="https://video.lichuanyang.top" target="_blank" rel="noopener">🔓 关 AdBlock</a>
+    <p class="text-gray-600 text-xs px-1 -mt-0.5 mb-1">在官网关闭去广告插件</p>
+    <a href="https://video.lichuanyang.top" target="_blank" rel="noopener">👆 点下广告</a>
+    <p class="text-gray-600 text-xs px-1 -mt-0.5 mb-1">举手之劳，实实在在</p>
+    <p class="text-gray-600 text-xs mt-2 leading-relaxed">谢谢你的支持 ❤️</p>
+  </div>
+</aside>
+
+<!-- Main content -->
+<div class="max-w-4xl flex-1 min-w-0 py-8">
 
   <!-- Header -->
   <div class="text-center mb-10 relative">
@@ -135,6 +315,19 @@
     </h1>
     <p class="text-gray-500 mt-2 text-sm tracking-wide" data-i18n="subtitle">AI 视频，一键生成</p>
   </div>
+
+  <!-- Resource links -->
+  <nav class="flex justify-center items-center gap-4 mb-8 text-xs tracking-wide">
+    <a href="https://video.lichuanyang.top/demo" target="_blank" rel="noopener" class="flex items-center gap-1 text-amber-400/70 hover:text-amber-300 transition-colors">🎬 Demo</a>
+    <span class="text-white/5 select-none">·</span>
+    <a href="https://video.lichuanyang.top" target="_blank" rel="noopener" class="flex items-center gap-1 text-gray-500 hover:text-gray-300 transition-colors">🏠 Home</a>
+    <span class="text-white/5 select-none">·</span>
+    <a href="https://video.lichuanyang.top/guides/prompt-tips" target="_blank" rel="noopener" class="flex items-center gap-1 text-gray-500 hover:text-gray-300 transition-colors">📖 Guides</a>
+    <span class="text-white/5 select-none">·</span>
+    <a href="https://video.lichuanyang.top/faq" target="_blank" rel="noopener" class="flex items-center gap-1 text-gray-500 hover:text-gray-300 transition-colors">❓ FAQ</a>
+    <span class="text-white/5 select-none">·</span>
+    <a href="https://github.com/lcy362/agnes-video-generator" target="_blank" rel="noopener" class="flex items-center gap-1 text-gray-500 hover:text-gray-300 transition-colors">📖 GitHub</a>
+  </nav>
 
   <!-- API Key -->
   <div id="apikey-section" class="glass-card rounded-2xl mb-6 overflow-hidden transition-all duration-300">
@@ -563,12 +756,16 @@
           <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
             <div>
               <label class="block text-sm text-gray-400 mb-1.5" data-i18n="voiceRole">语音角色</label>
-              <select id="c_voice" class="w-full glass-input rounded-lg px-3 py-2.5 text-sm text-gray-100">
-                <option value="zh-CN-XiaoxiaoNeural">Xiaoxiao (温柔女声)</option>
-                <option value="zh-CN-YunyangNeural">Yunyang (沉稳男声)</option>
-                <option value="zh-CN-XiaoyiNeural">Xiaoyi (活泼女声)</option>
-                <option value="zh-CN-YunxiNeural">Yunxi (年轻男声)</option>
-              </select>
+              <div class="voice-selector" id="c_voice_selector" role="button" tabindex="0"
+                   onclick="openVoicePicker('c')"
+                   onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();openVoicePicker('c');}">
+                <span class="vs-main">
+                  <span class="vs-name" id="c_voice_name">Xiaoxiao</span>
+                  <span class="vs-desc" id="c_voice_desc">普通话 · 女声</span>
+                </span>
+                <span class="vs-arrow">▾</span>
+                <input type="hidden" id="c_voice" value="zh-CN-XiaoxiaoNeural">
+              </div>
             </div>
             <div>
               <label class="block text-sm text-gray-400 mb-1.5" data-i18n="speechRate">语速</label>
@@ -712,12 +909,16 @@
           <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
             <div>
               <label class="block text-sm text-gray-400 mb-1.5" data-i18n="voiceRole">语音角色</label>
-              <select id="m_voice" class="w-full glass-input rounded-lg px-3 py-2.5 text-sm text-gray-100">
-                <option value="zh-CN-XiaoxiaoNeural">Xiaoxiao (温柔女声)</option>
-                <option value="zh-CN-YunyangNeural">Yunyang (沉稳男声)</option>
-                <option value="zh-CN-XiaoyiNeural">Xiaoyi (活泼女声)</option>
-                <option value="zh-CN-YunxiNeural">Yunxi (年轻男声)</option>
-              </select>
+              <div class="voice-selector" id="m_voice_selector" role="button" tabindex="0"
+                   onclick="openVoicePicker('m')"
+                   onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();openVoicePicker('m');}">
+                <span class="vs-main">
+                  <span class="vs-name" id="m_voice_name">Xiaoxiao</span>
+                  <span class="vs-desc" id="m_voice_desc">普通话 · 女声</span>
+                </span>
+                <span class="vs-arrow">▾</span>
+                <input type="hidden" id="m_voice" value="zh-CN-XiaoxiaoNeural">
+              </div>
             </div>
             <div>
               <label class="block text-sm text-gray-400 mb-1.5" data-i18n="speechRate">语速</label>
@@ -894,12 +1095,16 @@
             <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
               <div>
                 <label class="block text-sm text-gray-400 mb-1.5" data-i18n="voiceRole">语音角色</label>
-                <select id="a_voice" class="w-full glass-input rounded-lg px-3 py-2.5 text-sm text-gray-100">
-                  <option value="zh-CN-XiaoxiaoNeural">Xiaoxiao (温柔女声)</option>
-                  <option value="zh-CN-YunyangNeural">Yunyang (沉稳男声)</option>
-                  <option value="zh-CN-XiaoyiNeural">Xiaoyi (活泼女声)</option>
-                  <option value="zh-CN-YunxiNeural">Yunxi (年轻男声)</option>
-                </select>
+                  <div class="voice-selector" id="a_voice_selector" role="button" tabindex="0"
+                       onclick="openVoicePicker('a')"
+                       onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();openVoicePicker('a');}">
+                    <span class="vs-main">
+                      <span class="vs-name" id="a_voice_name">Xiaoxiao</span>
+                      <span class="vs-desc" id="a_voice_desc">普通话 · 女声</span>
+                    </span>
+                    <span class="vs-arrow">▾</span>
+                    <input type="hidden" id="a_voice" value="zh-CN-XiaoxiaoNeural">
+                  </div>
               </div>
               <div>
                 <label class="block text-sm text-gray-400 mb-1.5" data-i18n="speechRate">语速</label>
@@ -1123,12 +1328,16 @@
           <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
             <div>
               <label class="block text-sm text-gray-400 mb-1.5" data-i18n="voiceRole">语音角色</label>
-              <select id="p_voice" class="w-full glass-input rounded-lg px-3 py-2.5 text-sm text-gray-100">
-                <option value="zh-CN-XiaoxiaoNeural">Xiaoxiao (温柔女声)</option>
-                <option value="zh-CN-YunyangNeural">Yunyang (沉稳男声)</option>
-                <option value="zh-CN-XiaoyiNeural">Xiaoyi (活泼女声)</option>
-                <option value="zh-CN-YunxiNeural">Yunxi (年轻男声)</option>
-              </select>
+              <div class="voice-selector" id="p_voice_selector" role="button" tabindex="0"
+                   onclick="openVoicePicker('p')"
+                   onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();openVoicePicker('p');}">
+                <span class="vs-main">
+                  <span class="vs-name" id="p_voice_name">Xiaoxiao</span>
+                  <span class="vs-desc" id="p_voice_desc">普通话 · 女声</span>
+                </span>
+                <span class="vs-arrow">▾</span>
+                <input type="hidden" id="p_voice" value="zh-CN-XiaoxiaoNeural">
+              </div>
             </div>
             <div>
               <label class="block text-sm text-gray-400 mb-1.5" data-i18n="speechRate">语速</label>
@@ -1217,6 +1426,36 @@
     </div>
   </div>
 
+<footer class="text-center pb-8">
+  <div class="border-t border-white/[0.04] pt-8 mt-4">
+    <p class="text-xs text-gray-600 mb-3">更多资源</p>
+    <div class="flex justify-center flex-wrap gap-x-5 gap-y-2 text-xs">
+      <a href="https://video.lichuanyang.top" target="_blank" rel="noopener" class="text-gray-500 hover:text-gray-300 transition-colors">🏠 项目主页</a>
+      <a href="https://video.lichuanyang.top/demo" target="_blank" rel="noopener" class="text-amber-400/70 hover:text-amber-300 transition-colors">🎬 在线体验</a>
+      <a href="https://video.lichuanyang.top/guides/prompt-tips" target="_blank" rel="noopener" class="text-gray-500 hover:text-gray-300 transition-colors">📖 使用指南</a>
+      <a href="https://video.lichuanyang.top/faq" target="_blank" rel="noopener" class="text-gray-500 hover:text-gray-300 transition-colors">❓ 常见问题</a>
+      <a href="https://video.lichuanyang.top/api-docs" target="_blank" rel="noopener" class="text-gray-500 hover:text-gray-300 transition-colors">📋 API 文档</a>
+      <a href="https://video.lichuanyang.top/use-cases" target="_blank" rel="noopener" class="text-gray-500 hover:text-gray-300 transition-colors">🎯 应用场景</a>
+      <a href="https://github.com/lcy362/agnes-video-generator" target="_blank" rel="noopener" class="text-gray-500 hover:text-gray-300 transition-colors">📖 GitHub</a>
+    </div>
+  </div>
+</footer>
+</div>
+
+<!-- Right sidebar -->
+<aside class="hidden lg:block sticky top-[120px] self-start w-[115px] shrink-0 mt-8">
+  <div class="sidebar-card">
+    <div class="stitle">🔗 快速入口</div>
+    <a href="https://video.lichuanyang.top/demo" target="_blank" rel="noopener">🎬 在线体验</a>
+    <a href="https://video.lichuanyang.top/guides/prompt-tips" target="_blank" rel="noopener">📖 Prompt 技巧</a>
+    <a href="https://video.lichuanyang.top/guides/model-overview" target="_blank" rel="noopener">📚 模型概览</a>
+    <a href="https://video.lichuanyang.top/guides/api-call" target="_blank" rel="noopener">📘 API 调用</a>
+    <a href="https://video.lichuanyang.top/faq" target="_blank" rel="noopener">❓ 常见问题</a>
+    <a href="https://video.lichuanyang.top/api-docs" target="_blank" rel="noopener">📋 API 文档</a>
+    <a href="https://video.lichuanyang.top/use-cases" target="_blank" rel="noopener">🎯 应用场景</a>
+  </div>
+</aside>
+
 </div>
 
 <script>
@@ -1262,6 +1501,10 @@ const T = {
     scene_: '场景', addEndFrame: '+ 添加尾帧',
     audioConfig: '音频配置', subtitleConfig: '字幕配置', enableNarration: '启用旁白配音', enableSubtitle: '启用字幕',
     voiceRole: '语音角色', speechRate: '语速', rateNormal: '正常',
+    selectVoice: '选择语音角色', searchVoice: '搜索音色名称或风格...', currentSelection: '当前选择', confirmSelection: '确认选择', cancel: '取消',
+    previewPlay: '试听', previewStop: '停止', previewFailed: '试听失败，该音色可能不支持此语言',
+    voiceCompatWarning: '此音色可能不兼容当前语言的视频生成，确认使用吗？',
+    voiceGenderFemale: '女声', voiceGenderMale: '男声', voiceEmpty: '没有匹配的音色',
     subtitleStyle: '字幕样式', subFont: '字体', subColor: '颜色', subSize: '字号', subPosition: '位置', posBottom: '底部', posTop: '顶部',
     subStrokeColor: '描边色', subStrokeWidth: '描边宽', subBgColor: '背景色',
     subStyleMode: '样式模式', subStyleFixed: '固定样式', subStyleLLM: 'AI 智能样式',
@@ -1396,6 +1639,10 @@ const T = {
     scene_: 'Scene', addEndFrame: '+ Add end frame',
     audioConfig: 'Audio Config', subtitleConfig: 'Subtitle Config', enableNarration: 'Enable narration', enableSubtitle: 'Enable subtitle',
     voiceRole: 'Voice Role', speechRate: 'Speech Rate', rateNormal: 'Normal',
+    selectVoice: 'Select Voice', searchVoice: 'Search voice name or style...', currentSelection: 'Current', confirmSelection: 'Confirm', cancel: 'Cancel',
+    previewPlay: 'Preview', previewStop: 'Stop', previewFailed: 'Preview failed, voice may not support this language',
+    voiceCompatWarning: 'This voice may not support the current language. Use it anyway?',
+    voiceGenderFemale: 'Female', voiceGenderMale: 'Male', voiceEmpty: 'No matching voices',
     subtitleStyle: 'Subtitle Style', subFont: 'Font', subColor: 'Color', subSize: 'Size', subPosition: 'Position', posBottom: 'Bottom', posTop: 'Top',
     subStrokeColor: 'Stroke Color', subStrokeWidth: 'Stroke Width', subBgColor: 'BG Color',
     subStyleMode: 'Style Mode', subStyleFixed: 'Fixed', subStyleLLM: 'AI Smart',
@@ -2776,7 +3023,249 @@ const STEPS = {
   });
 
   autoReconnectRunningTask();
+
+  // v4.0: 加载音色目录并初始化选择器
+  try {
+    await initVoiceSelector();
+  } catch (e) { console.error('init voice selector error:', e); }
 })();
+
+// ═══════════════════════════════════════════════════
+// v4.0: 音色选择器（Voice Selector + Picker）
+// ═══════════════════════════════════════════════════
+
+let voiceCatalog = null;       // 分组目录 {languages:[...], compat_hint:{...}}
+let voiceIndex = {};           // voice id -> voice 条目（扁平索引）
+let vpState = {
+  task: null,                  // 当前任务前缀: c/m/a/p
+  activeLang: 'zh',            // 当前 Tab 语言
+  selectedId: null,            // 当前选中 voice id
+  query: '',                   // 搜索词
+  searchTimer: null,
+};
+let vpAudio = null;            // 当前播放的 Audio 对象
+let vpPlayingId = null;        // 正在试听的音色 id
+
+async function initVoiceSelector() {
+  try {
+    const r = await fetch('/api/voices');
+    voiceCatalog = await r.json();
+    voiceCatalog.languages.forEach(g => g.voices.forEach(v => { voiceIndex[v.id] = v; }));
+  } catch (e) {
+    console.error('load voices failed:', e);
+    voiceCatalog = { languages: [], compat_hint: {} };
+  }
+  // 初始化 4 个任务的芯片显示
+  ['c', 'm', 'a', 'p'].forEach(task => applyVoiceChip(task));
+}
+
+function applyVoiceChip(task) {
+  const hidden = document.getElementById(task + '_voice');
+  const nameEl = document.getElementById(task + '_voice_name');
+  const descEl = document.getElementById(task + '_voice_desc');
+  if (!hidden || !nameEl) return;
+  const v = voiceIndex[hidden.value];
+  if (v) {
+    nameEl.textContent = v.name;
+    descEl.textContent = `${v.region} · ${v.gender === 'female' ? t('voiceGenderFemale') : t('voiceGenderMale')}`;
+  } else {
+    // 离线 fallback：直接显示 id 中的名称
+    const fallbackName = hidden.value.split('-').pop().replace('Neural', '');
+    nameEl.textContent = fallbackName;
+    descEl.textContent = '';
+  }
+}
+
+function openVoicePicker(task) {
+  vpState.task = task;
+  vpState.activeLang = currentLang;
+  vpState.query = '';
+  const hidden = document.getElementById(task + '_voice');
+  vpState.selectedId = hidden ? hidden.value : null;
+  const searchInput = document.getElementById('vp-search-input');
+  if (searchInput) searchInput.value = '';
+
+  renderVoiceTabs();
+  renderVoiceGrid();
+  updateCurrentSelection();
+
+  const overlay = document.getElementById('voice-picker-overlay');
+  overlay.style.display = 'flex';
+  document.body.style.overflow = 'hidden';
+}
+
+function closeVoicePicker() {
+  stopVoicePreview();
+  const overlay = document.getElementById('voice-picker-overlay');
+  overlay.style.display = 'none';
+  document.body.style.overflow = '';
+}
+
+function renderVoiceTabs() {
+  const tabsEl = document.getElementById('vp-tabs');
+  if (!tabsEl || !voiceCatalog) return;
+  tabsEl.innerHTML = '';
+  voiceCatalog.languages.forEach(g => {
+    const tab = document.createElement('div');
+    tab.className = 'vp-tab' + (g.code === vpState.activeLang ? ' active' : '');
+    tab.innerHTML = `${g.label}<span class="vp-count">${g.count}</span>`;
+    tab.onclick = () => {
+      vpState.activeLang = g.code;
+      vpState.query = '';
+      const si = document.getElementById('vp-search-input');
+      if (si) si.value = '';
+      stopVoicePreview();
+      renderVoiceTabs();
+      renderVoiceGrid();
+    };
+    tabsEl.appendChild(tab);
+  });
+}
+
+function renderVoiceGrid() {
+  const grid = document.getElementById('vp-grid');
+  if (!grid || !voiceCatalog) return;
+  const group = voiceCatalog.languages.find(g => g.code === vpState.activeLang);
+  const q = vpState.query.trim().toLowerCase();
+  let voices = group ? group.voices : [];
+
+  if (q) {
+    voices = voices.filter(v => {
+      const hay = [v.name, v.local_name, v.region, (v.style_tags || []).join(' '),
+                   v.region_code, v.id].join(' ').toLowerCase();
+      return hay.includes(q);
+    });
+  }
+
+  grid.innerHTML = '';
+  if (!voices.length) {
+    grid.innerHTML = `<div class="vp-empty" data-i18n="voiceEmpty">没有匹配的音色</div>`;
+    return;
+  }
+
+  voices.forEach(v => {
+    const card = document.createElement('div');
+    card.className = 'vp-card' + (v.id === vpState.selectedId ? ' selected' : '');
+    card.dataset.voiceId = v.id;
+    card.onclick = (e) => {
+      if (e.target.closest('.vp-preview-btn')) return;  // 试听按钮单独处理
+      selectVoice(v.id);
+    };
+
+    const genderTag = `<span class="vp-tag gender-${v.gender}">${v.gender === 'female' ? t('voiceGenderFemale') : t('voiceGenderMale')}</span>`;
+    const styleTags = (v.style_tags || []).slice(0, 3).map(s => `<span class="vp-tag">${s}</span>`).join('');
+    const playing = vpPlayingId === v.id;
+
+    card.innerHTML = `
+      <div class="vp-card-top">
+        <span class="vp-card-name">${v.name}</span>
+        <span class="vp-card-region">${v.region}</span>
+      </div>
+      <div class="vp-tags">${genderTag}${styleTags}</div>
+      <button class="vp-preview-btn ${playing ? 'playing' : ''}" data-voice-id="${v.id}"
+              onclick="previewVoice('${v.id}', this)">
+        ${playing ? '⏸ ' + t('previewStop') : '▶ ' + t('previewPlay')}
+      </button>
+    `;
+    grid.appendChild(card);
+  });
+}
+
+function selectVoice(voiceId) {
+  vpState.selectedId = voiceId;
+  document.querySelectorAll('#vp-grid .vp-card').forEach(c => {
+    c.classList.toggle('selected', c.dataset.voiceId === voiceId);
+  });
+  updateCurrentSelection();
+}
+
+function updateCurrentSelection() {
+  const nameEl = document.getElementById('vp-current-name');
+  if (!nameEl) return;
+  const v = voiceIndex[vpState.selectedId];
+  nameEl.textContent = v ? `${v.name}（${v.region}）` : (vpState.selectedId || '—');
+}
+
+function previewVoice(voiceId, btn) {
+  // 停止当前播放
+  if (vpPlayingId && vpPlayingId !== voiceId) {
+    stopVoicePreview();
+  }
+  if (vpPlayingId === voiceId) {
+    stopVoicePreview();
+    return;
+  }
+
+  const v = voiceIndex[voiceId];
+  const text = v ? v.preview_text : '';
+  const url = `/api/voices/preview?voice=${encodeURIComponent(voiceId)}&text=${encodeURIComponent(text)}`;
+
+  btn.classList.add('loading');
+  btn.textContent = '⏳ ...';
+
+  fetch(url).then(r => {
+    if (!r.ok) throw new Error('preview failed');
+    return r.blob();
+  }).then(blob => {
+    const audioUrl = URL.createObjectURL(blob);
+    vpAudio = new Audio(audioUrl);
+    vpPlayingId = voiceId;
+    btn.classList.remove('loading');
+    btn.classList.add('playing');
+    btn.textContent = '⏸ ' + t('previewStop');
+    vpAudio.onended = () => { resetPreviewButton(voiceId); vpPlayingId = null; vpAudio = null; };
+    vpAudio.play().catch(err => { console.error('play error:', err); resetPreviewButton(voiceId); vpPlayingId = null; });
+  }).catch(err => {
+    console.error('voice preview error:', err);
+    btn.classList.remove('loading');
+    btn.textContent = '▶ ' + t('previewPlay');
+    showToast(t('previewFailed'), 3000);
+  });
+}
+
+function resetPreviewButton(voiceId) {
+  const btn = document.querySelector(`.vp-preview-btn[data-voice-id="${voiceId}"]`);
+  if (btn) {
+    btn.classList.remove('playing', 'loading');
+    btn.textContent = '▶ ' + t('previewPlay');
+  }
+}
+
+function stopVoicePreview() {
+  if (vpAudio) { vpAudio.pause(); vpAudio = null; }
+  if (vpPlayingId) {
+    resetPreviewButton(vpPlayingId);
+    vpPlayingId = null;
+  }
+}
+
+function onVoiceSearch(value) {
+  if (vpState.searchTimer) clearTimeout(vpState.searchTimer);
+  vpState.searchTimer = setTimeout(() => {
+    vpState.query = value;
+    renderVoiceGrid();
+  }, 200);
+}
+
+function confirmVoiceSelection() {
+  if (!vpState.task || !vpState.selectedId) { closeVoicePicker(); return; }
+  const v = voiceIndex[vpState.selectedId];
+  const voiceLang = v ? v.lang : (vpState.selectedId.split('-')[0].toLowerCase());
+
+  // 跨语言兼容检查：音色语言 ≠ 页面语言 时警告
+  const compat = (voiceCatalog && voiceCatalog.compat_hint) || {};
+  const supported = compat[voiceLang] || [];
+  if (voiceLang !== currentLang && !supported.includes(currentLang)) {
+    const ok = confirm(t('voiceCompatWarning'));
+    if (!ok) return;
+  }
+
+  // 写入隐藏 input 并更新芯片
+  const hidden = document.getElementById(vpState.task + '_voice');
+  if (hidden) hidden.value = vpState.selectedId;
+  applyVoiceChip(vpState.task);
+  closeVoicePicker();
+}
 
 // ═══════════════════════════════════════════════════
 // Toast
@@ -3055,6 +3544,7 @@ async function submitCreative() {
   // Audio config
   form.append('audio_enabled', document.getElementById('c_audio_enabled').checked);
   form.append('audio_voice', document.getElementById('c_voice').value);
+  form.append('audio_lang', currentLang);
   form.append('audio_rate', document.getElementById('c_rate').value);
   // Subtitle config (v3.0 independent)
   form.append('subtitle_enabled', document.getElementById('c_subtitle_enabled').checked);
@@ -3101,6 +3591,7 @@ async function submitManuscript() {
   // Audio config
   form.append('audio_enabled', document.getElementById('m_audio_enabled').checked);
   form.append('audio_voice', document.getElementById('m_voice').value);
+  form.append('audio_lang', currentLang);
   form.append('audio_rate', document.getElementById('m_rate').value);
   // Subtitle config (v3.0 independent)
   form.append('subtitle_enabled', document.getElementById('m_subtitle_enabled').checked);
@@ -3154,6 +3645,7 @@ async function submitAnchor() {
   // Audio config
   form.append('audio_enabled', document.getElementById('a_audio_enabled').checked);
   form.append('audio_voice', document.getElementById('a_voice').value);
+  form.append('audio_lang', currentLang);
   form.append('audio_rate', document.getElementById('a_rate').value);
   // Subtitle config
   form.append('subtitle_enabled', document.getElementById('a_subtitle_enabled').checked);
@@ -3221,6 +3713,7 @@ async function submitPoetry() {
   // Audio config
   form.append('audio_enabled', document.getElementById('p_audio_enabled').checked);
   form.append('audio_voice', document.getElementById('p_voice').value);
+  form.append('audio_lang', currentLang);
   form.append('audio_rate', document.getElementById('p_rate').value);
   // Subtitle config（固定诗歌样式，仅开关）
   form.append('subtitle_enabled', document.getElementById('p_subtitle_enabled').checked);
@@ -4458,6 +4951,31 @@ document.getElementById('workspace-add').onclick = async () => {
   }
 };
 </script>
+
+<!-- ═══════════════════════════════════════════════════
+     音色选择弹窗（Voice Picker）— 4 种任务类型共享
+     ═══════════════════════════════════════════════════ -->
+<div id="voice-picker-overlay" class="vp-overlay" style="display:none" onclick="if(event.target===this)closeVoicePicker()">
+  <div class="vp-modal" role="dialog" aria-modal="true" aria-label="选择语音角色">
+    <div class="vp-header">
+      <h3 data-i18n="selectVoice">选择语音角色</h3>
+      <button class="vp-close" onclick="closeVoicePicker()" aria-label="关闭">✕</button>
+    </div>
+    <div class="vp-search">
+      <input id="vp-search-input" type="text" data-i18n-placeholder="searchVoice" placeholder="搜索音色名称或风格..." oninput="onVoiceSearch(this.value)">
+    </div>
+    <div class="vp-tabs" id="vp-tabs"></div>
+    <div class="vp-warning" id="vp-warning" style="display:none"></div>
+    <div class="vp-grid" id="vp-grid"></div>
+    <div class="vp-selection">
+      <div class="vp-current" id="vp-current"><span data-i18n="currentSelection">当前选择</span>: <b id="vp-current-name">—</b></div>
+      <div class="vp-actions">
+        <button class="vp-btn vp-btn-cancel" data-i18n="cancel" onclick="closeVoicePicker()">取消</button>
+        <button class="vp-btn vp-btn-confirm" data-i18n="confirmSelection" onclick="confirmVoiceSelection()">确认选择</button>
+      </div>
+    </div>
+  </div>
+</div>
 
 </body>
 </html>

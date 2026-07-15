@@ -14,6 +14,7 @@ resume 端点根据 task_type 自动选择对应的 Pipeline。
 
 import asyncio
 import base64
+import hashlib
 import json
 import logging
 import os
@@ -32,7 +33,18 @@ from fastapi import FastAPI, UploadFile, File, Form, HTTPException
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse, JSONResponse
 
-from core.config import get_api_key, set_api_key, delete_api_key, get_api_key_source, get_working_dir, AVAILABLE_VOICES, DURATION_FRAME_MAP, get_workspaces, add_workspace, remove_workspace, set_active_workspace, get_active_workspace, REGRESSION_WORKING_DIR_ENV, get_watermark_config, set_watermark_config, WATERMARK_PROMO_TEXT_ZH, WATERMARK_PROMO_TEXT_EN
+from core.config import get_api_key, set_api_key, delete_api_key, get_api_key_source, get_working_dir, DURATION_FRAME_MAP, get_workspaces, add_workspace, remove_workspace, set_active_workspace, get_active_workspace, REGRESSION_WORKING_DIR_ENV, get_watermark_config, set_watermark_config, WATERMARK_PROMO_TEXT_ZH, WATERMARK_PROMO_TEXT_EN
+from core.audio.voices import (
+    get_voice_catalog,
+    get_voice_lang,
+    is_voice_compatible,
+    is_voice_compatible_with_text,
+    load_voice_catalog,
+    VOICE_PREVIEW_TEXTS,
+    LANG_COMPAT,
+    PROJECT_LANGUAGES,
+)
+import edge_tts
 from core.pipelines import (
     AnchorPipeline,
     BasePipeline,
@@ -220,10 +232,89 @@ async def lifespan(app: FastAPI):
                 except Exception as e:
                     logger.debug(f"[Startup] Failed to reset stale task {name}: {e}")
 
+    # v4.0: 预加载音色目录（edge_tts.list_voices），失败不阻断启动
+    try:
+        await load_voice_catalog()
+        logger.info("[Startup] Voice catalog loaded")
+    except Exception as e:
+        logger.warning(f"[Startup] Voice catalog load failed ({e}); will use fallback")
+
     yield
 
 
 app = FastAPI(title="Agnes Video Generator", lifespan=lifespan)
+
+
+# ═══════════════════════════════════════════════════
+# v4.0: 音色试听缓存
+# ═══════════════════════════════════════════════════
+
+# 试听音频缓存目录（系统临时目录，重启后自动清理）
+VOICE_PREVIEW_CACHE_DIR = os.path.join(tempfile.gettempdir(), "agnes-voice-previews")
+os.makedirs(VOICE_PREVIEW_CACHE_DIR, exist_ok=True)
+
+
+def _preview_cache_key(voice_id: str, text: str) -> str:
+    """生成试听缓存文件名：{voice_id}__{md5(text)}.mp3"""
+    text_hash = hashlib.md5(text.encode("utf-8")).hexdigest()
+    return f"{voice_id}__{text_hash}"
+
+
+async def _get_or_generate_preview(voice_id: str, text: str) -> str:
+    """获取试听音频：缓存命中直接返回路径，否则调用 edge_tts 生成后缓存。
+
+    写入使用 .tmp + os.replace 原子替换，避免并发读到半成品。
+    """
+    cache_key = _preview_cache_key(voice_id, text)
+    cache_path = os.path.join(VOICE_PREVIEW_CACHE_DIR, cache_key + ".mp3")
+    if os.path.exists(cache_path):
+        return cache_path  # 缓存命中
+
+    tmp_path = cache_path + ".tmp"
+    communicate = edge_tts.Communicate(text, voice=voice_id)
+    await communicate.save(tmp_path)
+    os.replace(tmp_path, cache_path)  # 原子替换
+    return cache_path
+
+
+def _resolve_preview_text(voice_id: str, text: str) -> str:
+    """解析试听文本：显式传入优先，否则用该音色语言的预设试听句。"""
+    if text:
+        return text
+    vlang = get_voice_lang(voice_id) or "zh"
+    name = voice_id.split("-")[-1].replace("Neural", "")
+    return VOICE_PREVIEW_TEXTS.get(vlang, VOICE_PREVIEW_TEXTS["zh"]).format(name=name)
+
+
+def _validate_voice_compat(audio_voice: str, target_lang: str, text: str = None):
+    """校验 voice 与目标任务语言的兼容性，不兼容时抛出 422。
+
+    - target_lang: 页面语言（创意/诗歌/主播等由 LLM 按页面语言生成文本）
+    - text: 稿件正文（manuscript），已知文本时做更精确的脚本级检测
+    """
+    if not audio_voice:
+        return
+    if text is not None and text.strip():
+        if not is_voice_compatible_with_text(audio_voice, text):
+            raise HTTPException(
+                status_code=422,
+                detail=(
+                    f"所选音色 {audio_voice} 不支持当前稿件语言的朗读"
+                    f"（跨文字体系无法朗读，任务将失败）。请更换为匹配语言的音色。"
+                ),
+            )
+        return
+    if target_lang and not is_voice_compatible(audio_voice, target_lang):
+        lang_label = PROJECT_LANGUAGES.get(target_lang, {}).get("label", target_lang)
+        supported = LANG_COMPAT.get(get_voice_lang(audio_voice) or "", [])
+        supported_labels = [PROJECT_LANGUAGES.get(c, {}).get("label", c) for c in supported]
+        raise HTTPException(
+            status_code=422,
+            detail=(
+                f"所选音色 {audio_voice} 不支持「{lang_label}」语言的视频生成"
+                f"（仅支持：{', '.join(supported_labels)}）。请更换音色或语言。"
+            ),
+        )
 
 def get_upload_dir() -> str:
     """返回当前激活工作目录下的 uploads 子目录。"""
@@ -413,8 +504,62 @@ def _pick_directory_native() -> str:
 
 @app.get("/api/voices")
 async def get_voices():
-    """返回可选 TTS 语音角色列表。"""
-    return {"voices": AVAILABLE_VOICES}
+    """返回按语言分组的可选 TTS 语音角色列表（含兼容性提示）。
+
+    响应结构：
+    {
+      "languages": [
+        {"code": "zh", "label": "中文", "count": N, "voices": [ {id,name,region,gender,style_tags,preview_text,lang}, ... ]},
+        ...
+      ],
+      "compat_hint": { "zh": ["zh","en"], ... }
+    }
+    """
+    return get_voice_catalog()
+
+
+@app.get("/api/voices/preview")
+async def preview_voice(voice: str, text: str = ""):
+    """返回音色试听音频（audio/mpeg），带服务端缓存。
+
+    - voice: 必填，音色 id
+    - text: 选填，试听文本；缺省时使用该音色语言的预设试听句
+    - 跨语言不兼容时 edge_tts 抛异常，返回 400 + 明确错误信息
+    """
+    if not voice:
+        raise HTTPException(status_code=400, detail="缺少 voice 参数")
+    preview_text = _resolve_preview_text(voice, text)
+    try:
+        cache_path = await _get_or_generate_preview(voice, preview_text)
+    except Exception as e:
+        logger.warning(f"[Preview] voice={voice} failed: {e}")
+        raise HTTPException(
+            status_code=400,
+            detail=f"该音色不支持此语言的试听文本（跨文字体系无法朗读）：{e}",
+        )
+    return FileResponse(
+        cache_path,
+        media_type="audio/mpeg",
+        filename=f"{voice}.mp3",
+        headers={"Cache-Control": "public, max-age=86400"},
+    )
+
+
+@app.get("/api/voices/compat")
+async def voice_compat(voice: str, target_lang: str):
+    """查询 voice 与目标语言 target_lang 的兼容性。
+
+    响应：{"compatible": bool, "voice_lang": str, "target_lang": str, "supported_langs": [...]}
+    """
+    vlang = get_voice_lang(voice)
+    compatible = is_voice_compatible(voice, target_lang)
+    supported = LANG_COMPAT.get(vlang, [vlang]) if vlang else []
+    return {
+        "compatible": compatible,
+        "voice_lang": vlang,
+        "target_lang": target_lang,
+        "supported_langs": supported,
+    }
 
 
 # ═══════════════════════════════════════════════════
@@ -1057,6 +1202,7 @@ async def create_creative_task(
     audio_enabled: bool = Form(False),
     audio_voice: str = Form("zh-CN-XiaoxiaoNeural"),
     audio_rate: str = Form("+0%"),
+    audio_lang: str = Form(""),  # 页面语言，用于音色兼容性校验
     # v3.0 字幕独立配置
     subtitle_enabled: bool = Form(True),
     subtitle_style_mode: str = Form("fixed"),
@@ -1073,6 +1219,10 @@ async def create_creative_task(
     api_key = get_api_key()
     if not api_key:
         raise HTTPException(status_code=400, detail="请先配置 API Key")
+
+    # v4.0: 音色与目标语言兼容性校验
+    if audio_enabled:
+        _validate_voice_compat(audio_voice, audio_lang or "zh")
 
     # P7: 参数校验
     if len(idea) > 10000:
@@ -1191,6 +1341,7 @@ async def create_manuscript_task(
     audio_enabled: bool = Form(True),
     audio_voice: str = Form("zh-CN-XiaoxiaoNeural"),
     audio_rate: str = Form("+0%"),
+    audio_lang: str = Form(""),  # 页面语言，用于音色兼容性校验
     # v3.0 字幕独立配置
     subtitle_enabled: bool = Form(True),
     subtitle_style_mode: str = Form("fixed"),
@@ -1213,6 +1364,10 @@ async def create_manuscript_task(
     # P7: 文本长度上限
     if len(manuscript_text) > 50000:
         raise HTTPException(status_code=422, detail="稿件文本最多 50000 字符")
+
+    # v4.0: 稿件正文已知，做脚本级音色兼容性校验（最准确）
+    if audio_enabled:
+        _validate_voice_compat(audio_voice, audio_lang or "zh", text=manuscript_text)
 
     task_id = uuid.uuid4().hex[:12]
     name = creative_name.strip() if creative_name else f"manuscript_{task_id}"
@@ -1280,6 +1435,7 @@ async def create_poetry_task(
     audio_enabled: bool = Form(True),
     audio_voice: str = Form("zh-CN-XiaoxiaoNeural"),
     audio_rate: str = Form("-15%"),
+    audio_lang: str = Form(""),  # 页面语言，用于音色兼容性校验
     # 字幕配置（默认开启，固定诗歌样式，用户仅开关）
     subtitle_enabled: bool = Form(True),
 ):
@@ -1287,6 +1443,10 @@ async def create_poetry_task(
     api_key = get_api_key()
     if not api_key:
         raise HTTPException(status_code=400, detail="请先配置 API Key")
+
+    # v4.0: 音色与目标语言兼容性校验
+    if audio_enabled:
+        _validate_voice_compat(audio_voice, audio_lang or "zh")
 
     if not poem_text.strip():
         raise HTTPException(status_code=400, detail="古诗原文不能为空")
@@ -1374,6 +1534,7 @@ async def create_anchor_task(
     audio_enabled: bool = Form(True),
     audio_voice: str = Form("zh-CN-XiaoxiaoNeural"),
     audio_rate: str = Form("+0%"),
+    audio_lang: str = Form(""),  # 页面语言，用于音色兼容性校验
     subtitle_enabled: bool = Form(True),
     subtitle_style_mode: str = Form("fixed"),
     subtitle_style_hints: str = Form(""),
@@ -1389,6 +1550,10 @@ async def create_anchor_task(
     api_key = get_api_key()
     if not api_key:
         raise HTTPException(status_code=400, detail="请先配置 API Key")
+
+    # v4.0: 音色与目标语言兼容性校验
+    if audio_enabled:
+        _validate_voice_compat(audio_voice, audio_lang or "zh")
 
     if not script_text.strip():
         raise HTTPException(status_code=400, detail="口播稿件不能为空")

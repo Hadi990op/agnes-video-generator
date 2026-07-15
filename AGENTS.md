@@ -79,7 +79,7 @@ curl -s http://localhost:8765/api/config | python3 -m json.tool
 
 # 3. TTS 语音列表可达
 curl -s http://localhost:8765/api/voices | python3 -m json.tool
-# 期望：返回包含 4 个语音角色的 JSON 数组
+# 期望：返回按 13 种项目语言分组的音色目录 JSON
 
 # 4. 任务列表可达
 curl -s http://localhost:8765/api/tasks | python3 -m json.tool
@@ -210,11 +210,18 @@ print('All subtitle multi-line tests passed!')
 
 ## 二、项目定位
 
-基于 Agnes AI **完全免费**模型的视频生成工具，支持 **三种任务类型** 的一站式 Web 应用：
+基于 Agnes AI **完全免费**模型的视频生成工具，支持 **六种任务类型**（外加简单图片生成）的一站式 Web 应用。
 
-- **简单视频**：单次调用 Agnes Video API，暴露全部参数的结构化 UI（t2v / i2v / ti2vid / keyframes）
-- **创意长视频**：AI 编剧 → 分镜图生成 → 视频生成 → edge_tts 旁白配音 + 细粒度字幕叠加 → 拼接
-- **稿件长视频**：长文本 → 时间估算拆段 → AI 场景 prompt → 逐段视频生成 → 统一 TTS+字幕 → 拼接
+自 v4.0 起，创意 / 稿件 / 数字人 / 诗词四种长视频流水线统一继承 `MultiScenePipeline`（模板方法核心：`build_scenes → build_reference_images → generate_videos → audio+subtitle → composite`），仅简单视频直接继承 `BasePipeline`。
+
+- **简单视频**（simple）：单次调用 Agnes Video API，暴露全部参数的结构化 UI（t2v / i2v / ti2vid / keyframes）
+- **创意长视频**（creative）：AI 编剧 → 分镜图生成 → 视频生成 → edge_tts 旁白配音 + 细粒度字幕叠加 → 拼接
+- **稿件长视频**（manuscript）：长文本 → 时间估算拆段 → AI 场景 prompt → 逐段视频生成 → 统一 TTS+字幕 → 拼接
+- **数字人口播**（anchor）：数字人形象 → 循环 i2v 视频，支持 `post_stitch`（TTS 后拼接音频）与 `model`（模型自带口型音频）两种音频模式
+- **诗词视频**（poetry）：古诗 → LLM 拆分场景（原诗句作旁白，场景描述作视频 prompt）→ 逐句 t2v + TTS 朗诵 + 定时对齐字幕 → 拼接
+- **简单图片**（simple_image）：单次调用 Agnes Image API 的结构化 t2i / i2i 生成
+
+> 另有 `multi_scene`（多场景通用框架，非独立任务类型，而是上述长视频流水线的共享基类）。
 
 ---
 
@@ -222,15 +229,17 @@ print('All subtitle multi-line tests passed!')
 
 | 层 | 选型 |
 |------|------|
-| 后端框架 | Python FastAPI + WebSocket |
+| 后端框架 | Python FastAPI（进度经任务状态轮询暴露，非 WebSocket） |
 | 数据模型 | Pydantic v2 |
 | 视频处理 | moviepy + ffmpeg |
 | TTS | edge_tts >= 6.1.0（免费，无需 API Key） |
 | 字幕 | srt >= 3.5.0 + moviepy（词级细粒度 + 多行换行） |
-| 前端 | 原生 HTML/CSS/JS + Tailwind CDN（单文件 `static/index.html`，7 语言 i18n） |
+| 前端 | 原生 HTML/CSS/JS + Tailwind CDN（单文件 `static/index.html`，多 Tab + 13 语言 i18n） |
 | LLM | Agnes Chat API (`agnes-2.0-flash`) — 免费 |
 | 图片模型 | `agnes-image-2.1-flash` (t2i) / `agnes-image-2.0-flash` (i2i) — 免费 |
 | 视频模型 | `agnes-video-v2.0` — 免费 |
+| 水印 | moviepy TextClip 生成 PNG + ffmpeg overlay 叠加（避免整片重编码 OOM） |
+| 音色 | edge_tts 动态音色目录，按 13 种项目语言分组 + 跨脚本兼容性校验 |
 | 日志 | `logging.getLogger(__name__)` |
 
 ---
@@ -239,45 +248,55 @@ print('All subtitle multi-line tests passed!')
 
 ```
 agnes-video-generator/
-├── server.py                         # FastAPI 主服务，三种任务路由 + WebSocket
+├── server.py                         # FastAPI 主服务，六种任务路由 + 图片生成 + 工作区管理 + artifacts
 ├── start.sh                          # 一键启动脚本（venv + pip install + run）
-├── requirements.txt                  # 依赖（含 edge_tts, srt）
+├── requirements.txt                  # 依赖（含 edge_tts, srt, tenacity）
 │
 ├── models/
 │   ├── __init__.py
-│   └── task.py                       # TaskType + BaseTaskState + 3 子类 + 请求/响应模型
+│   └── task.py                       # TaskType/VideoMode + BaseTaskState + 6 任务子类
+│                                     #   (Simple/Creative/Manuscript/Anchor/Poetry/SimpleImage)
+│                                     #   + Subtitle/Audio 配置 + 请求/响应/WS 模型
 │
 ├── core/
 │   ├── __init__.py
-│   ├── config.py                     # API Key 持久化、字体解析、音视频默认配置
+│   ├── config.py                     # API Key/水印/工作区持久化、字体 CJK 回退、音视频默认配置
 │   ├── task_manager.py               # 任务状态持久化，多态反序列化，向后兼容
-│   ├── screenwriter.py               # 编剧 Agent（故事/脚本/旁白/角色提取/尾帧 prompt）
-│   ├── pipeline.py                   # 通用 Pipeline 工具（早期版本，已由 pipelines/ 包取代）
-│   ├── image_generator.py            # 图片生成工具（早期版本，已由 api/agnes_image.py 取代）
-│   ├── video_generator.py            # 视频生成工具（早期版本，已由 api/agnes_video.py 取代）
+│   ├── screenwriter.py               # 编剧 Agent（故事/脚本/旁白/角色提取/尾帧/诗词场景 prompt）
+│   ├── artifacts.py                  # 中间产物注册表 + 级联删除计划（creative/manuscript/anchor）
+│   │
+│   ├── pipeline.py                   # 向后兼容别名 → core.pipelines.creative_video
+│   ├── image_generator.py            # 向后兼容别名 → core.api.agnes_image
+│   ├── video_generator.py            # 向后兼容别名 → core.api.agnes_video
 │   │
 │   ├── api/
 │   │   ├── __init__.py
 │   │   ├── agnes_chat.py             # LLM Chat API（text + multimodal + JSON mode）
 │   │   ├── agnes_image.py            # 图片生成 API（t2i + i2i + ref image）
 │   │   ├── agnes_video.py            # 视频生成 API（t2v/i2v/ti2vid/keyframes + 轮询 + 重试）
-│   │   └── rate_limiter.py           # 全局令牌桶限速器（20 次/分钟，Chat+Image+Video 共享）
+│   │   ├── rate_limiter.py           # 全局令牌桶限速器（16 次/分钟，Chat+Image+Video 共享）
+│   │   └── error_collector.py        # 模型接口报错收集（prompt/错误类型/详情 → error_logs/）
 │   │
 │   ├── audio/
 │   │   ├── __init__.py
 │   │   ├── tts.py                    # EdgeTTSEngine（旁白+词级时间戳）+ SilentTTSEngine
-│   │   └── subtitle.py               # SRT 生成（词级细粒度 + 多行换行）+ moviepy 字幕叠加
+│   │   ├── subtitle.py               # SRT 生成（词级细粒度 + 多行换行）+ moviepy 字幕叠加
+│   │   └── voices.py                 # 音色目录（13 语言分组）+ 跨脚本兼容性校验矩阵
 │   │
 │   ├── compositor/
 │   │   ├── __init__.py
 │   │   ├── concatenator.py           # 视频拼接 + 统一音频/字幕叠加（MoneyPrinterTurbo 方式）
-│   │   └── processor.py              # 视频缩放/帧提取/定格延长/静音音频生成
+│   │   ├── processor.py              # 视频缩放/帧提取/定格延长/静音音频生成
+│   │   └── watermark.py              # ffmpeg overlay 水印叠加 + 语言检测
 │   │
 │   └── pipelines/
-│       ├── __init__.py               # BasePipeline（共享 shutdown 和 WS 推送逻辑）
-│       ├── simple_video.py           # 类型 1：单 prompt → 单视频
-│       ├── creative_video.py         # 类型 2：10 步全流程（含旁白+字幕）
-│       └── manuscript_video.py       # 类型 3：5 步稿件流程（统一 TTS+字幕）
+│       ├── __init__.py               # BasePipeline 抽象基类（共享 shutdown/WS 推送/字幕/水印）
+│       ├── multi_scene.py            # MultiScenePipeline 多场景模板方法基类（v4.0 重构核心）
+│       ├── simple_video.py           # 类型 1：单 prompt → 单视频（直接继承 BasePipeline）
+│       ├── creative_video.py         # 类型 2：创意长视频（继承 MultiScenePipeline）
+│       ├── manuscript_video.py       # 类型 3：稿件长视频（继承 MultiScenePipeline）
+│       ├── anchor_video.py           # 类型 4：数字人口播（继承 MultiScenePipeline）
+│       └── poetry_video.py           # 类型 6：诗词视频（继承 MultiScenePipeline）
 │
 ├── utils/
 │   ├── __init__.py
@@ -290,21 +309,34 @@ agnes-video-generator/
 │       └── MicrosoftYaHeiNormal.ttc  # 备用中文字体
 │
 ├── static/
-│   └── index.html                    # 三 Tab 前端（简单/创意/稿件），7 语言 i18n
+│   ├── index.html                    # 多 Tab 前端（简单/创意/稿件/数字人/诗词/图片），13 语言 i18n
+│   ├── favicon.ico
+│   └── icon.png
 │
 ├── scripts/
-│   └── regression_runner.py          # 10 场景大版本回归测试脚本
+│   ├── regression_runner.py          # 大版本回归测试脚本
+│   ├── scene_runner.py               # 单场景/端点回归执行器
+│   └── run_mock_regression.sh        # mock 回归一键脚本
+│
+├── tests/
+│   ├── test_core.py                  # 核心单元测试
+│   └── mock_regression/              # mock 回归框架（mock API + fixture + 流水线测试）
+│       ├── conftest.py / mock_apis.py / test_pipelines.py
+│       ├── assets/                   # 测试图片/视频
+│       └── fixture_data/             # 编剧/场景/字幕等 mock 返回数据
 │
 └── docs/
     ├── regression_test_plan.md       # 大版本回归测试计划
-    ├── plans-v1.0/                   # v1.0 计划文档
-    │   ├── development_plan.md       # 开发计划
-    │   ├── system_design.md          # v1.0 原始系统架构设计
-    │   ├── class-diagram.mermaid     # 类图
-    │   └── sequence-diagram.mermaid  # 时序图
-    ├── plans-v2.0/                   # v2.0 计划 & 审查文档（含 code review、bug fix、i2i 优化）
-    └── plans-v3.0/                   # v3.0 计划文档
+    ├── tts_research_report.md        # TTS 选型研究
+    ├── voice_selector_design.md      # 音色选择器设计
+    ├── watermark_*.md                # 水印设计/评估/实现文档
+    ├── plans-v1.0/                   # v1.0 计划文档（含 system_design、类图、时序图）
+    ├── plans-v2.0/                   # v2.0 计划 & 审查（code review、bug fix、i2i 优化）
+    ├── plans-v3.0/                   # v3.0 计划文档
+    ├── plans-v4.0/                   # v4.0 计划（mock 回归设计、pipeline 重构）
+    └── release-notes/                # v2.0 ~ v3.0 发布说明
 ```
+
 
 ---
 
@@ -456,13 +488,15 @@ python scripts/scene_runner.py --endpoints
 #### 第三层：集成测试
 | 端点 | 测试点 |
 |------|--------|
-| `GET /` | 返回 200，三 Tab HTML |
+| `GET /` | 返回 200，多 Tab HTML |
 | `GET /api/config` | 返回 ok: true |
-| `GET /api/voices` | 返回 4 个语音角色 |
+| `GET /api/voices` | 返回按 13 语言分组的音色目录 |
 | `POST /api/tasks/simple` | 参数校验 + task_type: simple |
 | `POST /api/tasks/creative` | 参数校验 + task_type: creative |
 | `POST /api/tasks/manuscript` | 参数校验 + task_type: manuscript |
-| `GET /api/tasks` | 列表含三种类型 |
+| `POST /api/tasks/poetry` | 参数校验 + task_type: poetry |
+| `POST /api/tasks/anchor` | 参数校验 + task_type: anchor |
+| `GET /api/tasks` | 列表含各任务类型 |
 | `GET /api/tasks/{id}` | 返回 task_type |
 | `POST /api/tasks/{id}/stop` | 停止运行中任务 |
 | `GET /api/video/{id}` | 视频文件下载/流式播放 |
@@ -475,20 +509,33 @@ python scripts/scene_runner.py --endpoints
 
 | 前缀 | 模块 |
 |------|------|
-| `[Startup]` | server.py |
-| `[WS]` | WebSocket |
+| `[Startup]` | server.py 启动 |
 | `[Resume]` | server.py resume |
 | `[Stop]` | server.py stop |
-| `[Pipeline]` | creative_video.py |
+| `[Workspace]` | server.py 工作区管理 |
+| `[Concurrency]` | server.py 并发信号量 |
+| `[Preview]` | server.py 音色试听 |
+| `[Cleanup]` | server.py 回归清理 |
+| `[Pipeline]` | 流水线通用（BasePipeline） |
+| `[MultiScene]` | multi_scene.py |
 | `[Simple]` | simple_video.py |
+| `[Creative]` | creative_video.py |
 | `[Manuscript]` | manuscript_video.py |
+| `[Anchor]` | anchor_video.py |
+| `[Poetry]` | poetry_video.py |
+| `[EndFrame]` / `[Keyframes]` | 尾帧 / 关键帧处理 |
 | `[TTS]` | tts.py |
 | `[Subtitle]` | subtitle.py |
-| `[Compositor]` | compositor/ |
+| `[Voices]` | voices.py |
+| `[Compositor]` | compositor/ concatenator/processor |
+| `[Watermark]` | watermark.py |
+| `[Image]` | 图片生成流程 |
 | `[AgnesImage]` | agnes_image.py |
 | `[AgnesVideo]` | agnes_video.py |
 | `[AgnesChat]` | agnes_chat.py |
 | `[RateLimiter]` | rate_limiter.py |
+| `[ErrorCollector]` | error_collector.py |
+| `[Artifacts]` | artifacts.py |
 | `[TaskManager]` | task_manager.py |
 | `[Screenwriter]` | screenwriter.py |
 
@@ -496,11 +543,12 @@ python scripts/scene_runner.py --endpoints
 
 | 场景 | 策略 |
 |------|------|
-| 全局限速 | `core/api/rate_limiter.py` 令牌桶（16 次/分钟，留 20% 余量），Chat+Image+Video 共享 |
+| 全局限速 | `core/api/rate_limiter.py` 令牌桶（默认 `AGNES_RATE_LIMIT=20`，`_SAFETY_FACTOR` 留 20% 余量 → 实际 16 次/分钟），Chat+Image+Video 含轮询共享 |
 | LLM Chat | 重试 3 次，间隔 15s 递增；5xx 和 429 均重试 |
 | 图片生成 | 重试 3 次，间隔 20s 递增；5xx 和 429 均重试 |
 | 视频提交 | 重试 5 次，间隔 30s 递增；5xx、429、超时均重试 |
-| 视频轮询 | 间隔 30s，每 10 次输出日志；连续 10 次失败后放弃 |
+| 视频轮询 | 间隔 60s（见 D14），每 10 次输出日志；连续 10 次失败后放弃 |
+| 报错收集 | `error_collector.py` 记录失败调用的 prompt/错误类型/详情至工作目录 `error_logs/` |
 | PipelineShutdown | 所有流水线统一处理，落盘当前状态 |
 | TTS 失败 | 降级为静音 + 字幕 |
 
@@ -508,6 +556,7 @@ python scripts/scene_runner.py --endpoints
 
 - `TaskManager.load()` 自动将无 `task_type` 字段的旧数据识别为 `CreativeVideoTask`
 - 旧 `task_state.json` 字段名保持不变
+- `core/pipeline.py`、`core/image_generator.py`、`core/video_generator.py` 为**向后兼容别名模块**（重导出 `core.pipelines` / `core.api` 中的真实类，如 `VideoPipeline = CreativeVideoPipeline`），非废弃空文件，勿删
 
 ### 8.4 API 响应格式
 
@@ -519,7 +568,9 @@ python scripts/scene_runner.py --endpoints
 HTTPException(status_code=4xx/5xx, detail="...")
 ```
 
-### 8.5 WebSocket 消息格式
+### 8.5 内部进度事件结构（WSMessage）
+
+`WSMessage` 是流水线通过 `BasePipeline._emit` 产生的进度事件结构，落盘到任务状态供前端轮询读取（当前无 WebSocket 推送）：
 
 ```json
 {
@@ -604,22 +655,75 @@ def resolve_font_path(font: str) -> str:
 
 ## 九、API 端点完整列表
 
+> 前端采用**轮询模式**获取进度：任务创建后定期 `GET /api/tasks/{id}` 拉取状态（见 `static/index.html` 的 `pollTaskProgress`），当前版本对外**无 WebSocket 端点**。`WSMessage` 模型与 `BasePipeline._emit` 仅作为内部进度事件结构落盘到任务状态。
+
+### 配置与工作区
+
 | 方法 | 路径 | 说明 |
 |------|------|------|
 | GET | `/` | Web UI 页面 |
 | GET | `/api/config` | 获取 API Key（脱敏） |
 | POST | `/api/config` | 保存 API Key |
-| GET | `/api/voices` | 列出可用 TTS 语音角色（4 个） |
+| DELETE | `/api/config` | 清除 API Key |
+| POST | `/api/config/watermark` | 保存水印开关配置 |
+| GET | `/api/workspaces` | 列出工作区 |
+| POST | `/api/workspaces` | 新建工作区 |
+| DELETE | `/api/workspaces` | 删除工作区 |
+| POST | `/api/workspaces/active` | 激活工作区 |
+| GET | `/api/workspaces/pick-directory` | 原生目录选择对话框 |
+
+### 音色
+
+| 方法 | 路径 | 说明 |
+|------|------|------|
+| GET | `/api/voices` | 列出可用 TTS 音色（按 13 语言分组） |
+| GET | `/api/voices/preview` | 音色试听（生成/缓存样本） |
+| GET | `/api/voices/compat` | 音色与目标语言/文本兼容性校验 |
+
+### 图片
+
+| 方法 | 路径 | 说明 |
+|------|------|------|
+| POST | `/api/image/generate` | 生成简单图片（t2i / i2i） |
+| GET | `/api/image/{task_id}` | 下载/预览生成的图片 |
+
+### 任务创建
+
+| 方法 | 路径 | 说明 |
+|------|------|------|
 | POST | `/api/tasks/simple` | 创建简单视频任务 |
 | POST | `/api/tasks/creative` | 创建创意长视频任务 |
 | POST | `/api/tasks/manuscript` | 创建稿件长视频任务 |
+| POST | `/api/tasks/poetry` | 创建诗词视频任务 |
+| POST | `/api/tasks/anchor` | 创建数字人口播任务 |
 | POST | `/api/tasks` | 兼容旧版（映射到 creative） |
+| GET | `/api/poetry-scene-prompt` | 诗词场景 prompt 预生成 |
+
+### 任务查询与控制
+
+| 方法 | 路径 | 说明 |
+|------|------|------|
 | GET | `/api/tasks` | 列出所有任务（含 task_type 标识） |
-| GET | `/api/tasks/{id}` | 查询任务详情 |
+| GET | `/api/tasks/{id}` | 查询任务详情（轮询进度） |
 | POST | `/api/tasks/{id}/resume` | 续传中断任务 |
 | POST | `/api/tasks/{id}/stop` | 停止运行中的任务 |
 | GET | `/api/video/{id}` | 下载/流式播放最终视频 |
-| WS | `/ws/{id}` | WebSocket 实时进度推送 |
+
+### 中间产物（artifacts）
+
+| 方法 | 路径 | 说明 |
+|------|------|------|
+| GET | `/api/tasks/{id}/artifacts` | 列举任务的所有中间产物 |
+| GET | `/api/tasks/{id}/artifacts/{artifact_id}/file` | 下载单个产物文件 |
+| GET | `/api/tasks/{id}/artifacts/{artifact_id}/cascade-preview` | 预览删除某产物的级联影响 |
+| DELETE | `/api/tasks/{id}/artifacts/{artifact_id}` | 删除产物（含级联删除） |
+
+### 运维
+
+| 方法 | 路径 | 说明 |
+|------|------|------|
+| GET | `/api/concurrency` | 并发信号量利用率状态 |
+| POST | `/api/cleanup-regression` | 清理回归测试产物 |
 
 ---
 
@@ -633,7 +737,7 @@ def resolve_font_path(font: str) -> str:
 | D4 | 视频 padding | ≤ 1 秒 |
 | D5 | 简单视频 prompt | 结构化暴露 Agnes API 全部 9 个参数，不做 AI 增强 |
 | D6 | 旧数据兼容 | 无 task_type → CREATIVE |
-| D7 | 多语言 | 保持 7 语言 (zh/en/ru/ja/ko/ms/id) |
+| D7 | 多语言 | 13 语言 i18n (zh/en/ja/ko/ru/de/fr/nl/es/pt/it/id/ms)，音色按脚本体系分组校验 |
 | D8 | TTS 付费方案 | 不引入，仅用 edge_tts（免费） |
 | D9 | 字幕多行换行 | 动态计算每行字符数上限，CJK 标点处断行，method="caption" |
 | D10 | 音频叠加方式 | MoneyPrinterTurbo 方式：先拼接再整体叠加，避免 padding 累积 |
@@ -645,4 +749,4 @@ def resolve_font_path(font: str) -> str:
 
 ---
 
-*文档版本：v5.2 | 更新日期：2026-06-19 | 阶段：🟢 开发完成（v2.0）— 维护模式*
+*文档版本：v6.0 | 更新日期：2026-07-15 | 阶段：🟢 维护模式（代码已演进至六种任务类型 + artifacts/水印/多工作区/13 语言音色）*
