@@ -1,0 +1,15 @@
+[Unit]
+Description=Agnes Video Generator
+After=network.target
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory=/opt/baal-agent/workspace/agnes-video-generator
+Environment=AGNES_API_KEY=
+ExecStart=/opt/baal-agent/workspace/agnes-video-generator/.venv/bin/python server.py
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
