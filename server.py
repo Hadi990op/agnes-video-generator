@@ -30,6 +30,7 @@ from datetime import datetime
 from typing import Dict, List, Optional, Union
 
 from fastapi import FastAPI, UploadFile, File, Form, HTTPException
+from pydantic import BaseModel
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse, JSONResponse
 
@@ -587,6 +588,9 @@ async def generate_image(
     negative_prompt: Optional[str] = Form(None),
     system_prompt: str = Form(""),
     reference_image: UploadFile = File(None),
+    # v5.1: Storyboard
+    use_storyboard: bool = Form(False),
+    storyboard_scenes: str = Form("[]"),
 ):
     """简单图片生成：创建任务 → 直调 Agnes Image API → 保存到任务目录。"""
     api_key = get_api_key()
@@ -1369,6 +1373,9 @@ async def create_manuscript_task(
     # v5.0: Character consistency + style
     style: str = Form(""),
     reference_image: UploadFile = File(None),
+    # v5.1: Storyboard
+    use_storyboard: bool = Form(False),
+    storyboard_scenes: str = Form("[]"),
 ):
     """创建稿件长视频任务（类型 3）。
 
@@ -1425,6 +1432,8 @@ async def create_manuscript_task(
         audio_config=audio_config,
         subtitle_config=subtitle_config,
         style=style,
+        use_storyboard=use_storyboard,
+        storyboard_scenes=json.loads(storyboard_scenes) if storyboard_scenes else [],
     )
 
     # v5.0: Handle user-provided character reference image
@@ -1445,6 +1454,106 @@ async def create_manuscript_task(
     _launch_background_task(_run_pipeline_with_concurrency(pipeline, state, tm))
     logger.info(f"[Manuscript] Task created: {task_id}, text_len={len(manuscript_text)} (queued)")
     return {"ok": True, "task_id": task_id, "dir_name": dir_name}
+
+
+
+
+class StoryboardRequest(BaseModel):
+    manuscript_text: str
+
+
+@app.post("/api/tasks/preview/storyboard")
+async def preview_storyboard(
+    req: StoryboardRequest,
+):
+    """Generate a storyboard preview: split text into scenes with video prompts.
+
+    Does NOT generate actual videos. Returns scene descriptions for user review.
+    """
+    api_key = get_api_key()
+    if not api_key:
+        raise HTTPException(status_code=400, detail="请先配置 API Key")
+    manuscript_text = req.manuscript_text
+    if not manuscript_text.strip():
+        raise HTTPException(status_code=400, detail="稿件内容不能为空")
+
+    try:
+        from core.screenwriter import Screenwriter
+        sw = Screenwriter(api_key=api_key)
+
+        # Step 1: Parse scene markers if present
+        from core.pipelines.manuscript_video import _SCENE_MARKER_RE, _split_text
+        scenes = []
+        if _SCENE_MARKER_RE.search(manuscript_text):
+            # Has scene markers — parse them
+            parts = _SCENE_MARKER_RE.split(manuscript_text)
+            markers = _SCENE_MARKER_RE.findall(manuscript_text)
+            for i, (marker_text, narration_text) in enumerate(zip(markers, parts[1:])):
+                narration_text = narration_text.strip()
+                video_prompt = marker_text.strip()
+                # Generate a richer video prompt using screenwriter
+                scene_prompt = await asyncio.to_thread(
+                    sw.enhance_scene_prompt,
+                    scene_description=video_prompt,
+                    narration=narration_text,
+                )
+                scenes.append({
+                    "index": i,
+                    "video_prompt": scene_prompt,
+                    "narration_text": narration_text[:200],
+                    "duration": 5,
+                    "description": video_prompt,
+                })
+        else:
+            # No markers — split text into segments using the manuscript pipeline logic
+            from core.pipelines.manuscript_video import _split_text
+            paragraphs = _split_text(manuscript_text.strip())
+            for i, p in enumerate(paragraphs):
+                scene_prompt = await asyncio.to_thread(
+                    sw.enhance_scene_prompt,
+                    scene_description=p.text[:300],
+                    narration=p.text,
+                )
+                scenes.append({
+                    "index": i,
+                    "video_prompt": scene_prompt,
+                    "narration_text": p.text[:200],
+                    "duration": max(int(len(p.text) / 4), 3),
+                    "description": p.text[:200],
+                })
+
+        # Step 2: Generate storyboard images for first few scenes (t2i)
+        if scenes:
+            from core.api.agnes_image import AgnesImageAPI
+            img_api = AgnesImageAPI(api_key=api_key, model="agnes-image-2.1-flash")
+            image_count = min(len(scenes), 5)  # Generate images for first 5 scenes max
+            for i in range(image_count):
+                try:
+                    img_output = await img_api.generate_single_image(
+                        prompt=scenes[i]["video_prompt"],
+                        size="768x1152",
+                    )
+                    img_path = f"/tmp/storyboard_scene_{i}.png"
+                    img_output.save(img_path)
+                    # Read as base64 for response
+                    import base64
+                    with open(img_path, "rb") as f:
+                        b64 = base64.b64encode(f.read()).decode()
+                    scenes[i]["image_url"] = f"data:image/png;base64,{b64}"
+                    os.remove(img_path)
+                except Exception as e:
+                    logger.warning(f"[Storyboard] Failed to generate image for scene {i}: {e}")
+                    scenes[i]["image_url"] = None
+
+        return {
+            "ok": True,
+            "scenes": scenes,
+            "total_scenes": len(scenes),
+        }
+
+    except Exception as e:
+        logger.error(f"[Storyboard] Preview failed: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 @app.post("/api/tasks/poetry")

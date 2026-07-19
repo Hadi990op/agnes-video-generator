@@ -163,13 +163,25 @@ class VideoConcatenator:
                     style_map[idx] = s
 
         # 根据视频宽度动态计算每行最大字符数（与 subtitle.py 一致）
-        available_w = video_width - 40
+        # 限制最大宽度为视频的 80%，避免字幕占满整屏
+        available_w = int((video_width - 40) * 0.80)
+
+        # 限制字号不超过视频的 5%，避免字幕过大
+        max_fontsize = int(video_height * 0.05)
+        if max_fontsize < 12:
+            max_fontsize = 12
+        if fs > max_fontsize:
+            fs = max_fontsize
+            # 根据缩小后的字号重新计算每行字符数
+            cjk_max_chars = max(8, available_w // fs) if fs > 0 else 14
 
         # 位置冲突时的备选位置池（循环取用，确保重叠字幕不在同一位置）
+        # 默认优先底部位置，避免遮挡主体内容
         _FALLBACK_POSITIONS = [
-            ("center", "top+80"),
+            ("center", "bottom-60"),
+            ("center", "bottom-120"),
             ("center", "center"),
-            ("center", "bottom-100"),
+            ("center", "top+80"),
             ("left", "center"),
             ("right", "center"),
             ("left", "top+60"),
@@ -213,6 +225,9 @@ class VideoConcatenator:
                     size=(available_w, None),
                     text_align="center",
                 )
+                # 确保字幕clip高度不超过视频高度的15%
+                if clip.h and clip.h > int(video_height * 0.15):
+                    clip = clip.with_duration(dur)
                 # M10: 钳位字幕结束时间不超过视频时长
                 if video_duration > 0:
                     end_s = min(end_s, video_duration - 0.01)

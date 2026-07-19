@@ -95,6 +95,21 @@
     box-shadow: 0 0 10px rgba(59,130,246,0.4), 0 0 20px rgba(245,158,11,0.2);
   }
 
+
+  /* Storyboard preview cards */
+  .storyboard-card {
+    transition: all 0.2s ease;
+  }
+  .storyboard-card:hover {
+    border-color: rgba(168, 85, 247, 0.3);
+    box-shadow: 0 0 15px rgba(168, 85, 247, 0.1);
+  }
+  .storyboard-card img {
+    transition: transform 0.3s ease;
+  }
+  .storyboard-card:hover img {
+    transform: scale(1.05);
+  }
   /* ── Step Connector ── */
   .step-line { transition: all 0.5s ease; }
 
@@ -1165,6 +1180,42 @@ Steam rose from his coffee cup as he gazed out the window.
             </select>
           </div>
         </div>
+
+        <!-- Storyboard Preview -->
+        <div class="mb-4">
+          <div class="flex items-center justify-between mb-2">
+            <label class="block text-sm text-purple-300 font-semibold">🎬 Storyboard Preview</label>
+            <button type="button" id="btn-mv-generate-storyboard" onclick="generateMovieStoryboard()" class="px-3 py-1.5 bg-purple-700/60 hover:bg-purple-600 rounded-lg text-xs transition flex items-center gap-1">
+              <span>✨</span> Generate Storyboard
+            </button>
+          </div>
+          <p class="text-xs text-gray-500 mb-2">Click "Generate" to preview scene descriptions and AI-generated storyboard images before creating the video.</p>
+          <div id="mv_storyboard_container" class="hidden space-y-3">
+            <!-- Storyboard scenes will be inserted here -->
+          </div>
+        </div>
+
+        <!-- Character Reference for Movie -->
+        <div class="glass-card rounded-2xl p-4 mb-4">
+          <div class="flex items-center gap-2 mb-2">
+            <h3 class="text-sm font-semibold text-purple-300">Character Reference</h3>
+          </div>
+          <p class="text-xs text-gray-400 mb-2">Upload a character image to keep consistency across all scenes.</p>
+          <div class="flex items-center gap-3">
+            <input type="file" id="mv_char_ref" accept="image/*" class="hidden">
+            <button type="button" onclick="document.getElementById('mv_char_ref').click()" class="px-4 py-2 bg-purple-700/60 hover:bg-purple-600 rounded-lg text-sm transition flex items-center gap-2">
+              <span>📁</span>
+              Upload Character Image
+            </button>
+            <button type="button" id="mv_char_ref_clear" onclick="clearMvCharRef()" class="px-3 py-2 bg-gray-700/60 hover:bg-gray-600 rounded-lg text-sm transition hidden">
+              <span>✕</span>
+            </button>
+            <div id="mv_char_ref_preview" class="char-ref-preview hidden">
+              <img id="mv_char_ref_thumb" class="w-12 h-12 rounded-lg object-cover border border-purple-500/40">
+              <span id="mv_char_ref_name" class="text-xs text-purple-300 truncate"></span>
+            </div>
+          </div>
+        </div>
       </div>
 
       <button id="btn-movie" onclick="submitMovie()" class="w-full py-3.5 bg-gradient-to-r from-purple-600 via-purple-500 to-purple-600 hover:from-purple-500 hover:via-purple-400 hover:to-purple-500 rounded-xl text-base font-semibold transition disabled:opacity-50 disabled:cursor-not-allowed glow-btn" data-i18n="startGenerate">
@@ -1836,6 +1887,7 @@ const T = {
     charConsistencyTitle: 'Character Consistency', charConsistencyHint: 'Upload a character reference image or let the AI auto-generate one from your story. This keeps the same character appearance across all scenes (Disney/fairytale style).',
     artStyle: 'Art Style', styleAuto: 'Auto (auto-detect from text)', styleDisney: 'Disney/Pixar 3D Animation', styleGhibli: 'Studio Ghibli Anime', style2D: 'Classic 2D Animation', styleCinematic: 'Cinematic Realistic', styleWatercolor: 'Watercolor Fairytale',
     charRefImage: 'Character Reference Image', uploadCharRef: 'Upload Image', charRefAuto: 'Auto-generate from story',
+    storyboardTitle: '🎬 Storyboard Preview', generateStoryboard: '✨ Generate', storyboardHint: 'Click "Generate" to preview scene descriptions and AI-generated storyboard images before creating the video.',
     startGenerate: 'Start Generating', submitting: 'Submitting...', taskRunning: 'Task in progress...',
     loading: 'Loading...', noTasks: 'No tasks', loadFailed: 'Load failed',
     progress: 'Progress', stopTask: 'Stop Task',
@@ -3894,6 +3946,18 @@ async function submitMovie() {
   form.append('subtitle_stroke_width', 2);
   form.append('subtitle_bg_color', 'black@0.5');
 
+  // Movie tab: character reference
+  const mvCharRefFile = document.getElementById('mv_char_ref').files[0];
+  if (mvCharRefFile) {
+    form.append('reference_image', mvCharRefFile);
+  }
+
+  // If storyboard was generated, use it for scene-specific prompts
+  if (_movieStoryboardData && _movieStoryboardData.length > 0) {
+    form.append('use_storyboard', 'true');
+    form.append('storyboard_scenes', JSON.stringify(_movieStoryboardData));
+  }
+
   try {
     const r = await fetch('api/tasks/manuscript', { method: 'POST', body: form });
     const d = await r.json();
@@ -5351,6 +5415,88 @@ document.getElementById('workspace-add').onclick = async () => {
     alert(d.detail || 'Failed');
   }
 };
+
+// ═══════ Movie tab: character reference image ═══════
+document.getElementById('mv_char_ref').addEventListener('change', function(e) {
+  const file = e.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = function(ev) {
+    document.getElementById('mv_char_ref_thumb').src = ev.target.result;
+    document.getElementById('mv_char_ref_name').textContent = file.name;
+    document.getElementById('mv_char_ref_preview').classList.remove('hidden');
+    document.getElementById('mv_char_ref_clear').classList.remove('hidden');
+  };
+  reader.readAsDataURL(file);
+});
+
+function clearMvCharRef() {
+  document.getElementById('mv_char_ref').value = '';
+  document.getElementById('mv_char_ref_preview').classList.add('hidden');
+  document.getElementById('mv_char_ref_clear').classList.add('hidden');
+}
+
+// ═══════ Storyboard generation ═══════
+let _movieStoryboardData = null;
+
+async function generateMovieStoryboard() {
+  const text = document.getElementById('mv_text').value.trim();
+  if (!text) return alert('Please enter a movie script first.');
+
+  const btn = document.getElementById('btn-mv-generate-storyboard');
+  btn.disabled = true;
+  btn.innerHTML = '<span class="animate-spin inline-block">⏳</span> Generating...';
+
+  try {
+    const r = await fetch('api/tasks/preview/storyboard', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        manuscript_text: text,
+      })
+    });
+    const data = await r.json();
+    if (!data.ok) throw new Error(data.detail || 'Failed to generate storyboard');
+
+    _movieStoryboardData = data.scenes || [];
+    renderStoryboard(_movieStoryboardData);
+    showToast('Storyboard generated! Review scenes, then click Generate Video.');
+  } catch(e) {
+    alert('Storyboard generation failed: ' + e.message);
+  } finally {
+    btn.disabled = false;
+    btn.innerHTML = '<span>✨</span> Generate Storyboard';
+  }
+}
+
+function renderStoryboard(scenes) {
+  const container = document.getElementById('mv_storyboard_container');
+  if (!scenes || scenes.length === 0) {
+    container.innerHTML = '<p class="text-xs text-gray-500">No scenes generated.</p>';
+    container.classList.remove('hidden');
+    return;
+  }
+  container.classList.remove('hidden');
+  container.innerHTML = scenes.map((s, i) => \`
+    <div class="glass-card rounded-xl p-3">
+      <div class="flex items-start gap-3">
+        <div class="flex-shrink-0 w-20 h-20 rounded-lg overflow-hidden bg-gray-800">
+          \${s.image_url
+            ? \`<img src="\${s.image_url}" class="w-full h-full object-cover" alt="Scene \${i+1}">\`
+            : \`<div class="w-full h-full flex items-center justify-center text-gray-600 text-xs">Scene \${i+1}</div>\`
+          }
+        </div>
+        <div class="flex-1 min-w-0">
+          <p class="text-xs text-purple-300 font-semibold mb-1">Scene \${i+1}</p>
+          <p class="text-xs text-gray-300 mb-1"><strong>Video:</strong> \${s.video_prompt || s.scene_prompt || s.description || '—'}</p>
+          <p class="text-xs text-gray-400"><strong>Narration:</strong> \${(s.narration_text || s.text || '').substring(0, 150)}\${(s.narration_text || s.text || '').length > 150 ? '...' : ''}</p>
+          \${s.duration ? \`<p class="text-xs text-gray-500 mt-1">⏱ ~\${s.duration}s</p>\` : ''}
+        </div>
+      </div>
+    </div>
+  \`).join('');
+}
+
 </script>
 
 <!-- ═══════════════════════════════════════════════════

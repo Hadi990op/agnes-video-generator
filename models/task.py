@@ -295,6 +295,10 @@ class ManuscriptVideoTask(BaseTaskState):
     combined_subtitle: str = ""
     subtitle_styles_path: str = ""      # LLM 样式 JSON 路径（Phase 2）
 
+    # ── Storyboard (v5.1) ──
+    use_storyboard: bool = False        # Use storyboard scenes instead of auto-split
+    storyboard_scenes: list = Field(default_factory=list)  # Scene data from preview
+
     step_split: StepStatus = StepStatus.PENDING
     step_scene_prompts: StepStatus = StepStatus.PENDING
     # v4.0 重构：MultiScenePipeline 规范步骤字段

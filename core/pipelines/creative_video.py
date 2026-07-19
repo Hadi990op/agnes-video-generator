@@ -1037,6 +1037,10 @@ class CreativeVideoPipeline(MultiScenePipeline):
 
         Phase 1 submits all video tasks; Phase 2 waits for them to complete.
 
+        Uses a *per-scene* first frame so each scene starts from a distinct image.
+        For scene 0 the character ref is used; for subsequent scenes the previous
+        scene's last frame becomes the first frame of the next scene (chain-like).
+
         Args:
             scenes: Scene description list.
             character_ref_path: Path to the character reference image.
@@ -1048,6 +1052,8 @@ class CreativeVideoPipeline(MultiScenePipeline):
         """
         total = len(scenes)
         pending: List[dict] = []
+        # Track last frame path so each scene starts from a different image
+        current_first_frame = character_ref_path if character_ref_path else None
 
         # Phase 1: Submit all video tasks, saving scene state for resumability
         for scene_idx, scene_text in enumerate(scenes):
@@ -1058,6 +1064,24 @@ class CreativeVideoPipeline(MultiScenePipeline):
             video_path = os.path.join(scene_dir, "video.mp4")
 
             if os.path.exists(video_path):
+                # Extract last frame for chaining to next scene
+                last_frame_path = os.path.join(scene_dir, "last_frame.jpg")
+                try:
+                    await _run_ffmpeg_async(
+                        [
+                            "ffmpeg", "-y",
+                            "-sseof", "-1",
+                            "-i", video_path,
+                            "-frames:v", "1",
+                            "-update", "1",
+                            last_frame_path,
+                        ],
+                        timeout=30,
+                    )
+                    if os.path.exists(last_frame_path):
+                        current_first_frame = last_frame_path
+                except Exception:
+                    pass
                 continue
 
             existing_video_id = self._load_scene_task(scene_dir)
@@ -1066,6 +1090,25 @@ class CreativeVideoPipeline(MultiScenePipeline):
                     f"[Pipeline] Scene {scene_idx}: resuming existing video task "
                     f"{existing_video_id[:16]}..."
                 )
+                # Extract last frame for chaining too
+                last_frame_path = os.path.join(scene_dir, "last_frame.jpg")
+                if os.path.exists(video_path):
+                    try:
+                        await _run_ffmpeg_async(
+                            [
+                                "ffmpeg", "-y",
+                                "-sseof", "-1",
+                                "-i", video_path,
+                                "-frames:v", "1",
+                                "-update", "1",
+                                last_frame_path,
+                            ],
+                            timeout=30,
+                        )
+                        if os.path.exists(last_frame_path):
+                            current_first_frame = last_frame_path
+                    except Exception:
+                        pass
                 pending.append({
                     "scene_idx": scene_idx, "video_path": video_path,
                     "video_id": existing_video_id, "scene_dir": scene_dir,
@@ -1078,9 +1121,11 @@ class CreativeVideoPipeline(MultiScenePipeline):
                 f"场景 {scene_idx+1}/{total}: 提交任务 (ti2vid)...",
                 0.35 + 0.45 * scene_idx / total,
             )
+            # Use per-scene first frame so scenes look different
+            refs = [current_first_frame] if current_first_frame else []
             video_id = await self.video_generator.submit_video(
                 prompt=scene_text,
-                reference_image_paths=[character_ref_path],
+                reference_image_paths=refs,
                 duration=self._scene_duration(scene_idx),
                 width=vw,
                 height=vh,

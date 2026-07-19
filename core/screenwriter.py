@@ -1864,6 +1864,49 @@ Night rain, wind sounds... | Rain on window, petals on stone""",
         return scenes
 
 
+    def enhance_scene_prompt(self, scene_description: str, narration: str = "") -> str:
+        """Enhance a simple scene description into a detailed video prompt.
+
+        Uses the LLM to enrich the scene with visual details, camera movement,
+        lighting, and mood.
+
+        Args:
+            scene_description: Brief scene description (e.g., from [SCENE: ...]).
+            narration: Narration text for context.
+
+        Returns:
+            A detailed, cinematic video prompt suitable for the Agnes video API.
+        """
+        system_prompt = self._prompt(
+            zh_text="""你是一位专业电影分镜师。根据场景描述，生成详细的视频生成提示词。
+要求：
+- 用中文输出
+- 包含画面细节、镜头运动、光线、氛围
+- 适合视频生成模型理解
+- 2-4句话
+- 不要加任何标签、解释，只输出提示词本身""",
+            en_text="""You are a professional cinematographer. Generate a detailed video generation prompt from the scene description.
+Requirements:
+- Use Chinese if the input is Chinese, otherwise English
+- Include visual details, camera movement, lighting, atmosphere
+- Suitable for video generation AI models
+- 2-4 sentences
+- Output ONLY the prompt, no labels, no explanations""",
+        )
+        user_prompt = f"""<scene_description>
+{scene_description}
+</scene_description>
+{'<narration>' + narration + '</narration>' if narration else ''}
+
+Please generate a detailed cinematic video prompt."""
+        try:
+            result = self._chat(system_prompt, user_prompt)
+            return result.strip()
+        except Exception as e:
+            logger.warning(f"[Screenwriter] enhance_scene_prompt failed: {e}, returning original")
+            return scene_description
+
+
 def build_poetry_scene_prompt(
     poem: str,
     scene_count: int = 0,

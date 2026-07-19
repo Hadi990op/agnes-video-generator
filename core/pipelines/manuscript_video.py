@@ -46,6 +46,129 @@ _MIN_SEGMENT_DURATION = 5.0
 # Everything after the marker (until next marker) is narration text.
 _SCENE_MARKER_RE = re.compile(r"^\s*\[(?:SCENE|场景|_scene|sc)\s*[:：]\s*(.+?)\]\s*$", re.IGNORECASE | re.MULTILINE)
 
+def _split_text(text: str) -> List[ManuscriptParagraph]:
+    """Standalone text splitter — used by preview endpoint and pipeline.
+
+    将长文本按朗读时长拆分为段落列表。
+
+    拆分策略:
+        0. 如果文本含 [SCENE: ...] 标记，则按场景拆分（用户自定义视频 prompt）。
+        1. 先按换行符 (``\\n``) 切分为粗段落。
+        2. 每个粗段落再按中文句末标点 (``。！？``) 切分为候选句。
+        3. 对候选句进行贪心合并：累积时长 <= 12s，最短 >= 5s。
+        4. 短句 (< 5s) 合并到前一个段落；长句 (> 12s) 保持原样不拆分。
+    """
+    # Defensive fix for double-encoded UTF-8
+    text = _fix_double_utf8(text)
+
+    # ── Mode 0: Scene-marker mode ──
+    if _SCENE_MARKER_RE.search(text):
+        paragraphs = _split_by_scene_markers(text)
+        if paragraphs is not None:
+            logger.info(
+                "[Manuscript] split_text: scene-marker mode, %d scenes created",
+                len(paragraphs),
+            )
+            return paragraphs
+
+    # ── Mode 1: Original auto-split mode ──
+    raw_blocks = [b.strip() for b in text.split("\n") if b.strip()]
+
+    candidate_sentences: List[str] = []
+    for block in raw_blocks:
+        parts = _SENTENCE_END_RE.split(block)
+        for part in parts:
+            part = part.strip()
+            if part:
+                candidate_sentences.append(part)
+
+    if not candidate_sentences:
+        logger.warning("[Manuscript] split_text: no sentences found in text")
+        return []
+
+    # Greedy merge
+    merged: List[str] = []
+    current_text = ""
+    current_duration = 0.0
+
+    for sentence in candidate_sentences:
+        sentence_duration = len(sentence) / _CHARS_PER_SEC
+        if not current_text:
+            current_text = sentence
+            current_duration = sentence_duration
+            continue
+
+        prospective_duration = current_duration + sentence_duration
+        if prospective_duration <= _MAX_SEGMENT_DURATION:
+            current_text += sentence
+            current_duration = prospective_duration
+        else:
+            merged.append(current_text)
+            current_text = sentence
+            current_duration = sentence_duration
+
+    if current_text:
+        merged.append(current_text)
+
+    # Post-process: merge short trailing segments
+    final_texts: List[str] = []
+    for segment in merged:
+        seg_duration = len(segment) / _CHARS_PER_SEC
+        if seg_duration < _MIN_SEGMENT_DURATION and final_texts:
+            final_texts[-1] += segment
+        else:
+            final_texts.append(segment)
+
+    paragraphs: List[ManuscriptParagraph] = []
+    for idx, para_text in enumerate(final_texts):
+        paragraphs.append(ManuscriptParagraph(index=idx, text=para_text))
+        logger.info(
+            "[Manuscript] Paragraph %d: %d chars, ~%.1fs",
+            idx, len(para_text), len(para_text) / _CHARS_PER_SEC,
+        )
+
+    logger.info(
+        "[Manuscript] split_text: %d paragraphs created", len(paragraphs),
+    )
+    return paragraphs
+
+
+# ── Helper functions extracted from the class ──
+
+def _fix_double_utf8(text: str) -> str:
+    """Detect and fix double UTF-8 encoded text."""
+    try:
+        decoded = text.encode('latin1').decode('utf-8')
+        if decoded != text:
+            return decoded
+    except (UnicodeDecodeError, UnicodeEncodeError):
+        pass
+    return text
+
+
+def _split_by_scene_markers(text: str) -> List[ManuscriptParagraph]:
+    """Parse [SCENE: ...] markers and split text accordingly."""
+    matches = list(_SCENE_MARKER_RE.finditer(text))
+    if not matches:
+        return None
+
+    paragraphs = []
+    for i, match in enumerate(matches):
+        scene_prompt = match.group(1).strip()
+        start = match.end()
+        end = matches[i + 1].start() if i + 1 < len(matches) else len(text)
+        narration_text = text[start:end].strip()
+        # Split long narration into chunks
+        chunks = [narration_text[j:j+200] for j in range(0, max(len(narration_text), 1), 200) if narration_text[j:j+200].strip()]
+        for chunk in chunks:
+            if chunk.strip():
+                paragraphs.append(ManuscriptParagraph(
+                    index=len(paragraphs),
+                    text=chunk.strip(),
+                    scene_prompt=scene_prompt,
+                ))
+    return paragraphs if paragraphs else None
+
 
 class ManuscriptVideoPipeline(MultiScenePipeline):
     """稿件长视频生成流水线。
@@ -86,10 +209,40 @@ class ManuscriptVideoPipeline(MultiScenePipeline):
         """构建场景列表：拆段 → 生成场景 prompt → 填充 self._state.scenes。
 
         支持 resume：若 paragraphs 已存在则复用，仅补全缺失的 scene_prompt。
+        如果用户通过 storyboard 预览生成了场景，直接使用 storyboard 数据。
         """
+        # If storyboard data was provided by user, use it directly
+        if self._state.use_storyboard and self._state.storyboard_scenes:
+            logger.info(
+                "[Manuscript] _build_scenes: using %d storyboard scenes",
+                len(self._state.storyboard_scenes),
+            )
+            for i, s in enumerate(self._state.storyboard_scenes):
+                narration = s.get("narration_text", s.get("text", ""))
+                scene_prompt = s.get("video_prompt", s.get("scene_prompt", s.get("description", "")))
+                dur = s.get("duration", max(int(len(narration) / 4), 3))
+                self._state.paragraphs.append(ManuscriptParagraph(
+                    index=i,
+                    text=narration[:10000],
+                    scene_prompt=scene_prompt[:2000],
+                    duration=dur,
+                ))
+                self._state.scenes.append(SceneTask(
+                    index=i,
+                    scene_prompt=scene_prompt,
+                    narration_text=narration,
+                    duration=max(int(dur), 3),
+                ))
+            self.task_manager.update_state(
+                paragraphs=self._state.paragraphs,
+                scenes=[s.model_dump() for s in self._state.scenes],
+            )
+            logger.info("[Manuscript] _build_scenes: storyboard scenes loaded")
+            return
+
         # resume：若 paragraphs 已存在（如中途续传），直接复用
         if not self._state.paragraphs:
-            paragraphs = self._split_text(self._state.manuscript_text)
+            paragraphs = _split_text(self._state.manuscript_text)
             self._state.paragraphs = paragraphs
             self.task_manager.update_state(paragraphs=paragraphs)
         else:
@@ -218,7 +371,8 @@ class ManuscriptVideoPipeline(MultiScenePipeline):
             4. 短句 (< 5s) 合并到前一个段落；长句 (> 12s) 保持原样不拆分。
         """
         # 防御性修复：检测并修复双重 UTF-8 编码
-        text = self.fix_double_utf8(text)
+        # Delegate to module-level _split_text, then handle state
+        paragraphs = _split_text(text)
         if text != self._state.manuscript_text:
             logger.info("[Manuscript] split_text: fixed double-encoded UTF-8 text")
             self._state.manuscript_text = text
@@ -232,201 +386,9 @@ class ManuscriptVideoPipeline(MultiScenePipeline):
             )
             return self._state.paragraphs
 
-        logger.info("[Manuscript] split_text: splitting %d chars...", len(text))
-
-        # ── Mode 0: Scene-marker mode ──
-        # If text contains [SCENE: ...] markers, split by scenes.
-        # The marker line becomes scene_prompt; text after it (until next
-        # marker) becomes narration. Long narration is further split into
-        # sub-segments so each video clip stays 5-12s.
-        paragraphs = self._split_by_scene_markers(text)
-        if paragraphs is not None:
-            logger.info(
-                "[Manuscript] split_text: scene-marker mode, %d scenes created",
-                len(paragraphs),
-            )
-            return paragraphs
-
-        # ── Mode 1: Original auto-split mode ──
-        # Step 1: split by newline.
-        raw_blocks = [b.strip() for b in text.split("\n") if b.strip()]
-
-        # Step 2: further split each block by Chinese sentence-ending punctuation.
-        candidate_sentences: List[str] = []
-        for block in raw_blocks:
-            parts = _SENTENCE_END_RE.split(block)
-            for part in parts:
-                part = part.strip()
-                if part:
-                    candidate_sentences.append(part)
-
-        if not candidate_sentences:
-            logger.warning("[Manuscript] split_text: no sentences found in text")
-            return []
-
-        # Step 3: greedy merge.
-        merged: List[str] = []
-        current_text = ""
-        current_duration = 0.0
-
-        for sentence in candidate_sentences:
-            sentence_duration = len(sentence) / _CHARS_PER_SEC
-
-            if not current_text:
-                current_text = sentence
-                current_duration = sentence_duration
-                continue
-
-            prospective_duration = current_duration + sentence_duration
-
-            if prospective_duration <= _MAX_SEGMENT_DURATION:
-                current_text += sentence
-                current_duration = prospective_duration
-            else:
-                merged.append(current_text)
-                current_text = sentence
-                current_duration = sentence_duration
-
-        if current_text:
-            merged.append(current_text)
-
-        # Step 4: post-process -- merge short trailing segments into previous.
-        final_texts: List[str] = []
-        for segment in merged:
-            seg_duration = len(segment) / _CHARS_PER_SEC
-            if seg_duration < _MIN_SEGMENT_DURATION and final_texts:
-                final_texts[-1] += segment
-            else:
-                final_texts.append(segment)
-
-        # Build ManuscriptParagraph list.
-        paragraphs: List[ManuscriptParagraph] = []
-        for idx, para_text in enumerate(final_texts):
-            paragraphs.append(ManuscriptParagraph(index=idx, text=para_text))
-            logger.info(
-                "[Manuscript] Paragraph %d: %d chars, ~%.1fs",
-                idx, len(para_text), len(para_text) / _CHARS_PER_SEC,
-            )
-
-        logger.info(
-            "[Manuscript] split_text: %d paragraphs created", len(paragraphs),
-        )
+        self._state.paragraphs = paragraphs
+        self.task_manager.update_state(paragraphs=paragraphs)
         return paragraphs
-
-    def _split_by_scene_markers(
-        self, text: str,
-    ) -> Optional[List[ManuscriptParagraph]]:
-        """Parse script with [SCENE: ...] markers into paragraphs.
-
-        Format:
-            [SCENE: A rainy night in the city, neon lights on wet streets]
-            The narration text for this scene. The narrator speaks this...
-            More narration...
-
-            [SCENE: Close-up of an old man's face in a café]
-            Another narration text here...
-
-        Returns None if no scene markers found (falls back to auto-split).
-        Long narration blocks are sub-split into 5-12s segments, each
-        reusing the same scene_prompt, so very long scenes still generate
-        multiple video clips that get merged.
-        """
-        markers = list(_SCENE_MARKER_RE.finditer(text))
-        if not markers:
-            return None
-
-        scenes_raw: List[tuple] = []  # (scene_prompt, narration_text)
-        for i, m in enumerate(markers):
-            scene_prompt = m.group(1).strip()
-            start = m.end()
-            end = markers[i + 1].start() if i + 1 < len(markers) else len(text)
-            narration = text[start:end].strip()
-            scenes_raw.append((scene_prompt, narration))
-
-        paragraphs: List[ManuscriptParagraph] = []
-        idx = 0
-        for scene_prompt, narration in scenes_raw:
-            if not narration:
-                # Scene with no narration — still create a 3s clip
-                paragraphs.append(ManuscriptParagraph(
-                    index=idx, text=scene_prompt, scene_prompt=scene_prompt,
-                ))
-                logger.info(
-                    "[Manuscript] Scene %d (no narration): %s...",
-                    idx, scene_prompt[:60],
-                )
-                idx += 1
-                continue
-
-            # Sub-split long narration into 5-12s segments
-            sub_texts = self._greedy_split_narration(narration)
-            for sub_text in sub_texts:
-                paragraphs.append(ManuscriptParagraph(
-                    index=idx,
-                    text=sub_text,
-                    scene_prompt=scene_prompt,
-                ))
-                logger.info(
-                    "[Manuscript] Scene %d: %d chars ~%.1fs | prompt: %s...",
-                    idx, len(sub_text),
-                    len(sub_text) / _CHARS_PER_SEC,
-                    scene_prompt[:60],
-                )
-                idx += 1
-
-        return paragraphs if paragraphs else None
-
-    def _greedy_split_narration(self, text: str) -> List[str]:
-        """Split narration text into segments of 5-12 seconds.
-
-        Uses both sentence-ending punctuation (。！？ and .!?) and newlines.
-        Short segments merge into previous; long segments stay as-is.
-        """
-        # Split by newlines first, then by sentence-ending punctuation.
-        sent_re = re.compile(r"(?<=[。！？\.!\?])\s*")
-        candidate_sentences: List[str] = []
-        for block in text.split("\n"):
-            block = block.strip()
-            if not block:
-                continue
-            for part in sent_re.split(block):
-                part = part.strip()
-                if part:
-                    candidate_sentences.append(part)
-
-        if not candidate_sentences:
-            return [text.strip()] if text.strip() else []
-
-        merged: List[str] = []
-        current_text = ""
-        current_duration = 0.0
-        for sentence in candidate_sentences:
-            sentence_duration = len(sentence) / _CHARS_PER_SEC
-            if not current_text:
-                current_text = sentence
-                current_duration = sentence_duration
-                continue
-            prospective = current_duration + sentence_duration
-            if prospective <= _MAX_SEGMENT_DURATION:
-                current_text += sentence
-                current_duration = prospective
-            else:
-                merged.append(current_text)
-                current_text = sentence
-                current_duration = sentence_duration
-        if current_text:
-            merged.append(current_text)
-
-        # Merge short trailing segments into previous.
-        final: List[str] = []
-        for seg in merged:
-            seg_dur = len(seg) / _CHARS_PER_SEC
-            if seg_dur < _MIN_SEGMENT_DURATION and final:
-                final[-1] += seg
-            else:
-                final.append(seg)
-        return final or [text.strip()]
-
     async def _generate_scene_prompts(
         self, paragraphs: List[ManuscriptParagraph],
     ) -> None:
