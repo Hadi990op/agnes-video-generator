@@ -1181,6 +1181,15 @@ Steam rose from his coffee cup as he gazed out the window.
           </div>
         </div>
 
+        <!-- Dialogue-only toggle (v5.2) -->
+        <div class="mb-4 p-3 rounded-lg bg-purple-900/20 border border-purple-700/40">
+          <label class="flex items-center gap-2 cursor-pointer">
+            <input type="checkbox" id="mv_dialogue_only" class="w-4 h-4 rounded accent-purple-500">
+            <span class="text-sm text-purple-200 font-medium">🎭 Dialogue-only Mode</span>
+          </label>
+          <p class="text-xs text-gray-400 mt-1 ml-6">Only TTS reads character dialogue (quoted speech). Full narration text is excluded from audio and subtitles.</p>
+        </div>
+
         <!-- Storyboard Preview -->
         <div class="mb-4">
           <div class="flex items-center justify-between mb-2">
@@ -1189,8 +1198,17 @@ Steam rose from his coffee cup as he gazed out the window.
               <span>✨</span> Generate Storyboard
             </button>
           </div>
-          <p class="text-xs text-gray-500 mb-2">Click "Generate" to preview scene descriptions and AI-generated storyboard images before creating the video.</p>
+          <p class="text-xs text-gray-500 mb-2">Review scene descriptions and narration below. Upload custom reference images for each scene, then click "Generate Video".</p>
           <div id="mv_storyboard_container" class="hidden space-y-3">
+            <div class="glass-card rounded-xl p-4">
+              <div class="flex items-center gap-3 mb-3">
+                <div class="sb-status flex-1 text-sm text-purple-300 animate-pulse">✨ Generating storyboard...</div>
+              </div>
+              <div class="w-full bg-gray-700/50 rounded-full h-2 overflow-hidden">
+                <div class="sb-progress-bar bg-gradient-to-r from-purple-500 to-pink-500 h-full rounded-full transition-all duration-500" style="width: 0%"></div>
+              </div>
+              <div class="sb-status-line text-xs text-gray-500 mt-2 text-center">Analyzing scenes...</div>
+            </div>
             <!-- Storyboard scenes will be inserted here -->
           </div>
         </div>
@@ -1887,7 +1905,7 @@ const T = {
     charConsistencyTitle: 'Character Consistency', charConsistencyHint: 'Upload a character reference image or let the AI auto-generate one from your story. This keeps the same character appearance across all scenes (Disney/fairytale style).',
     artStyle: 'Art Style', styleAuto: 'Auto (auto-detect from text)', styleDisney: 'Disney/Pixar 3D Animation', styleGhibli: 'Studio Ghibli Anime', style2D: 'Classic 2D Animation', styleCinematic: 'Cinematic Realistic', styleWatercolor: 'Watercolor Fairytale',
     charRefImage: 'Character Reference Image', uploadCharRef: 'Upload Image', charRefAuto: 'Auto-generate from story',
-    storyboardTitle: '🎬 Storyboard Preview', generateStoryboard: '✨ Generate', storyboardHint: 'Click "Generate" to preview scene descriptions and AI-generated storyboard images before creating the video.',
+    storyboardTitle: '🎬 Storyboard Preview', generateStoryboard: '✨ Generate', storyboardHint: 'Review scene descriptions and narration below. Upload custom reference images for each scene, then click "Generate Video".',
     startGenerate: 'Start Generating', submitting: 'Submitting...', taskRunning: 'Task in progress...',
     loading: 'Loading...', noTasks: 'No tasks', loadFailed: 'Load failed',
     progress: 'Progress', stopTask: 'Stop Task',
@@ -3958,6 +3976,9 @@ async function submitMovie() {
     form.append('storyboard_scenes', JSON.stringify(_movieStoryboardData));
   }
 
+  // v5.2: Dialogue-only mode
+  form.append('dialogue_only', document.getElementById('mv_dialogue_only').checked ? 'true' : 'false');
+
   try {
     const r = await fetch('api/tasks/manuscript', { method: 'POST', body: form });
     const d = await r.json();
@@ -5438,6 +5459,7 @@ function clearMvCharRef() {
 
 // ═══════ Storyboard generation ═══════
 let _movieStoryboardData = null;
+let _storyboardAbort = null;
 
 async function generateMovieStoryboard() {
   const text = document.getElementById('mv_text').value.trim();
@@ -5447,54 +5469,282 @@ async function generateMovieStoryboard() {
   btn.disabled = true;
   btn.innerHTML = '<span class="animate-spin inline-block">⏳</span> Generating...';
 
+  const container = document.getElementById('mv_storyboard_container');
+  container.classList.remove('hidden');
+  container.innerHTML = `
+    <div class="glass-card rounded-xl p-4">
+      <div class="flex items-center gap-3 mb-3">
+        <div class="sb-status flex-1 text-sm text-purple-300 animate-pulse">✨ Generating storyboard...</div>
+      </div>
+      <div class="w-full bg-gray-700/50 rounded-full h-2 overflow-hidden">
+        <div class="sb-progress-bar bg-gradient-to-r from-purple-500 to-pink-500 h-full rounded-full transition-all duration-500" style="width: 0%"></div>
+      </div>
+      <div class="sb-status-line text-xs text-gray-500 mt-2 text-center">Initializing...</div>
+    </div>
+  `;
+
+  // Abort previous request if any
+  if (_storyboardAbort) {
+    _storyboardAbort.abort();
+  }
+  const controller = new AbortController();
+  _storyboardAbort = controller;
+
   try {
     const r = await fetch('api/tasks/preview/storyboard', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        manuscript_text: text,
-      })
+      body: JSON.stringify({ manuscript_text: text }),
+      signal: controller.signal,
     });
-    const data = await r.json();
-    if (!data.ok) throw new Error(data.detail || 'Failed to generate storyboard');
 
-    _movieStoryboardData = data.scenes || [];
-    renderStoryboard(_movieStoryboardData);
-    showToast('Storyboard generated! Review scenes, then click Generate Video.');
+    _movieStoryboardData = [];
+    let totalScenes = 0;
+
+    // Robust SSE reading: read as text stream line by line
+    // (Avoids Android Chrome HTTP/2 ReadableStream issues)
+    const reader = r.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = '';
+
+    console.log('[Storyboard] Response status:', r.status, 'headers:', r.headers.get('content-type'));
+
+    while (true) {
+      try {
+        const { done, value } = await reader.read();
+        if (done) break;
+
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split('\n');
+        buffer = lines.pop() || '';
+
+        for (const line of lines) {
+          const trimmed = line.trimEnd();
+          if (!trimmed.startsWith('data: ')) continue;
+          try {
+            const evt = JSON.parse(trimmed.slice(6));
+            console.log('[Storyboard] Event:', evt.type, evt.message || '');
+            handleStoryboardEvent(evt, container);
+          } catch (e) {
+            // Skip malformed events
+          }
+        }
+      } catch (readErr) {
+        console.error('[Storyboard] Stream read error:', readErr);
+        // Connection might have been reset — try to process remaining buffer
+        if (buffer.startsWith('data: ')) {
+          try {
+            const evt = JSON.parse(buffer.slice(6));
+            handleStoryboardEvent(evt, container);
+          } catch (e) { /* ignore */ }
+        }
+        break;
+      }
+    }
+
+    // Process remaining buffer
+    if (buffer.startsWith('data: ')) {
+      try {
+        const evt = JSON.parse(buffer.slice(6));
+        console.log('[Storyboard] Remaining buffer event:', evt.type);
+        handleStoryboardEvent(evt, container);
+        if (evt.type === 'done') {
+          totalScenes = evt.total_scenes || _movieStoryboardData.length;
+        }
+      } catch (e) { /* ignore */ }
+    }
+
+    showToast(`Storyboard generated! ${totalScenes} scenes. Review and click Generate Video.`);
   } catch(e) {
-    alert('Storyboard generation failed: ' + e.message);
+    console.error('[Storyboard] Full error:', e);
+    if (e.name !== 'AbortError') {
+      container.innerHTML = `<div class="text-center py-4 text-red-400">❌ Storyboard generation failed: ${e.message}</div>`;
+      alert('Storyboard generation failed: ' + e.message);
+    }
   } finally {
     btn.disabled = false;
     btn.innerHTML = '<span>✨</span> Generate Storyboard';
   }
 }
 
-function renderStoryboard(scenes) {
-  const container = document.getElementById('mv_storyboard_container');
-  if (!scenes || scenes.length === 0) {
-    container.innerHTML = '<p class="text-xs text-gray-500">No scenes generated.</p>';
-    container.classList.remove('hidden');
-    return;
+function handleStoryboardEvent(evt, container) {
+  if (evt.type === 'step') {
+    // Update the status message
+    const statusEl = container.querySelector('.sb-status');
+    if (statusEl) {
+      statusEl.textContent = evt.message;
+      statusEl.classList.remove('animate-pulse');
+    }
+    const statusLine = container.querySelector('.sb-status-line');
+    if (statusLine) {
+      statusLine.textContent = evt.message;
+    }
+  } else if (evt.type === 'scene') {
+    const total = evt.total || 0;
+    _movieStoryboardData[evt.index] = {
+      index: evt.index,
+      // We'll fill in full data from done event
+    };
+    // Show progress indicator
+    const statusLine = container.querySelector('.sb-status-line');
+    if (statusLine) {
+      statusLine.textContent = `Scene ${evt.index + 1}/${total} — Scene description & narration ready`;
+    }
+    // Update progress bar (scenes are ~70% of work)
+    const progress = Math.round(((evt.index + 1) / total) * 70);
+    const bar = container.querySelector('.sb-progress-bar');
+    if (bar) {
+      bar.style.width = progress + '%';
+    }
+  } else if (evt.type === 'image_progress') {
+    const statusLine = container.querySelector('.sb-status-line');
+    if (statusLine) {
+      if (evt.index !== undefined && evt.total) {
+        statusLine.textContent = `Generating image ${evt.index + 1}/${evt.total}...`;
+      } else {
+        statusLine.textContent = evt.message || '';
+      }
+    }
+    // Update progress bar — images are remaining ~30% (70%..100%)
+    if (evt.progress !== undefined) {
+      const bar = container.querySelector('.sb-progress-bar');
+      if (bar) {
+        const totalProgress = 70 + (evt.progress * 30);
+        bar.style.width = Math.round(totalProgress) + '%';
+      }
+    }
+  } else if (evt.type === 'done') {
+    _movieStoryboardData = evt.scenes || [];
+    const totalScenes = evt.total_scenes || _movieStoryboardData.length;
+
+    // Update progress bar to 100%
+    const bar = container.querySelector('.sb-progress-bar');
+    if (bar) bar.style.width = '100%';
+    const statusEl = container.querySelector('.sb-status');
+    if (statusEl) {
+      statusEl.textContent = '✅ Generation complete!';
+      statusEl.classList.remove('animate-pulse');
+      statusEl.style.color = '#4ade80';
+    }
+    const statusLine = container.querySelector('.sb-status-line');
+    // Update progress line to completion
+    if (statusLine) statusLine.textContent = `${totalScenes} scenes generated successfully ✅`;
+
+    // Build scene cards BELOW the progress card
+    const scenesHTML = _buildStoryboardHTML(_movieStoryboardData, totalScenes);
+    if (scenesHTML) {
+      container.insertAdjacentHTML('beforeend', scenesHTML);
+    }
+  } else if (evt.type === 'error') {
+    container.innerHTML = `<div class="text-center py-4 text-red-400">❌ ${evt.message}</div>`;
   }
-  container.classList.remove('hidden');
-  container.innerHTML = scenes.map((s, i) => \`
-    <div class="glass-card rounded-xl p-3">
-      <div class="flex items-start gap-3">
-        <div class="flex-shrink-0 w-20 h-20 rounded-lg overflow-hidden bg-gray-800">
-          \${s.image_url
-            ? \`<img src="\${s.image_url}" class="w-full h-full object-cover" alt="Scene \${i+1}">\`
-            : \`<div class="w-full h-full flex items-center justify-center text-gray-600 text-xs">Scene \${i+1}</div>\`
-          }
+}
+
+function _buildStoryboardHTML(scenes, total) {
+  return scenes.map((s, i) => {
+    const promptText = s.video_prompt || s.scene_prompt || s.description || '';
+    const narrationText = (s.narration_text || s.text || '');
+    const hasImage = s.image_url || (s.ref_images && s.ref_images.length > 0);
+    const previewSrc = s.image_url || (s.ref_images && s.ref_images[0] ? (s.ref_images[0].startsWith('data:') ? s.ref_images[0] : 'data:image/png;base64,' + s.ref_images[0]) : null);
+    return `
+    <div class="glass-card rounded-xl p-3" data-scene-index="${i}">
+      <div class="flex flex-col md:flex-row gap-3">
+        <!-- Image upload area -->
+        <div class="flex-shrink-0 flex flex-col items-center gap-1">
+          <div class="w-32 h-32 rounded-lg overflow-hidden bg-gray-800 border border-purple-500/30 relative group">
+            ${previewSrc
+              ? `<img src="${previewSrc}" class="w-full h-full object-cover" alt="Scene ${i+1}">`
+              : `<div class="w-full h-full flex flex-col items-center justify-center text-gray-600 text-xs gap-1">
+                   <span class="text-lg">🖼️</span>
+                   <span>Scene ${i+1}</span>
+                 </div>`
+            }
+            <!-- Hover overlay with upload button -->
+            <div class="absolute inset-0 bg-black/60 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer"
+                 onclick="document.getElementById('scene_upload_${i}').click()">
+              <span class="text-white text-xs">📁 Upload</span>
+            </div>
+          </div>
+          <input type="file" id="scene_upload_${i}" accept="image/*" class="hidden" onchange="handleSceneUpload(${i}, this)">
+          ${hasImage ? `<button onclick="clearSceneImage(${i})" class="text-xs text-red-400 hover:text-red-300 mt-1">✕ Clear</button>` : ''}
+          <button onclick="document.getElementById('scene_upload_${i}').click()" class="text-xs text-purple-400 hover:text-purple-300">Upload image</button>
         </div>
-        <div class="flex-1 min-w-0">
-          <p class="text-xs text-purple-300 font-semibold mb-1">Scene \${i+1}</p>
-          <p class="text-xs text-gray-300 mb-1"><strong>Video:</strong> \${s.video_prompt || s.scene_prompt || s.description || '—'}</p>
-          <p class="text-xs text-gray-400"><strong>Narration:</strong> \${(s.narration_text || s.text || '').substring(0, 150)}\${(s.narration_text || s.text || '').length > 150 ? '...' : ''}</p>
-          \${s.duration ? \`<p class="text-xs text-gray-500 mt-1">⏱ ~\${s.duration}s</p>\` : ''}
+        <!-- Editable fields -->
+        <div class="flex-1 min-w-0 space-y-2">
+          <p class="text-xs text-purple-300 font-semibold">Scene ${i+1}</p>
+          <!-- Editable video prompt -->
+          <div>
+            <label class="text-xs text-gray-500 block mb-0.5">Video Prompt</label>
+            <textarea class="w-full bg-gray-800/50 border border-gray-700 rounded px-2 py-1 text-xs text-gray-200 resize-y"
+                      rows="3"
+                      onchange="updateScenePrompt(${i}, this.value)"
+                      oninput="updateScenePrompt(${i}, this.value)">${promptText}</textarea>
+          </div>
+          <!-- Editable narration (read-only label but editable) -->
+          <div>
+            <label class="text-xs text-gray-500 block mb-0.5">Narration</label>
+            <textarea class="w-full bg-gray-800/50 border border-gray-700 rounded px-2 py-1 text-xs text-gray-200 resize-y"
+                      rows="2"
+                      onchange="updateSceneNarration(${i}, this.value)"
+                      oninput="updateSceneNarration(${i}, this.value)">${narrationText.substring(0, 300)}${narrationText.length > 300 ? '...' : ''}</textarea>
+          </div>
+          ${s.duration ? `<p class="text-xs text-gray-500">⏱ ~${s.duration}s</p>` : ''}
         </div>
       </div>
-    </div>
-  \`).join('');
+    </div>`;
+  }).join('');
+}
+
+// ═══════ Storyboard image upload & editing ═══════
+
+function handleSceneUpload(sceneIdx, input) {
+  const file = input.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = function(e) {
+    const b64 = e.target.result; // data:image/...;base64,...
+    // Update _movieStoryboardData
+    if (!_movieStoryboardData || !_movieStoryboardData[sceneIdx]) return;
+    if (!_movieStoryboardData[sceneIdx].ref_images) {
+      _movieStoryboardData[sceneIdx].ref_images = [];
+    }
+    _movieStoryboardData[sceneIdx].ref_images = [b64];
+    // Remove old image_url if exists (user is replacing it)
+    delete _movieStoryboardData[sceneIdx].image_url;
+    // Re-render this card
+    const container = document.getElementById('mv_storyboard_container');
+    if (!container) return;
+    // Remove old cards and rebuild
+    const oldCards = container.querySelectorAll('.glass-card.rounded-xl.p-3');
+    oldCards.forEach(c => c.remove());
+    const newHTML = _buildStoryboardHTML(_movieStoryboardData, _movieStoryboardData.length);
+    container.insertAdjacentHTML('beforeend', newHTML);
+    showToast(`Scene ${sceneIdx + 1} image uploaded`);
+  };
+  reader.readAsDataURL(file);
+}
+
+function clearSceneImage(sceneIdx) {
+  if (!_movieStoryboardData || !_movieStoryboardData[sceneIdx]) return;
+  delete _movieStoryboardData[sceneIdx].ref_images;
+  delete _movieStoryboardData[sceneIdx].image_url;
+  // Re-render
+  const container = document.getElementById('mv_storyboard_container');
+  if (!container) return;
+  const oldCards = container.querySelectorAll('.glass-card.rounded-xl.p-3');
+  oldCards.forEach(c => c.remove());
+  const newHTML = _buildStoryboardHTML(_movieStoryboardData, _movieStoryboardData.length);
+  container.insertAdjacentHTML('beforeend', newHTML);
+}
+
+function updateScenePrompt(sceneIdx, value) {
+  if (!_movieStoryboardData || !_movieStoryboardData[sceneIdx]) return;
+  _movieStoryboardData[sceneIdx].video_prompt = value;
+}
+
+function updateSceneNarration(sceneIdx, value) {
+  if (!_movieStoryboardData || !_movieStoryboardData[sceneIdx]) return;
+  _movieStoryboardData[sceneIdx].narration_text = value;
 }
 
 </script>

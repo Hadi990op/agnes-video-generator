@@ -32,7 +32,7 @@ from typing import Dict, List, Optional, Union
 from fastapi import FastAPI, UploadFile, File, Form, HTTPException
 from pydantic import BaseModel
 from fastapi.staticfiles import StaticFiles
-from fastapi.responses import FileResponse, JSONResponse
+from fastapi.responses import FileResponse, JSONResponse, StreamingResponse
 
 from core.config import get_api_key, set_api_key, set_api_keys, delete_api_key, get_api_key_source, get_api_keys, get_key_rotation_status, get_working_dir, DURATION_FRAME_MAP, get_workspaces, add_workspace, remove_workspace, set_active_workspace, get_active_workspace, REGRESSION_WORKING_DIR_ENV, get_watermark_config, set_watermark_config, WATERMARK_PROMO_TEXT_ZH, WATERMARK_PROMO_TEXT_EN
 from core.audio.voices import (
@@ -244,6 +244,17 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(title="Agnes Video Generator", lifespan=lifespan)
+
+
+@app.exception_handler(Exception)
+async def global_exception_handler(request, exc):
+    """Return JSON error response for all unhandled exceptions."""
+    import traceback
+    logger.error(f"Unhandled exception: {exc}", exc_info=True)
+    return JSONResponse(
+        status_code=500,
+        content={"ok": False, "detail": f"Internal Server Error: {str(exc)}"},
+    )
 
 
 # ═══════════════════════════════════════════════════
@@ -1376,6 +1387,8 @@ async def create_manuscript_task(
     # v5.1: Storyboard
     use_storyboard: bool = Form(False),
     storyboard_scenes: str = Form("[]"),
+    # v5.2: Dialogue-only mode (narration off → only dialogue lines)
+    dialogue_only: bool = Form(False),
 ):
     """创建稿件长视频任务（类型 3）。
 
@@ -1434,12 +1447,13 @@ async def create_manuscript_task(
         style=style,
         use_storyboard=use_storyboard,
         storyboard_scenes=json.loads(storyboard_scenes) if storyboard_scenes else [],
+        dialogue_only=dialogue_only,
     )
 
     # v5.0: Handle user-provided character reference image
     if reference_image and reference_image.filename:
         ext = os.path.splitext(reference_image.filename)[1] or ".png"
-        upload_dir = os.path.join(_WORKING_DIR, dir_name)
+        upload_dir = os.path.join(get_working_dir(), dir_name)
         os.makedirs(upload_dir, exist_ok=True)
         upload_path = os.path.join(upload_dir, f"character_ref_input{ext}")
         with open(upload_path, "wb") as f:
@@ -1462,13 +1476,23 @@ class StoryboardRequest(BaseModel):
     manuscript_text: str
 
 
+def _sse_event(data: dict) -> str:
+    """Format a dict as a Server-Sent Event."""
+    return f"data: {json.dumps(data, ensure_ascii=False)}\n\n"
+
+
 @app.post("/api/tasks/preview/storyboard")
 async def preview_storyboard(
     req: StoryboardRequest,
 ):
-    """Generate a storyboard preview: split text into scenes with video prompts.
+    """Generate a storyboard preview with SSE streaming progress.
 
-    Does NOT generate actual videos. Returns scene descriptions for user review.
+    Returns scene descriptions for user review. Streams progress events:
+      {"type": "step", "message": "...", "progress": 0.0}
+      {"type": "scene", "index": N, "total": N, "message": "..."}
+      {"type": "image_progress", "index": N, "total": N, "message": "..."}
+      {"type": "done", "scenes": [...], "total_scenes": N}
+      {"type": "error", "message": "..."}
     """
     api_key = get_api_key()
     if not api_key:
@@ -1477,83 +1501,202 @@ async def preview_storyboard(
     if not manuscript_text.strip():
         raise HTTPException(status_code=400, detail="稿件内容不能为空")
 
-    try:
-        from core.screenwriter import Screenwriter
-        sw = Screenwriter(api_key=api_key)
+    async def event_generator():
+        try:
+            from core.screenwriter import Screenwriter
+            sw = Screenwriter(api_key=api_key)
 
-        # Step 1: Parse scene markers if present
-        from core.pipelines.manuscript_video import _SCENE_MARKER_RE, _split_text
-        scenes = []
-        if _SCENE_MARKER_RE.search(manuscript_text):
-            # Has scene markers — parse them
-            parts = _SCENE_MARKER_RE.split(manuscript_text)
-            markers = _SCENE_MARKER_RE.findall(manuscript_text)
-            for i, (marker_text, narration_text) in enumerate(zip(markers, parts[1:])):
-                narration_text = narration_text.strip()
-                video_prompt = marker_text.strip()
-                # Generate a richer video prompt using screenwriter
-                scene_prompt = await asyncio.to_thread(
-                    sw.enhance_scene_prompt,
-                    scene_description=video_prompt,
-                    narration=narration_text,
-                )
-                scenes.append({
-                    "index": i,
-                    "video_prompt": scene_prompt,
-                    "narration_text": narration_text[:200],
-                    "duration": 5,
-                    "description": video_prompt,
-                })
-        else:
-            # No markers — split text into segments using the manuscript pipeline logic
-            from core.pipelines.manuscript_video import _split_text
-            paragraphs = _split_text(manuscript_text.strip())
-            for i, p in enumerate(paragraphs):
-                scene_prompt = await asyncio.to_thread(
-                    sw.enhance_scene_prompt,
-                    scene_description=p.text[:300],
-                    narration=p.text,
-                )
-                scenes.append({
-                    "index": i,
-                    "video_prompt": scene_prompt,
-                    "narration_text": p.text[:200],
-                    "duration": max(int(len(p.text) / 4), 3),
-                    "description": p.text[:200],
-                })
+            # Step 1: Parse scene markers if present
+            from core.pipelines.manuscript_video import _SCENE_MARKER_RE, _split_text
 
-        # Step 2: Generate storyboard images for first few scenes (t2i)
-        if scenes:
-            from core.api.agnes_image import AgnesImageAPI
-            img_api = AgnesImageAPI(api_key=api_key, model="agnes-image-2.1-flash")
-            image_count = min(len(scenes), 5)  # Generate images for first 5 scenes max
-            for i in range(image_count):
-                try:
-                    img_output = await img_api.generate_single_image(
-                        prompt=scenes[i]["video_prompt"],
-                        size="768x1152",
+            has_markers = bool(_SCENE_MARKER_RE.search(manuscript_text))
+
+            if has_markers:
+                # Has scene markers — parse them
+                yield _sse_event({"type": "step", "message": "分析场景标记...", "progress": 0.0})
+                parts = _SCENE_MARKER_RE.split(manuscript_text)
+                markers = _SCENE_MARKER_RE.findall(manuscript_text)
+                scene_list = []
+                total = len(markers)
+                for i, (marker_text, narration_text) in enumerate(zip(markers, parts[1:])):
+                    narration_text = narration_text.strip()
+                    video_prompt = marker_text.strip()
+                    scene_prompt = await asyncio.to_thread(
+                        sw.enhance_scene_prompt,
+                        scene_description=video_prompt,
+                        narration=narration_text,
                     )
-                    img_path = f"/tmp/storyboard_scene_{i}.png"
-                    img_output.save(img_path)
-                    # Read as base64 for response
-                    import base64
-                    with open(img_path, "rb") as f:
-                        b64 = base64.b64encode(f.read()).decode()
-                    scenes[i]["image_url"] = f"data:image/png;base64,{b64}"
-                    os.remove(img_path)
-                except Exception as e:
-                    logger.warning(f"[Storyboard] Failed to generate image for scene {i}: {e}")
-                    scenes[i]["image_url"] = None
+                    scene_list.append({
+                        "index": i,
+                        "video_prompt": scene_prompt,
+                        "narration_text": narration_text[:200],
+                        "duration": 5,
+                        "description": video_prompt,
+                    })
+                    yield _sse_event({
+                        "type": "scene", "index": i, "total": total,
+                        "message": f"场景 {i+1}/{total} 描述完成",
+                    })
+                scenes = scene_list
+            else:
+                # No markers — split text into segments
+                yield _sse_event({"type": "step", "message": "智能拆分文本段落...", "progress": 0.0})
+                from core.pipelines.manuscript_video import _split_text
+                paragraphs = _split_text(manuscript_text.strip())
+                total = len(paragraphs)
+                yield _sse_event({"type": "step", "message": f"已拆分为 {total} 个段落", "progress": 0.05})
+                scene_list = []
+                for i, p in enumerate(paragraphs):
+                    scene_prompt = await asyncio.to_thread(
+                        sw.enhance_scene_prompt,
+                        scene_description=p.text[:300],
+                        narration=p.text,
+                    )
+                    scene_list.append({
+                        "index": i,
+                        "video_prompt": scene_prompt,
+                        "narration_text": p.text[:200],
+                        "duration": max(int(len(p.text) / 4), 3),
+                        "description": p.text[:200],
+                    })
+                    yield _sse_event({
+                        "type": "scene", "index": i, "total": total,
+                        "message": f"场景 {i+1}/{total} 描述完成",
+                    })
+                scenes = scene_list
 
-        return {
-            "ok": True,
-            "scenes": scenes,
-            "total_scenes": len(scenes),
-        }
+            # Step 2: Generate storyboard images concurrently with key rotation
+            if scenes:
+                import base64
+                import requests as sync_requests
+                from core.config import get_api_keys
 
-    except Exception as e:
-        logger.error(f"[Storyboard] Preview failed: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+                image_count = min(len(scenes), 5)
+                all_keys = get_api_keys()
+
+                yield _sse_event({
+                    "type": "image_progress",
+                    "message": f"正在生成 {image_count} 张故事板图片...",
+                    "progress": 0.6,
+                })
+
+                async def generate_one_image(idx, prompt, key):
+                    """Generate a single storyboard image via direct HTTP call.
+                    Hard 30s timeout total — storyboards are previews."""
+                    headers = {
+                        "Authorization": f"Bearer {key}",
+                        "Content-Type": "application/json",
+                    }
+                    payload = {
+                        "model": "agnes-image-2.1-flash",
+                        "prompt": prompt,
+                        "size": "768x1152",
+                        "n": 1,
+                    }
+                    url = "https://apihub.agnes-ai.com/v1/images/generations"
+
+                    try:
+                        # 3s connect + 25s read = 28s, plus 2s buffer
+                        resp = await asyncio.wait_for(
+                            asyncio.to_thread(
+                                sync_requests.post, url, headers=headers,
+                                json=payload, timeout=(3, 25),
+                            ),
+                            timeout=30,
+                        )
+
+                        if resp.status_code != 200:
+                            err_msg = resp.text[:100] if resp.text else f"HTTP {resp.status_code}"
+                            logger.warning(f"[Storyboard] Image {idx}: {err_msg}")
+                            return idx, None, f"HTTP {resp.status_code}"
+
+                        result = resp.json()
+                        if "error" in result:
+                            return idx, None, result["error"].get("message", "API error")
+
+                        data_list = result.get("data", [])
+                        if not data_list:
+                            return idx, None, "No data"
+
+                        item = data_list[0]
+                        b64_data = item.get("b64_json", "")
+                        if b64_data:
+                            return idx, f"data:image/png;base64,{b64_data}", None
+
+                        img_url = item.get("url", "")
+                        if not img_url:
+                            return idx, None, "No URL/b64"
+
+                        resp_img = await asyncio.wait_for(
+                            asyncio.to_thread(sync_requests.get, img_url, timeout=15),
+                            timeout=18,
+                        )
+                        b64_data = base64.b64encode(resp_img.content).decode()
+                        return idx, f"data:image/png;base64,{b64_data}", None
+
+                    except asyncio.TimeoutError:
+                        return idx, None, "Timeout"
+                    except Exception as e:
+                        return idx, None, str(e)
+
+                tasks = [
+                    generate_one_image(i, scenes[i]["video_prompt"], all_keys[i % len(all_keys)])
+                    for i in range(image_count)
+                ]
+                results = await asyncio.gather(*tasks, return_exceptions=True)
+
+                completed = 0
+                for result in results:
+                    if isinstance(result, Exception):
+                        continue
+                    idx, img_url, err = result
+                    if img_url:
+                        scenes[idx]["image_url"] = img_url
+                        yield _sse_event({
+                            "type": "image_progress",
+                            "index": idx,
+                            "total": image_count,
+                            "message": f"图片 {idx+1}/{image_count} 完成 ✅",
+                            "progress": 0.6 + 0.35 * ((idx + 1) / max(image_count, 1)),
+                        })
+                    else:
+                        scenes[idx]["image_url"] = None
+                        yield _sse_event({
+                            "type": "image_progress",
+                            "index": idx,
+                            "total": image_count,
+                            "message": f"图片 {idx+1}/{image_count} 失败",
+                            "progress": 0.6 + 0.35 * ((idx + 1) / max(image_count, 1)),
+                        })
+                    completed += 1
+
+                yield _sse_event({
+                    "type": "image_progress",
+                    "message": f"共 {completed}/{image_count} 张图片生成完成",
+                    "progress": 0.95,
+                })
+
+            # Done
+            yield _sse_event({
+                "type": "done",
+                "scenes": scenes,
+                "total_scenes": len(scenes),
+            })
+        except HTTPException:
+            raise
+        except Exception as e:
+            logger.error(f"[Storyboard] Preview failed: {e}")
+            yield _sse_event({"type": "error", "message": str(e)})
+
+    return StreamingResponse(
+        event_generator(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+            "X-Accel-Buffering": "no",
+        },
+    )
 
 
 @app.post("/api/tasks/poetry")

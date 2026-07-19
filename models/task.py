@@ -138,6 +138,8 @@ class SceneTask(BaseModel):
     final_clip: str = ""
     # v3.x 新增：每个场景独立时长
     duration: int = 5
+    # v5.0: per-scene reference images (from user upload, stored as base64 strings)
+    ref_images: list[str] = []
 
 
 # ═══════════════════════════════════════════════════
@@ -294,6 +296,9 @@ class ManuscriptVideoTask(BaseTaskState):
     combined_audio: str = ""
     combined_subtitle: str = ""
     subtitle_styles_path: str = ""      # LLM 样式 JSON 路径（Phase 2）
+
+    # ── Dialogue-only mode (narration off) ──
+    dialogue_only: bool = False         # When True, TTS only reads extracted dialogue, not full text
 
     # ── Storyboard (v5.1) ──
     use_storyboard: bool = False        # Use storyboard scenes instead of auto-split

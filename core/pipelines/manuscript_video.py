@@ -221,6 +221,9 @@ class ManuscriptVideoPipeline(MultiScenePipeline):
                 narration = s.get("narration_text", s.get("text", ""))
                 scene_prompt = s.get("video_prompt", s.get("scene_prompt", s.get("description", "")))
                 dur = s.get("duration", max(int(len(narration) / 4), 3))
+                ref_images = s.get("ref_images", [])
+                if ref_images:
+                    logger.info("[Manuscript] Scene %d: %d user-uploaded ref images", i, len(ref_images))
                 self._state.paragraphs.append(ManuscriptParagraph(
                     index=i,
                     text=narration[:10000],
@@ -232,6 +235,7 @@ class ManuscriptVideoPipeline(MultiScenePipeline):
                     scene_prompt=scene_prompt,
                     narration_text=narration,
                     duration=max(int(dur), 3),
+                    ref_images=ref_images,
                 ))
             self.task_manager.update_state(
                 paragraphs=self._state.paragraphs,
@@ -519,10 +523,17 @@ class ManuscriptVideoPipeline(MultiScenePipeline):
 
             para_duration = max(int(math.ceil(len(para.text) / _CHARS_PER_SEC)), 3)
 
-            # v5.0: Build reference images list
+            # v5.0: Build reference images list (char ref + per-scene user uploads)
             ref_images = []
             if char_ref_valid:
-                ref_images = [char_ref]
+                ref_images.append(char_ref)
+            # Add user-uploaded scene ref images from storyboard
+            if para.index < len(self._state.scenes):
+                scene_ref = self._state.scenes[para.index]
+                for ref in getattr(scene_ref, "ref_images", []):
+                    if ref and not ref.startswith(("http://", "https://", "data:")):
+                        ref = "data:image/png;base64," + ref
+                    ref_images.append(ref)
 
             for retry in range(_SUBMIT_RETRIES):
                 try:
@@ -587,10 +598,20 @@ class ManuscriptVideoPipeline(MultiScenePipeline):
             )
 
     async def _generate_audio(self) -> object:
-        """生成整段连续 TTS 音频，返回 sub_maker 供字幕步骤。"""
+        """生成整段连续 TTS 音频，返回 sub_maker 供字幕步骤。
+
+        如果 dialogue_only=True，则只使用提取的 dialogue 生成旁白，
+        而不是用完整的 narration text。
+        """
         paragraphs = self._state.paragraphs
         audio_config = self._state.audio_config
-        full_text = "\n\n".join(p.text for p in paragraphs if p.text)
+        if self._state.dialogue_only:
+            # Only use dialogue lines for TTS
+            dialogue_texts = [p.dialogue.strip() for p in paragraphs if getattr(p, 'dialogue', '') and p.dialogue.strip()]
+            full_text = "\n\n".join(dialogue_texts)
+            logger.info("[Manuscript] audio: dialogue-only mode, %d dialogue segments", len(dialogue_texts))
+        else:
+            full_text = "\n\n".join(p.text for p in paragraphs if p.text)
         if not full_text:
             logger.warning("[Manuscript] audio: empty full text, skipping")
             return None
@@ -638,17 +659,31 @@ class ManuscriptVideoPipeline(MultiScenePipeline):
         return sub_maker
 
     async def _generate_subtitles(self, sub_maker: object = None) -> None:
-        """生成整段 SRT 字幕（复用通用字幕生成逻辑）。"""
+        """生成整段 SRT 字幕（复用通用字幕生成逻辑）。
+
+        如果 dialogue_only=True，则字幕只显示 dialogue 文本，
+        而不是完整 narration。
+        """
         paragraphs = self._state.paragraphs
         subtitle_config = self._state.subtitle_config
-        segment_texts = [p.text for p in paragraphs if p.text]
+        if self._state.dialogue_only:
+            segment_texts = [
+                p.dialogue.strip() for p in paragraphs
+                if getattr(p, 'dialogue', '') and p.dialogue.strip()
+            ]
+            logger.info("[Manuscript] subtitle: dialogue-only mode, %d dialogue segments", len(segment_texts))
+        else:
+            segment_texts = [p.text for p in paragraphs if p.text]
         if not segment_texts:
             logger.warning("[Manuscript] subtitle: empty text, skipping")
             return
 
         segment_durations = []
         for p in paragraphs:
-            dur = max(len(p.text) / _CHARS_PER_SEC, 2.0) if p.text else 5.0
+            if self._state.dialogue_only and getattr(p, 'dialogue', ''):
+                dur = max(len(p.dialogue.strip()) / _CHARS_PER_SEC, 2.0)
+            else:
+                dur = max(len(p.text) / _CHARS_PER_SEC, 2.0) if p.text else 5.0
             segment_durations.append(dur)
 
         await self._emit(
