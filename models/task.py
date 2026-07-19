@@ -114,6 +114,9 @@ class ManuscriptParagraph(BaseModel):
     narration_audio: str = ""
     subtitle_srt: str = ""
     final_clip: str = ""
+    # v5.0: dialogue support
+    dialogue: str = ""           # extracted dialogue lines for this scene
+    character_action: str = ""    # visual action description for character consistency
 
 
 class SceneTask(BaseModel):
@@ -280,6 +283,13 @@ class ManuscriptVideoTask(BaseTaskState):
     audio_config: AudioConfig = Field(default_factory=AudioConfig)
     subtitle_config: SubtitleConfig = Field(default_factory=SubtitleConfig)
     video_duration: int = 10
+
+    # ── Character consistency (v5.0) ──
+    reference_image: str = ""              # user-provided character reference (path/URL)
+    character_ref_file: str = ""           # generated/reused character reference image path
+    character_ref_prompt: str = ""         # character description prompt used for ref image
+    step_character_ref: StepStatus = StepStatus.PENDING
+    style: str = ""                        # art style hint (e.g. "Disney", "Pixar", "anime")
 
     combined_audio: str = ""
     combined_subtitle: str = ""

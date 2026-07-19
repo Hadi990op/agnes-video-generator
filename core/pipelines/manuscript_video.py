@@ -71,6 +71,9 @@ class ManuscriptVideoPipeline(MultiScenePipeline):
         self.video_api.shutdown_event = shutdown_event
         self.video_api.set_refresh_key_callback(self._make_refresh_key_callback())
         self.screenwriter = Screenwriter(api_key=api_key)
+        # v5.0: image generator for character reference images
+        from core.api.agnes_image import AgnesImageAPI
+        self.image_api = AgnesImageAPI(api_key=api_key)
 
     # ------------------------------------------------------------------
     # 模板钩子：数据来源
@@ -111,8 +114,94 @@ class ManuscriptVideoPipeline(MultiScenePipeline):
         self.task_manager.update_state(scenes=[s.model_dump() for s in self._state.scenes])
 
     async def _build_reference_images(self) -> None:
-        """稿件视频无参考图阶段，空实现跳过。"""
-        return
+        """v5.0: Generate character reference image for consistency across scenes.
+
+        - If user provided a reference image → use it directly.
+        - Otherwise, extract character description from manuscript text and
+          generate a reference image via t2i.
+        - Store path in self._state.character_ref_file.
+        """
+        # Skip if already done (resume)
+        if self._state.step_character_ref == StepStatus.COMPLETED:
+            ref = self._state.character_ref_file
+            if ref and (ref.startswith(("http://", "https://")) or os.path.exists(ref)):
+                logger.info("[Manuscript] character_ref: SKIP (already completed)")
+                return
+            logger.warning("[Manuscript] character_ref: marked done but file missing, re-running")
+
+        ref_img_path = os.path.join(self.working_dir, "character_reference.png")
+        ref_prompt_path = os.path.join(self.working_dir, "character_ref_prompt.txt")
+
+        # Case 1: user provided reference image
+        if self._state.reference_image:
+            ref = self._state.reference_image
+            if ref.startswith(("http://", "https://")) or os.path.exists(ref):
+                logger.info("[Manuscript] character_ref: using user-provided reference image")
+                self._state.character_ref_file = ref
+                self._state.step_character_ref = StepStatus.COMPLETED
+                self.task_manager.update_state(
+                    character_ref_file=ref,
+                    step_character_ref=StepStatus.COMPLETED,
+                )
+                await self._emit("reference_images", "completed", "使用用户提供的角色参考图", 0.25)
+                return
+
+        # Case 2: cached on disk (resume after restart)
+        if os.path.exists(ref_img_path) and os.path.exists(ref_prompt_path):
+            logger.info("[Manuscript] character_ref: found cached reference image")
+            self._state.character_ref_file = ref_img_path
+            self._state.step_character_ref = StepStatus.COMPLETED
+            with open(ref_prompt_path, "r") as f:
+                self._state.character_ref_prompt = f.read()
+            self.task_manager.update_state(
+                character_ref_file=ref_img_path,
+                character_ref_prompt=self._state.character_ref_prompt,
+                step_character_ref=StepStatus.COMPLETED,
+            )
+            await self._emit("reference_images", "completed", "角色参考图已缓存", 0.25)
+            return
+
+        # Case 3: generate new reference image
+        await self._emit("reference_images", "running", "正在提取角色描述...", 0.18)
+
+        # Build a condensed story context for character extraction
+        # Use first ~2000 chars of manuscript for character description
+        story_context = self._state.manuscript_text[:2000]
+        style_hint = getattr(self._state, 'style', '') or ""
+
+        char_prompt = await asyncio.to_thread(
+            self.screenwriter.extract_character_description,
+            story_context, style_hint,
+        )
+        with open(ref_prompt_path, "w") as f:
+            f.write(char_prompt)
+        self._state.character_ref_prompt = char_prompt
+
+        await self._emit("reference_images", "running", "正在生成角色参考图...", 0.22)
+
+        try:
+            img_output = await self.image_api.generate_single_image(
+                prompt=char_prompt,
+                size=f"{self._state.video_width}x{self._state.video_height}",
+            )
+            img_output.save(ref_img_path)
+        except Exception as e:
+            logger.error(f"[Manuscript] character_ref: failed to generate: {e}")
+            # Non-fatal: continue without reference image
+            await self._emit("reference_images", "completed", "角色参考图生成失败，跳过", 0.25)
+            self._state.step_character_ref = StepStatus.COMPLETED
+            self.task_manager.update_state(step_character_ref=StepStatus.COMPLETED)
+            return
+
+        self._state.character_ref_file = ref_img_path
+        self._state.step_character_ref = StepStatus.COMPLETED
+        self.task_manager.update_state(
+            character_ref_file=ref_img_path,
+            character_ref_prompt=char_prompt,
+            step_character_ref=StepStatus.COMPLETED,
+        )
+        logger.info("[Manuscript] character_ref: generated → %s", ref_img_path)
+        await self._emit("reference_images", "completed", "角色参考图生成完成", 0.25)
 
     # ------------------------------------------------------------------
     # 步骤实现（覆写通用实现以保留稿件特有逻辑）
@@ -341,8 +430,17 @@ class ManuscriptVideoPipeline(MultiScenePipeline):
     async def _generate_scene_prompts(
         self, paragraphs: List[ManuscriptParagraph],
     ) -> None:
-        """为每个段落生成视频场景描述 prompt（语言跟随输入段落）。"""
+        """为每个段落生成视频场景描述 prompt（语言跟随输入段落）。
+
+        v5.0: Inject character appearance description for cross-scene consistency,
+        and extract dialogue from the paragraph text.
+        """
         total = len(paragraphs)
+
+        # v5.0: Get character appearance for consistency
+        char_appearance = self._state.character_ref_prompt or ""
+        style_hint = getattr(self._state, 'style', '') or ""
+
         for i, para in enumerate(paragraphs):
             self._check_shutdown()
 
@@ -363,10 +461,22 @@ class ManuscriptVideoPipeline(MultiScenePipeline):
                 0.05 + 0.10 * (i / max(total, 1)),
             )
 
+            # v5.0: Extract dialogue from the paragraph text
+            dialogue = ""
+            try:
+                dialogue = await asyncio.to_thread(
+                    self.screenwriter.extract_dialogue, para.text,
+                )
+                para.dialogue = dialogue
+            except Exception as e:
+                logger.debug(f"[Manuscript] dialogue extract failed for para {i}: {e}")
+
             prompt = await asyncio.to_thread(
-                self.screenwriter.generate_scene_prompt_for_paragraph,
+                self.screenwriter.generate_scene_prompt_enhanced,
                 para.text,
-                "",
+                style_hint,
+                char_appearance,
+                dialogue,
             )
             para.scene_prompt = prompt.strip()
 
@@ -378,7 +488,8 @@ class ManuscriptVideoPipeline(MultiScenePipeline):
 
         self.save_prompts({
             "scene_prompts": [
-                {"index": p.index, "text": p.text, "scene_prompt": p.scene_prompt}
+                {"index": p.index, "text": p.text, "scene_prompt": p.scene_prompt,
+                 "dialogue": p.dialogue}
                 for p in paragraphs
             ],
         })
@@ -386,6 +497,7 @@ class ManuscriptVideoPipeline(MultiScenePipeline):
     async def _generate_videos(self) -> None:
         """为每个段落调用 Agnes Video API 生成视频（两阶段并行）。
 
+        v5.0: Pass character reference image for cross-scene consistency.
         每段视频保存到 ``{working_dir}/para_{index}/video.mp4``，
         同时记录 video_id 和 curl 命令到 ``task.json`` / ``curl.sh``。
         """
@@ -393,6 +505,17 @@ class ManuscriptVideoPipeline(MultiScenePipeline):
         _WAIT_RETRIES = 3
         paragraphs = self._state.paragraphs
         total = len(paragraphs)
+
+        # v5.0: Collect character reference image
+        char_ref = self._state.character_ref_file or ""
+        char_ref_valid = bool(
+            char_ref and (
+                char_ref.startswith(("http://", "https://"))
+                or os.path.exists(char_ref)
+            )
+        )
+        if char_ref_valid:
+            logger.info("[Manuscript] video: using character ref: %s", char_ref[:60])
 
         # ── Phase 1: 批量提交 ────────────────────────────────────────────
         pending: list[tuple[int, str, str]] = []  # (para_index, video_id, video_path)
@@ -434,10 +557,16 @@ class ManuscriptVideoPipeline(MultiScenePipeline):
 
             para_duration = max(int(math.ceil(len(para.text) / _CHARS_PER_SEC)), 3)
 
+            # v5.0: Build reference images list
+            ref_images = []
+            if char_ref_valid:
+                ref_images = [char_ref]
+
             for retry in range(_SUBMIT_RETRIES):
                 try:
                     video_id = await self.video_api.submit_video(
                         prompt=para.scene_prompt,
+                        reference_image_paths=ref_images,
                         duration=para_duration,
                         width=self._state.video_width,
                         height=self._state.video_height,

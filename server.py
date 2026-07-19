@@ -1366,8 +1366,14 @@ async def create_manuscript_task(
     subtitle_stroke_color: str = Form("black"),
     subtitle_stroke_width: int = Form(2),
     subtitle_bg_color: str = Form("black@0.5"),
+    # v5.0: Character consistency + style
+    style: str = Form(""),
+    reference_image: UploadFile = File(None),
 ):
-    """创建稿件长视频任务（类型 3）。"""
+    """创建稿件长视频任务（类型 3）。
+
+    v5.0: 支持角色参考图上传和艺术风格，用于跨场景角色一致性。
+    """
     api_key = get_api_key()
     if not api_key:
         raise HTTPException(status_code=400, detail="请先配置 API Key")
@@ -1418,7 +1424,18 @@ async def create_manuscript_task(
         video_duration=video_duration,
         audio_config=audio_config,
         subtitle_config=subtitle_config,
+        style=style,
     )
+
+    # v5.0: Handle user-provided character reference image
+    if reference_image and reference_image.filename:
+        ext = os.path.splitext(reference_image.filename)[1] or ".png"
+        upload_dir = os.path.join(_WORKING_DIR, dir_name)
+        os.makedirs(upload_dir, exist_ok=True)
+        upload_path = os.path.join(upload_dir, f"character_ref_input{ext}")
+        with open(upload_path, "wb") as f:
+            f.write(await reference_image.read())
+        state.reference_image = upload_path
 
     pipeline = _create_pipeline_for_type(TaskType.MANUSCRIPT, api_key, task_id, dir_name)
     active_pipelines[task_id] = pipeline

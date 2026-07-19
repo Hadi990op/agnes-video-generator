@@ -526,6 +526,34 @@ language that focuses on what the camera sees and how it feels.
         logger.info(f"[Screenwriter] Script written: {len(scenes)} scenes")
         return scenes
 
+    def extract_dialogue(self, text: str) -> str:
+        """v5.0: Extract dialogue lines from a paragraph of narration text.
+
+        Identifies quoted speech (both Western quotes "" and Chinese quotes 「」)
+        and returns them as a formatted string. Returns empty string if no
+        dialogue found.
+        """
+        import re
+        # Match Western quotes, Chinese quotes, and common dialogue patterns
+        patterns = [
+            r'"([^"]+)"',           # Western double quotes
+            r'"([^"]+)"',           # Smart double quotes
+            r'「([^」]+)」',         # Japanese/Chinese corner brackets
+        ]
+        seen = set()
+        dialogues = []
+        for pattern in patterns:
+            matches = re.findall(pattern, text)
+            for m in matches:
+                if m not in seen:
+                    seen.add(m)
+                    dialogues.append(m)
+        if not dialogues:
+            return ""
+        result = "\n".join(f'- "{d}"' for d in dialogues)
+        logger.info(f"[Screenwriter] Extracted {len(dialogues)} dialogue line(s)")
+        return result
+
     def extract_character_description(self, story: str, style: str) -> str:
         system_prompt = self._prompt(
             zh_text="""\
@@ -881,6 +909,36 @@ Output in the SAME LANGUAGE as the input scene.
         Returns:
             视频 prompt 字符串（语言与输入一致）
         """
+        return self._generate_scene_prompt_enhanced(text, style, "", "")
+
+    def generate_scene_prompt_enhanced(
+        self,
+        text: str,
+        style: str = "",
+        character_appearance: str = "",
+        dialogue: str = "",
+    ) -> str:
+        """v5.0: Enhanced scene prompt with character consistency and dialogue.
+
+        Args:
+            text: Paragraph narration text.
+            style: Art style hint (e.g. "Disney", "Pixar").
+            character_appearance: Character description for visual consistency.
+            dialogue: Extracted dialogue to show as lip-sync/action in the scene.
+
+        Returns:
+            Enhanced video prompt string.
+        """
+        return self._generate_scene_prompt_enhanced(text, style, character_appearance, dialogue)
+
+    def _generate_scene_prompt_enhanced(
+        self,
+        text: str,
+        style: str = "",
+        character_appearance: str = "",
+        dialogue: str = "",
+    ) -> str:
+        """Internal: generate scene prompt with optional character/dialogue context."""
         system_prompt = self._prompt(
             zh_text="""\
 你是一位专业的视频导演和视觉提示词工程师。给定一段\
@@ -944,17 +1002,49 @@ Output ONLY the visual prompt text, no JSON, no explanation.
 """,
         )
         style_block = f"\n<style>{style}</style>\n" if style else ""
+        char_block = ""
+        if character_appearance:
+            char_block = f"""
+<character_appearance>
+{character_appearance}
+</character_appearance>
+{self._prompt(
+    zh_text="重要：场景中出现的角色必须严格遵循上述角色外观描述，保持跨场景一致性。"
+            "角色穿着、颜色、发型、体型必须与描述完全一致。",
+    en_text="IMPORTANT: The character appearing in this scene MUST strictly follow "
+            "the character appearance description above for cross-scene consistency. "
+            "Clothing, colors, hairstyle, body type must match exactly."
+)}
+"""
+        dialogue_block = ""
+        if dialogue:
+            dialogue_block = f"""
+<dialogue>
+{dialogue}
+</dialogue>
+{self._prompt(
+    zh_text="此场景包含对话。请在视觉描述中体现角色说话的动作（嘴唇动作、"
+            "表情变化、手势），但不要在视频中显示文字字幕。",
+    en_text="This scene contains dialogue. Reflect the speaking action in the visual "
+            "description (lip movement, facial expressions, gestures), but do NOT show "
+            "text subtitles in the video."
+)}
+"""
         user_prompt = f"""\
 <paragraph>
 {text}
 </paragraph>
-{style_block}
+{style_block}{char_block}{dialogue_block}
 {self._prompt(
     zh_text="请为此段落生成一个详细的视觉提示词。",
     en_text="Generate a detailed visual prompt for this paragraph."
 )}
 """
-        logger.info(f"[Screenwriter] Generating scene prompt for paragraph ({len(text)} chars)...")
+        logger.info(
+            f"[Screenwriter] Generating scene prompt ({len(text)} chars, "
+            f"char_ref={'yes' if character_appearance else 'no'}, "
+            f"dialogue={'yes' if dialogue else 'no'})..."
+        )
         prompt = strip_code_fence(self._chat(system_prompt, user_prompt))
         logger.info(f"[Screenwriter] Scene prompt: {prompt[:100]}...")
         return prompt

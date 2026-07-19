@@ -31,6 +31,14 @@
     box-shadow: 0 0 20px rgba(59,130,246,0.06);
   }
 
+  /* v5.0: Character reference preview */
+  .char-ref-preview {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    max-width: 200px;
+  }
+
   /* ── Glow Button ── */
   .glow-btn {
     position: relative;
@@ -914,6 +922,48 @@ Next narration text...</code>
             <option value="1024x1024" data-i18n="resSquare">方形 1:1</option>
           </select>
         </div>
+
+        <!-- v5.0: Character Consistency Settings -->
+        <div class="mb-4 p-4 rounded-lg bg-purple-900/20 border border-purple-700/40">
+          <div class="flex items-center gap-2 mb-3">
+            <span class="text-base">🎭</span>
+            <h3 class="text-sm font-semibold text-purple-300" data-i18n="charConsistencyTitle">角色一致性 (Character Consistency)</h3>
+          </div>
+          <p class="text-xs text-gray-400 mb-3" data-i18n="charConsistencyHint">Upload a character reference image or let the AI auto-generate one from your story. This keeps the same character appearance across all scenes (Disney/fairytale style).</p>
+
+          <!-- Art Style -->
+          <div class="mb-3">
+            <label class="block text-xs text-gray-400 mb-1" data-i18n="artStyle">艺术风格 (Art Style)</label>
+            <select id="m_style" class="w-full glass-input rounded-lg px-3 py-2 text-sm text-gray-100">
+              <option value="" data-i18n="styleAuto">Auto (auto-detect from text)</option>
+              <option value="Disney Pixar 3D animation style" data-i18n="styleDisney">Disney/Pixar 3D Animation</option>
+              <option value="Studio Ghibli anime style" data-i18n="styleGhibli">Studio Ghibli Anime</option>
+              <option value="classic 2D animation style" data-i18n="style2D">Classic 2D Animation</option>
+              <option value="cinematic realistic style" data-i18n="styleCinematic">Cinematic Realistic</option>
+              <option value="watercolor fairytale illustration style" data-i18n="styleWatercolor">Watercolor Fairytale</option>
+            </select>
+          </div>
+
+          <!-- Character Reference Image Upload -->
+          <div class="mb-2">
+            <label class="block text-xs text-gray-400 mb-1" data-i18n="charRefImage">角色参考图 (Character Reference Image)</label>
+            <div class="flex items-center gap-3">
+              <input type="file" id="m_char_ref" accept="image/*" class="hidden">
+              <button type="button" onclick="document.getElementById('m_char_ref').click()" class="px-4 py-2 bg-purple-700/60 hover:bg-purple-600 rounded-lg text-sm transition flex items-center gap-2">
+                <span>📁</span>
+                <span data-i18n="uploadCharRef">Upload Image</span>
+              </button>
+              <button type="button" id="m_char_ref_clear" onclick="clearCharRef()" class="px-3 py-2 bg-gray-700/60 hover:bg-gray-600 rounded-lg text-sm transition hidden">
+                <span>✕</span>
+              </button>
+              <div id="m_char_ref_preview" class="char-ref-preview hidden">
+                <img id="m_char_ref_thumb" class="w-12 h-12 rounded-lg object-cover border border-purple-500/40">
+                <span id="m_char_ref_name" class="text-xs text-purple-300 truncate"></span>
+              </div>
+              <span id="m_char_ref_auto" class="text-xs text-gray-500" data-i18n="charRefAuto">Auto-generate from story</span>
+            </div>
+          </div>
+        </div>
       </div>
 
       <!-- Audio Config (Manuscript) — v3.0 audio only -->
@@ -1634,6 +1684,10 @@ const T = {
     manuscriptText: '稿件正文', manuscriptPlaceholder: '粘贴你的文章、新闻稿、公众号文章等...',
     sceneFormatTitle: '场景格式（电影模式）：', sceneFormatHint: '每个 [SCENE: ...] 标记定义一个视频片段。标记后的文字是旁白。长场景自动拆分为 5-12 秒片段。不用标记则普通自动拆分。',
     charCount: '字数', maxChars: '最多', chars: '字符', currentLength: '当前', hours: '小时', movie: '电影',
+    // v5.0: Character consistency
+    charConsistencyTitle: '角色一致性', charConsistencyHint: '上传角色参考图或让 AI 从故事自动生成。保持所有场景中角色外观一致（迪士尼/童话风格）。',
+    artStyle: '艺术风格', styleAuto: '自动（从文本检测）', styleDisney: '迪士尼/皮克斯 3D 动画', styleGhibli: '吉卜力动漫', style2D: '经典 2D 动画', styleCinematic: '电影写实', styleWatercolor: '水彩童话',
+    charRefImage: '角色参考图', uploadCharRef: '上传图片', charRefAuto: '从故事自动生成',
     startGenerate: '开始生成视频', submitting: '提交中...', taskRunning: '任务进行中...',
     loading: '加载中...', noTasks: '暂无任务', loadFailed: '加载失败',
     progress: '生成进度', stopTask: '中断任务',
@@ -1778,6 +1832,10 @@ const T = {
     manuscriptText: 'Article Text', manuscriptPlaceholder: 'Paste your article, news, blog post...',
     sceneFormatTitle: 'Scene Format (for movies):', sceneFormatHint: 'Each [SCENE: ...] marker defines a video clip. Text after it is narrated. Long scenes auto-split into 5-12s clips. Without markers, plain text auto-splits normally.',
     charCount: 'Characters', maxChars: 'Max', chars: 'chars', currentLength: 'current', hours: 'hours', movie: 'movie',
+    // v5.0: Character consistency
+    charConsistencyTitle: 'Character Consistency', charConsistencyHint: 'Upload a character reference image or let the AI auto-generate one from your story. This keeps the same character appearance across all scenes (Disney/fairytale style).',
+    artStyle: 'Art Style', styleAuto: 'Auto (auto-detect from text)', styleDisney: 'Disney/Pixar 3D Animation', styleGhibli: 'Studio Ghibli Anime', style2D: 'Classic 2D Animation', styleCinematic: 'Cinematic Realistic', styleWatercolor: 'Watercolor Fairytale',
+    charRefImage: 'Character Reference Image', uploadCharRef: 'Upload Image', charRefAuto: 'Auto-generate from story',
     startGenerate: 'Start Generating', submitting: 'Submitting...', taskRunning: 'Task in progress...',
     loading: 'Loading...', noTasks: 'No tasks', loadFailed: 'Load failed',
     progress: 'Progress', stopTask: 'Stop Task',
@@ -3506,6 +3564,34 @@ function parseResolution(val) {
   return { width: w, height: h };
 }
 
+// v5.0: Character reference image upload handlers
+document.getElementById('m_char_ref').addEventListener('change', function(e) {
+  const file = e.target.files[0];
+  if (!file) return;
+  const preview = document.getElementById('m_char_ref_preview');
+  const thumb = document.getElementById('m_char_ref_thumb');
+  const nameEl = document.getElementById('m_char_ref_name');
+  const clearBtn = document.getElementById('m_char_ref_clear');
+  const autoHint = document.getElementById('m_char_ref_auto');
+
+  thumb.src = URL.createObjectURL(file);
+  nameEl.textContent = file.name;
+  preview.classList.remove('hidden');
+  clearBtn.classList.remove('hidden');
+  autoHint.classList.add('hidden');
+});
+
+function clearCharRef() {
+  const input = document.getElementById('m_char_ref');
+  const preview = document.getElementById('m_char_ref_preview');
+  const clearBtn = document.getElementById('m_char_ref_clear');
+  const autoHint = document.getElementById('m_char_ref_auto');
+  input.value = '';
+  preview.classList.add('hidden');
+  clearBtn.classList.add('hidden');
+  autoHint.classList.remove('hidden');
+}
+
 // Creative end frames
 function toggleCEndFrames() {
   const on = document.getElementById('c_use_end_frames').checked;
@@ -3744,6 +3830,13 @@ async function submitManuscript() {
   form.append('subtitle_stroke_color', document.getElementById('m_sub_stroke_color').value);
   form.append('subtitle_stroke_width', document.getElementById('m_sub_stroke_width').value);
   form.append('subtitle_bg_color', document.getElementById('m_sub_bg_color').value);
+
+  // v5.0: Character consistency — style and reference image
+  form.append('style', document.getElementById('m_style').value);
+  const charRefFile = document.getElementById('m_char_ref').files[0];
+  if (charRefFile) {
+    form.append('reference_image', charRefFile);
+  }
 
   try {
     const r = await fetch('api/tasks/manuscript', { method: 'POST', body: form });
