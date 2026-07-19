@@ -7,7 +7,246 @@
 <link rel="icon" type="image/x-icon" href="static/favicon.ico">
 <link rel="icon" type="image/png" sizes="1024x1024" href="static/icon.png">
 <link rel="apple-touch-icon" href="static/icon.png">
-<script src="https://cdn.tailwindcss.com"></script>
+<script src="https://cdn.tailwindcss.com">
+// ═══════ Story Creator (Type 4) ═══════
+
+let _storyCharacterCount = 0;
+let _storySceneCount = 0;
+
+function addStoryCharacter() {
+  _storyCharacterCount++;
+  const idx = _storyCharacterCount;
+  const html = `
+    <div class="glass-card rounded-lg p-3 border border-purple-500/20" data-char-idx="${idx}">
+      <div class="flex items-start justify-between mb-2">
+        <span class="text-xs text-purple-300 font-semibold">Character #${idx}</span>
+        <button type="button" onclick="this.closest('[data-char-idx]').remove()" class="text-xs text-red-400 hover:text-red-300">✕</button>
+      </div>
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-2 mb-2">
+        <div>
+          <label class="text-xs text-gray-500 block mb-0.5">Name</label>
+          <input type="text" class="char_name w-full glass-input rounded px-2 py-1 text-xs text-gray-200" placeholder="John Doe">
+        </div>
+        <div>
+          <label class="text-xs text-gray-500 block mb-0.5">Role</label>
+          <input type="text" class="char_role w-full glass-input rounded px-2 py-1 text-xs text-gray-200" placeholder="Protagonist">
+        </div>
+      </div>
+      <div class="mb-2">
+        <label class="text-xs text-gray-500 block mb-0.5">Appearance Description</label>
+        <textarea class="char_appearance w-full glass-input rounded px-2 py-1 text-xs text-gray-200 resize-y" rows="2" placeholder="Tall muscular man with dark beard, blue eyes, wearing a leather jacket..."></textarea>
+      </div>
+      <div>
+        <label class="text-xs text-gray-500 block mb-0.5">Voice Style <span class="text-gray-600">(optional)</span></label>
+        <input type="text" class="char_voice w-full glass-input rounded px-2 py-1 text-xs text-gray-200" placeholder="Deep, gravelly voice">
+      </div>
+      <div class="mt-2">
+        <label class="text-xs text-gray-500 block mb-0.5">Reference Image <span class="text-gray-600">(optional)</span></label>
+        <div class="flex items-center gap-2">
+          <input type="file" accept="image/*" onchange="handleCharImageUpload(this, ${idx})" class="text-xs text-gray-400 file:mr-2 file:py-1 file:px-2 file:rounded file:text-xs file:bg-purple-700/40 file:text-purple-300 file:border-0">
+          <span id="char_img_status_${idx}" class="text-xs text-green-400"></span>
+        </div>
+      </div>
+    </div>`;
+  document.getElementById('story_characters_list').insertAdjacentHTML('beforeend', html);
+}
+
+function handleCharImageUpload(input, idx) {
+  const file = input.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = function(e) {
+    const b64 = e.target.result;
+    document.getElementById('char_img_status_' + idx).textContent = '✓ Loaded (' + (b64.length/1024).toFixed(0) + 'KB)';
+  };
+  reader.readAsDataURL(file);
+}
+
+function addStoryScene() {
+  _storySceneCount++;
+  const idx = _storySceneCount;
+  const html = `
+    <div class="glass-card rounded-lg p-3 border border-purple-500/20" data-scene-idx="${idx}">
+      <div class="flex items-start justify-between mb-2">
+        <span class="text-xs text-purple-300 font-semibold">Scene #${idx}</span>
+        <button type="button" onclick="this.closest('[data-scene-idx]').remove()" class="text-xs text-red-400 hover:text-red-300">✕</button>
+      </div>
+      <div class="grid grid-cols-1 md:grid-cols-3 gap-2 mb-2">
+        <div>
+          <label class="text-xs text-gray-500 block mb-0.5">Location</label>
+          <input type="text" class="scene_location w-full glass-input rounded px-2 py-1 text-xs text-gray-200" placeholder="Forest clearing">
+        </div>
+        <div>
+          <label class="text-xs text-gray-500 block mb-0.5">Characters <span class="text-gray-600">(comma sep)</span></label>
+          <input type="text" class="scene_characters w-full glass-input rounded px-2 py-1 text-xs text-gray-200" placeholder="John, Mary">
+        </div>
+        <div>
+          <label class="text-xs text-gray-500 block mb-0.5">Duration (sec)</label>
+          <input type="number" class="scene_duration w-full glass-input rounded px-2 py-1 text-xs text-gray-200" value="5" min="3" max="30">
+        </div>
+      </div>
+      <div class="mb-2">
+        <label class="text-xs text-gray-500 block mb-0.5">Action / What Happens</label>
+        <textarea class="scene_action w-full glass-input rounded px-2 py-1 text-xs text-gray-200 resize-y" rows="2" placeholder="John walks through the dark forest, his torch flickering..."></textarea>
+      </div>
+      <div class="mb-2">
+        <label class="text-xs text-gray-500 block mb-0.5">Dialogue <span class="text-gray-600">(what characters say)</span></label>
+        <textarea class="scene_dialogue w-full glass-input rounded px-2 py-1 text-xs text-gray-200 resize-y" rows="2" placeholder="John: "The path is getting darker..." Mary: "Keep moving, we almost there.""></textarea>
+      </div>
+      <div>
+        <label class="text-xs text-gray-500 block mb-0.5">Mood / Atmosphere <span class="text-gray-600">(optional)</span></label>
+        <input type="text" class="scene_mood w-full glass-input rounded px-2 py-1 text-xs text-gray-200" placeholder="Tense, mysterious, suspenseful">
+      </div>
+    </div>`;
+  document.getElementById('story_scenes_list').insertAdjacentHTML('beforeend', html);
+}
+
+function collectStoryData() {
+  // Collect characters
+  const characters = [];
+  document.querySelectorAll('[data-char-idx]').forEach(el => {
+    const name = el.querySelector('.char_name').value.trim();
+    if (!name && !el.querySelector('.char_appearance').value.trim()) return;
+    characters.push({
+      name: name,
+      role: el.querySelector('.char_role').value.trim(),
+      appearance: el.querySelector('.char_appearance').value.trim(),
+      personality: '',
+      voice: el.querySelector('.char_voice').value.trim(),
+      image_base64: '',
+      image_url: ''
+    });
+  });
+
+  // Collect scenes
+  const scenes = [];
+  document.querySelectorAll('[data-scene-idx]').forEach(el => {
+    const action = el.querySelector('.scene_action').value.trim();
+    if (!action && !el.querySelector('.scene_location').value.trim()) return;
+    scenes.push({
+      index: scenes.length,
+      location: el.querySelector('.scene_location').value.trim(),
+      characters: el.querySelector('.scene_characters').value.trim().split(',').map(s => s.trim()).filter(Boolean),
+      action: action,
+      dialogue: el.querySelector('.scene_dialogue').value.trim(),
+      duration: parseInt(el.querySelector('.scene_duration').value) || 5,
+      mood: el.querySelector('.scene_mood').value.trim(),
+      visual_prompt: '',
+      image_base64: '',
+      image_url: ''
+    });
+  });
+
+  return { characters, scenes };
+}
+
+async function submitStory() {
+  const btn = document.getElementById('btn-story');
+  btn.disabled = true;
+  btn.textContent = '⏳ Creating story video...';
+
+  try {
+    // Collect story data
+    const { characters, scenes } = collectStoryData();
+    
+    const title = document.getElementById('story_title').value.trim();
+    const genre = document.getElementById('story_genre').value.trim();
+    const theme = document.getElementById('story_theme').value.trim();
+    const summary = document.getElementById('story_summary').value.trim();
+    const synopsis = document.getElementById('story_synopsis').value.trim();
+    const artStyle = document.getElementById('story_art_style').value;
+    const cameraStyle = document.getElementById('story_camera_style').value;
+    const colorTone = document.getElementById('story_color_tone').value;
+    const lighting = document.getElementById('story_lighting').value;
+    const musicMood = document.getElementById('story_music_mood').value;
+    const aspectRatio = document.getElementById('story_aspect_ratio').value;
+    const customInstructions = document.getElementById('story_custom_instructions').value.trim();
+    const audioEnabled = document.getElementById('story_audio_enabled').checked;
+    const subtitleEnabled = document.getElementById('story_subtitle_enabled').checked;
+    const audioVoice = document.getElementById('story_audio_voice').value;
+
+    // Check aspect ratio
+    const vw = aspectRatio === '9:16' ? 768 : (aspectRatio === '1:1' ? 1024 : 1152);
+    const vh = aspectRatio === '9:16' ? 1152 : (aspectRatio === '1:1' ? 1024 : 768);
+
+    // Handle character image uploads
+    const charIdxMap = {};
+    document.querySelectorAll('[data-char-idx]').forEach(el => {
+      const idx = parseInt(el.dataset.charIdx);
+      const input = el.querySelector('input[type="file"]');
+      if (input && input.files[0]) {
+        charIdxMap[idx] = input;
+      }
+    });
+
+    // Upload images synchronously (sequential to keep order)
+    const uploadPromises = [];
+    for (const idx of Object.keys(charIdxMap)) {
+      const promise = new Promise((resolve) => {
+        const input = charIdxMap[idx];
+        const reader = new FileReader();
+        reader.onload = (e) => {
+          characters[idx - 1].image_base64 = e.target.result;
+          resolve();
+        };
+        reader.readAsDataURL(input.files[0]);
+      });
+      uploadPromises.push(promise);
+    }
+    await Promise.all(uploadPromises);
+
+    const formData = new FormData();
+    formData.append('story_title', title);
+    formData.append('story_genre', genre);
+    formData.append('story_theme', theme);
+    formData.append('story_summary', summary);
+    formData.append('story_synopsis', synopsis);
+    formData.append('characters', JSON.stringify(characters));
+    formData.append('scenes', JSON.stringify(scenes));
+    formData.append('art_style', artStyle);
+    formData.append('camera_style', cameraStyle);
+    formData.append('color_tone', colorTone);
+    formData.append('lighting', lighting);
+    formData.append('music_mood', musicMood);
+    formData.append('aspect_ratio', aspectRatio);
+    formData.append('custom_instructions', customInstructions);
+    formData.append('audio_enabled', audioEnabled);
+    formData.append('audio_voice', audioVoice);
+    formData.append('audio_rate', '+0%');
+    formData.append('subtitle_enabled', subtitleEnabled);
+
+    const res = await fetch('/agnes-video/api/tasks/story', {
+      method: 'POST',
+      body: formData,
+    });
+
+    if (!res.ok) {
+      const errText = await res.text();
+      throw new Error(`API error ${res.status}: ${errText.slice(0, 300)}`);
+    }
+
+    const data = await res.json();
+    const taskId = data.task_id;
+
+    // Switch to progress panel
+    showProgressPanel(taskId);
+    showToast(`Story "${title}" created! Starting video generation...`);
+
+  } catch (e) {
+    console.error('Story submit error:', e);
+    showToast('Error: ' + e.message);
+    btn.disabled = false;
+    btn.textContent = '📖 Create & Generate Story Video';
+  }
+}
+
+// Auto-add default character and scene
+document.addEventListener('DOMContentLoaded', () => {
+  // Add one default character and scene for convenience
+  // Users can add more or remove as needed
+});
+
+</script>
 <style>
   /* ── Base Animations ── */
   @keyframes spin { to { transform: rotate(360deg); } }
@@ -458,6 +697,9 @@
       </button>
       <button onclick="switchTaskType('poetry')" id="ttype-poetry" class="ttype-btn flex-1 px-4 py-3 rounded-xl text-sm font-medium tab-inactive transition text-center">
         <span class="text-lg">📜</span><br><span data-i18n="ttPoetry">诗词视频</span>
+      </button>
+      <button onclick="switchTaskType('story')" id="ttype-story" class="ttype-btn flex-1 px-4 py-3 rounded-xl text-sm font-medium tab-inactive transition text-center">
+        <span class="text-lg">📖</span><br><span data-i18n="ttStory">故事创作者</span>
       </button>
     </div>
 
@@ -1603,6 +1845,181 @@ Steam rose from his coffee cup as he gazed out the window.
       <button id="btn-poetry" onclick="submitPoetry()" class="w-full py-3.5 bg-gradient-to-r from-blue-600 via-blue-500 to-blue-600 hover:from-blue-500 hover:via-blue-400 hover:to-blue-500 rounded-xl text-base font-semibold transition disabled:opacity-50 disabled:cursor-not-allowed glow-btn" data-i18n="startGenerate">
         开始生成视频
       </button>
+    </div>
+
+    <!-- Story Creator Form -->
+    <div id="form-story" class="hidden">
+      <div class="glass-card rounded-2xl p-6">
+
+        <!-- Story Basic Info -->
+        <div class="mb-6">
+          <h2 class="text-lg font-semibold text-purple-300 mb-4">📖 Story Basic Info</h2>
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+            <div>
+              <label class="block text-sm text-gray-400 mb-1.5">Story Title <span class="text-gray-500">(optional)</span></label>
+              <input type="text" id="story_title" class="w-full glass-input rounded-lg px-4 py-2.5 text-sm text-gray-100" placeholder="My Epic Story">
+            </div>
+            <div>
+              <label class="block text-sm text-gray-400 mb-1.5">Genre <span class="text-gray-500">(optional)</span></label>
+              <input type="text" id="story_genre" class="w-full glass-input rounded-lg px-4 py-2.5 text-sm text-gray-100" placeholder="Drama, Action, Comedy, Fantasy...">
+            </div>
+          </div>
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+            <div>
+              <label class="block text-sm text-gray-400 mb-1.5">Theme <span class="text-gray-500">(optional)</span></label>
+              <input type="text" id="story_theme" class="w-full glass-input rounded-lg px-4 py-2.5 text-sm text-gray-100" placeholder="Love, Revenge, Journey...">
+            </div>
+            <div>
+              <label class="block text-sm text-gray-400 mb-1.5">Summary <span class="text-gray-500">(short, optional)</span></label>
+              <textarea id="story_summary" rows="2" class="w-full glass-input rounded-lg px-4 py-2.5 text-sm text-gray-100 resize-y" placeholder="A brief summary of the entire story..."></textarea>
+            </div>
+          </div>
+          <div>
+            <label class="block text-sm text-gray-400 mb-1.5">Full Story Synopsis <span class="text-gray-500">(detailed, optional)</span></label>
+            <textarea id="story_synopsis" rows="6" class="w-full glass-input rounded-lg px-4 py-2.5 text-sm text-gray-100 resize-y font-mono" placeholder="Write the full story outline. This helps the AI understand the overall plot, character arcs, and narrative flow..."></textarea>
+          </div>
+        </div>
+
+        <!-- Characters -->
+        <details class="mb-6" open>
+          <summary class="cursor-pointer text-base font-semibold text-purple-300 mb-2 flex items-center gap-2">
+            👥 Characters <span class="text-xs text-gray-500 font-normal">— Add characters with descriptions & reference images</span>
+          </summary>
+          <div id="story_characters_list" class="space-y-3 ml-4"></div>
+          <button type="button" onclick="addStoryCharacter()" class="mt-3 px-4 py-2 bg-purple-700/40 hover:bg-purple-600/60 rounded-lg text-sm text-purple-300 transition flex items-center gap-2">
+            ➕ Add Character
+          </button>
+        </details>
+
+        <!-- Scenes -->
+        <details class="mb-6" open>
+          <summary class="cursor-pointer text-base font-semibold text-purple-300 mb-2 flex items-center gap-2">
+            🎬 Scenes <span class="text-xs text-gray-500 font-normal">— Define each scene with location, action, characters, and dialogue</span>
+          </summary>
+          <div id="story_scenes_list" class="space-y-3 ml-4"></div>
+          <button type="button" onclick="addStoryScene()" class="mt-3 px-4 py-2 bg-purple-700/40 hover:bg-purple-600/60 rounded-lg text-sm text-purple-300 transition flex items-center gap-2">
+            ➕ Add Scene
+          </button>
+        </details>
+
+        <!-- Visual Style -->
+        <details class="mb-6" open>
+          <summary class="cursor-pointer text-base font-semibold text-purple-300 mb-2 flex items-center gap-2">🎨 Visual Style</summary>
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-4 ml-4">
+            <div>
+              <label class="block text-sm text-gray-400 mb-1.5">Art Style</label>
+              <select id="story_art_style" class="w-full glass-input rounded-lg px-3 py-2 text-sm text-gray-100">
+                <option value="cinematic realistic">🎥 Cinematic Realistic</option>
+                <option value="anime style">🎌 Anime Style</option>
+                <option value="Pixar 3D animated">🧸 Pixar 3D Animated</option>
+                <option value="watercolor painting">🖌️ Watercolor Painting</option>
+                <option value="oil painting classical art">🖼️ Oil Painting Classical</option>
+                <option value="noir style black and white">🌑 Noir B&amp;W</option>
+                <option value="cyberpunk neon">🌆 Cyberpunk Neon</option>
+                <option value="retro vintage 1980s">📼 Retro Vintage</option>
+                <option value="documentary style">📹 Documentary</option>
+                <option value="stop motion animation">🧱 Stop Motion</option>
+              </select>
+            </div>
+            <div>
+              <label class="block text-sm text-gray-400 mb-1.5">Camera Style</label>
+              <select id="story_camera_style" class="w-full glass-input rounded-lg px-3 py-2 text-sm text-gray-100">
+                <option value="cinematic">🎥 Cinematic</option>
+                <option value="handheld documentary">📱 Handheld</option>
+                <option value="drone aerial">🚁 Drone Aerial</option>
+                <option value="static tripod">📷 Static Tripod</option>
+                <option value="slow motion">🐌 Slow Motion</option>
+                <option value="time-lapse">⏩ Time-lapse</option>
+                <option value="dolly zoom">🌀 Dolly Zoom</option>
+              </select>
+            </div>
+            <div>
+              <label class="block text-sm text-gray-400 mb-1.5">Color Tone</label>
+              <select id="story_color_tone" class="w-full glass-input rounded-lg px-3 py-2 text-sm text-gray-100">
+                <option value="natural">🌿 Natural</option>
+                <option value="warm golden">☀️ Warm Golden</option>
+                <option value="cool blue">🧊 Cool Blue</option>
+                <option value="sepia vintage">📜 Sepia Vintage</option>
+                <option value="high contrast dramatic">🎭 High Contrast</option>
+                <option value="pastel soft">🌸 Pastel Soft</option>
+                <option value="desaturated muted">🌫️ Desaturated</option>
+                <option value="neon vibrant">💜 Neon Vibrant</option>
+              </select>
+            </div>
+            <div>
+              <label class="block text-sm text-gray-400 mb-1.5">Lighting</label>
+              <select id="story_lighting" class="w-full glass-input rounded-lg px-3 py-2 text-sm text-gray-100">
+                <option value="natural lighting">🌅 Natural</option>
+                <option value="golden hour">🌇 Golden Hour</option>
+                <option value="dramatic shadows">🌑 Dramatic</option>
+                <option value="soft diffused">💡 Soft Diffused</option>
+                <option value="studio lighting">💡 Studio</option>
+                <option value="neon glow">💜 Neon Glow</option>
+                <option value="moonlight night">🌙 Moonlight</option>
+              </select>
+            </div>
+            <div>
+              <label class="block text-sm text-gray-400 mb-1.5">Music Mood</label>
+              <select id="story_music_mood" class="w-full glass-input rounded-lg px-3 py-2 text-sm text-gray-100">
+                <option value="">(None — silent)</option>
+                <option value="epic orchestral">🎻 Epic Orchestral</option>
+                <option value="calm ambient">🌊 Calm Ambient</option>
+                <option value="tense dramatic">😰 Tense</option>
+                <option value="happy upbeat">🎉 Happy Upbeat</option>
+                <option value="mysterious dark">🔮 Mysterious</option>
+                <option value="romantic soft">💕 Romantic</option>
+              </select>
+            </div>
+            <div>
+              <label class="block text-sm text-gray-400 mb-1.5">Aspect Ratio</label>
+              <select id="story_aspect_ratio" class="w-full glass-input rounded-lg px-3 py-2 text-sm text-gray-100">
+                <option value="16:9">16:9 (Landscape)</option>
+                <option value="9:16">9:16 (Portrait)</option>
+                <option value="1:1">1:1 (Square)</option>
+                <option value="4:3">4:3 (Classic TV)</option>
+              </select>
+            </div>
+          </div>
+        </details>
+
+        <!-- Custom Instructions -->
+        <details class="mb-6" open>
+          <summary class="cursor-pointer text-base font-semibold text-purple-300 mb-2 flex items-center gap-2">⚙️ Custom Instructions <span class="text-xs text-gray-500 font-normal">— Any special instructions for the AI</span></summary>
+          <textarea id="story_custom_instructions" rows="4" class="w-full glass-input rounded-lg px-4 py-2.5 text-sm text-gray-100 resize-y font-mono ml-4" placeholder="e.g. Use slow camera pans. Keep scenes under 10s. Focus on character close-ups..."></textarea>
+        </details>
+
+        <!-- Audio & Subtitle -->
+        <details class="mb-6" open>
+          <summary class="cursor-pointer text-base font-semibold text-purple-300 mb-2 flex items-center gap-2">🔊 Audio & Subtitle</summary>
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-4 ml-4">
+            <div>
+              <label class="block text-sm text-gray-400 mb-1.5">
+                <input type="checkbox" id="story_audio_enabled" checked class="mr-2"> Enable TTS Audio
+              </label>
+            </div>
+            <div>
+              <label class="block text-sm text-gray-400 mb-1.5">
+                <input type="checkbox" id="story_subtitle_enabled" checked class="mr-2"> Enable Subtitles
+              </label>
+            </div>
+            <div>
+              <label class="block text-sm text-gray-400 mb-1.5">Voice</label>
+              <select id="story_audio_voice" class="w-full glass-input rounded-lg px-3 py-2 text-sm text-gray-100">
+                <option value="zh-CN-XiaoxiaoNeural">🇨🇳 Xiaoxiao (Chinese F)</option>
+                <option value="zh-CN-YunxiNeural">🇨🇳 Yunxi (Chinese M)</option>
+                <option value="en-US-AriaNeural">🇺🇸 Aria (English F)</option>
+                <option value="en-US-GuyNeural">🇺🇸 Guy (English M)</option>
+                <option value="en-GB-SoniaNeural">🇬🇧 Sonia (British F)</option>
+              </select>
+            </div>
+          </div>
+        </details>
+
+        <!-- Generate Button -->
+        <button id="btn-story" onclick="submitStory()" class="w-full py-3.5 bg-gradient-to-r from-purple-600 via-fuchsia-500 to-purple-600 hover:from-purple-500 hover:via-fuchsia-400 hover:to-purple-500 rounded-xl text-base font-semibold transition disabled:opacity-50 disabled:cursor-not-allowed glow-btn">
+          📖 Create &amp; Generate Story Video
+        </button>
+      </div>
     </div>
 
   </div>
@@ -3585,7 +4002,7 @@ function switchTaskType(type) {
   });
   document.getElementById('ttype-' + type).className = document.getElementById('ttype-' + type).className.replace(/tab-inactive/, 'tab-active');
 
-  ['simple', 'creative', 'manuscript', 'movie', 'anchor', 'poetry'].forEach(t => {
+  ['simple', 'creative', 'manuscript', 'movie', 'anchor', 'poetry', 'story'].forEach(t => {
     document.getElementById('form-' + t).classList.toggle('hidden', t !== type);
   });
 }

@@ -37,6 +37,7 @@ class TaskType(str, Enum):
     ANCHOR = "anchor"
     IMAGE = "image"
     POETRY = "poetry"
+    STORY = "story"  # v5.1: Master Story Creator — full story with characters, scenes, style
 
 
 class VideoMode(str, Enum):
@@ -434,10 +435,106 @@ class SimpleImageTask(BaseTaskState):
 
 
 # ═══════════════════════════════════════════════════
+# 故事创作者模型（类型 7 — Story Mode）
+# ═══════════════════════════════════════════════════
+
+
+class StoryCharacter(BaseModel):
+    """故事角色"""
+
+    name: str = ""              # Character name
+    role: str = ""              # Role: protagonist, antagonist, supporting, etc.
+    appearance: str = ""        # Physical description
+    personality: str = ""       # Personality traits
+    voice: str = ""             # Voice style hint
+    image_base64: str = ""      # User-uploaded character reference image (base64)
+    image_url: str = ""         # Optional URL
+
+
+class StoryScene(BaseModel):
+    """故事场景（完整信息）"""
+
+    index: int = 0
+    location: str = ""          # Where the scene takes place
+    characters: list[str] = []  # Which characters are present
+    action: str = ""            # What happens in this scene
+    dialogue: str = ""          # Dialogue spoken (narrated by TTS)
+    duration: int = 5           # Scene duration in seconds
+    mood: str = ""              # Mood/atmosphere
+    visual_prompt: str = ""     # Generated/edited video prompt
+    image_base64: str = ""      # Optional user-uploaded scene image (base64)
+    image_url: str = ""         # Optional URL
+
+
+class StoryStyle(BaseModel):
+    """Visual style settings"""
+
+    art_style: str = "cinematic realistic"   # e.g. cinematic, anime, Pixar, watercolor
+    camera_style: str = "cinematic"           # e.g. cinematic, handheld, drone, static
+    color_tone: str = "natural"               # e.g. natural, warm, cool, sepia, high-contrast
+    lighting: str = "natural lighting"        # e.g. natural, golden hour, dramatic, soft
+    music_mood: str = ""                      # Music/background mood
+    aspect_ratio: str = "16:9"                # video aspect ratio
+
+
+class StoryTaskState(BaseTaskState):
+    """Master Story Creator task (Type STORY)
+
+    用户提供完整故事信息 → 角色 + 场景 + 风格 + 自定义指令 →
+    LLM 生成视频 prompt → 角色参考 → 视频生成 → TTS + 字幕 → 拼接。
+    """
+
+    task_type: Literal[TaskType.STORY] = TaskType.STORY
+
+    # ── 故事基本信息 ──
+    story_title: str = ""
+    story_genre: str = ""             # genre: drama, action, comedy, horror, etc.
+    story_theme: str = ""             # theme/topic
+    story_summary: str = ""           # Brief summary of the entire story
+    story_synopsis: str = ""          # Full synopsis (longer summary)
+
+    # ── 角色 ──
+    characters: List[StoryCharacter] = Field(default_factory=list)
+    step_characters: StepStatus = StepStatus.PENDING
+
+    # ── 场景 ──
+    scenes: List[StoryScene] = Field(default_factory=list)
+    step_scenes: StepStatus = StepStatus.PENDING
+
+    # ── 风格 ──
+    style: StoryStyle = Field(default_factory=StoryStyle)
+    step_style_config: StepStatus = StepStatus.PENDING
+
+    # ── 自定义指令 ──
+    custom_instructions: str = ""     # Freeform user instructions
+    step_custom_instructions: StepStatus = StepStatus.PENDING
+
+    # ── 视频生成 ──
+    total_duration: int = 0           # Calculated total duration
+    step_build_scenes: StepStatus = StepStatus.PENDING
+    step_reference_images: StepStatus = StepStatus.PENDING
+    step_video_generation: StepStatus = StepStatus.PENDING
+    scenes_output: List[SceneTask] = Field(default_factory=list)  # SceneTask list for pipeline
+
+    # ── 音频 + 字幕 ──
+    audio_config: AudioConfig = Field(default_factory=AudioConfig)
+    subtitle_config: SubtitleConfig = Field(default_factory=SubtitleConfig)
+    step_audio_subtitle: StepStatus = StepStatus.PENDING
+    step_audio: StepStatus = StepStatus.PENDING
+    step_subtitle: StepStatus = StepStatus.PENDING
+    step_concatenation: StepStatus = StepStatus.PENDING
+
+    # ── 产物 ──
+    combined_audio: str = ""
+    combined_subtitle: str = ""
+    final_video_path: str = ""
+
+
+# ═══════════════════════════════════════════════════
 # 联合类型 + 反序列化工厂
 # ═══════════════════════════════════════════════════
 
-AnyTaskState = Union[SimpleVideoTask, CreativeVideoTask, ManuscriptVideoTask, AnchorVideoTask, PoetryVideoTask, SimpleImageTask]
+AnyTaskState = Union[SimpleVideoTask, CreativeVideoTask, ManuscriptVideoTask, AnchorVideoTask, PoetryVideoTask, SimpleImageTask, StoryTaskState]
 
 # 用于 TaskManager.load()：根据 task_type 字段选择正确的模型类
 _TASK_TYPE_MAP: dict[str, type[BaseTaskState]] = {
@@ -447,6 +544,7 @@ _TASK_TYPE_MAP: dict[str, type[BaseTaskState]] = {
     TaskType.ANCHOR: AnchorVideoTask,
     TaskType.POETRY: PoetryVideoTask,
     TaskType.IMAGE: SimpleImageTask,
+    TaskType.STORY: StoryTaskState,
 }
 
 
@@ -527,6 +625,42 @@ class CreateSimpleImageTaskRequest(BaseModel):
     size: str = "1024x1024"
     negative_prompt: Optional[str] = None
     system_prompt: str = ""
+
+
+class CreateStoryTaskRequest(BaseModel):
+    """创建故事创作者任务的请求体（v5.1）"""
+
+    # 故事基本信息
+    story_title: str = ""
+    story_genre: str = ""
+    story_theme: str = ""
+    story_summary: str = ""
+    story_synopsis: str = ""
+
+    # 角色列表
+    characters: List[StoryCharacter] = Field(default_factory=list)
+
+    # 场景列表
+    scenes: List[StoryScene] = Field(default_factory=list)
+
+    # 风格设置
+    art_style: str = "cinematic realistic"
+    camera_style: str = "cinematic"
+    color_tone: str = "natural"
+    lighting: str = "natural lighting"
+    music_mood: str = ""
+    aspect_ratio: str = "16:9"
+
+    # 自定义指令
+    custom_instructions: str = ""
+
+    # 音频 + 字幕
+    audio_config: Optional[AudioConfig] = None
+    subtitle_config: Optional[SubtitleConfig] = None
+
+    # 分辨率
+    video_width: int = 1152
+    video_height: int = 768
 
 
 # ═══════════════════════════════════════════════════

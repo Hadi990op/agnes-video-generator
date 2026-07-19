@@ -1949,8 +1949,214 @@ async def create_task_legacy(
 
 
 # ═══════════════════════════════════════════════════
-# 任务恢复 + 停止
+# 故事创作者任务（Type STORY — v5.1）
 # ═══════════════════════════════════════════════════
+
+
+@app.post("/api/tasks/story")
+async def create_story_task(
+    story_title: str = Form(""),
+    story_genre: str = Form(""),
+    story_theme: str = Form(""),
+    story_summary: str = Form(""),
+    story_synopsis: str = Form(""),
+    characters: str = Form("[]"),  # JSON array of character objects
+    scenes: str = Form("[]"),       # JSON array of scene objects
+    art_style: str = Form("cinematic realistic"),
+    camera_style: str = Form("cinematic"),
+    color_tone: str = Form("natural"),
+    lighting: str = Form("natural lighting"),
+    music_mood: str = Form(""),
+    aspect_ratio: str = Form("16:9"),
+    custom_instructions: str = Form(""),
+    audio_enabled: bool = Form(True),
+    audio_voice: str = Form("zh-CN-XiaoxiaoNeural"),
+    audio_rate: str = Form("+0%"),
+    subtitle_enabled: bool = Form(True),
+    subtitle_font: str = Form("STHeitiMedium.ttc"),
+    subtitle_color: str = Form("white"),
+    subtitle_fontsize: int = Form(48),
+    subtitle_position: str = Form("bottom"),
+    subtitle_stroke_color: str = Form("black"),
+    subtitle_stroke_width: int = Form(2),
+    subtitle_bg_color: str = Form("black@0.5"),
+):
+    """Create a Master Story Creator task (Type STORY).
+
+    用户传入完整故事数据：角色、场景、风格、自定义指令。
+    系统生成视频提示词 → 角色参考 → 逐场景视频 → TTS + 字幕 → 最终视频。
+    """
+    from models.task import CreateStoryTaskRequest, StoryStyle, AudioConfig, SubtitleConfig, SubtitleStyle
+
+    # Parse characters and scenes from JSON
+    char_list = json.loads(characters)
+    scene_list = json.loads(scenes)
+
+    # Build style
+    style = StoryStyle(
+        art_style=art_style,
+        camera_style=camera_style,
+        color_tone=color_tone,
+        lighting=lighting,
+        music_mood=music_mood,
+        aspect_ratio=aspect_ratio,
+    )
+
+    # Build audio/subtitle config
+    audio_config = AudioConfig(
+        enabled=audio_enabled,
+        voice=audio_voice,
+        rate=audio_rate,
+    )
+    subtitle_style = SubtitleStyle(
+        font=subtitle_font,
+        color=subtitle_color,
+        fontsize=subtitle_fontsize,
+        stroke_color=subtitle_stroke_color,
+        stroke_width=subtitle_stroke_width,
+        bg_color=subtitle_bg_color,
+    )
+    subtitle_config = SubtitleConfig(
+        enabled=subtitle_enabled,
+        style=subtitle_style,
+    )
+
+    req = CreateStoryTaskRequest(
+        story_title=story_title,
+        story_genre=story_genre,
+        story_theme=story_theme,
+        story_summary=story_summary,
+        story_synopsis=story_synopsis,
+        characters=char_list,
+        scenes=scene_list,
+        art_style=art_style,
+        camera_style=camera_style,
+        color_tone=color_tone,
+        lighting=lighting,
+        music_mood=music_mood,
+        aspect_ratio=aspect_ratio,
+        custom_instructions=custom_instructions,
+        audio_config=audio_config,
+        subtitle_config=subtitle_config,
+    )
+
+    # Validate aspect ratio
+    video_width, video_height = 1152, 768  # 16:9 default
+    if aspect_ratio == "9:16":
+        video_width, video_height = 768, 1152  # 9:16 portrait
+    elif aspect_ratio == "1:1":
+        video_width, video_height = 1024, 1024
+
+    return await _create_story_task_impl(
+        req=req,
+        video_width=video_width,
+        video_height=video_height,
+    )
+
+
+async def _create_story_task_impl(req, video_width: int, video_height: int) -> JSONResponse:
+    """Internal implementation for story task creation."""
+    from models.task import StoryTaskState, StoryCharacter, StoryScene, StoryStyle, TaskType
+
+    state = StoryTaskState(
+        task_type=TaskType.STORY,
+        creative_name=req.story_title or "Story Video",
+        video_width=video_width,
+        video_height=video_height,
+        story_title=req.story_title,
+        story_genre=req.story_genre,
+        story_theme=req.story_theme,
+        story_summary=req.story_summary,
+        story_synopsis=req.story_synopsis,
+        characters=req.characters,  # List of dicts → will be converted
+        scenes=req.scenes,  # List of dicts → will be converted
+        style=StoryStyle(
+            art_style=req.art_style,
+            camera_style=req.camera_style,
+            color_tone=req.color_tone,
+            lighting=req.lighting,
+            music_mood=req.music_mood,
+            aspect_ratio=req.aspect_ratio,
+        ),
+        custom_instructions=req.custom_instructions,
+        audio_config=req.audio_config,
+        subtitle_config=req.subtitle_config,
+    )
+
+    # Create task and start pipeline
+    task_id = await TaskManager.create_task(state)
+
+    logger.info(
+        "[Story] Task %s created: '%s' (%d characters, %d scenes)",
+        task_id, req.story_title, len(state.characters), len(state.scenes),
+    )
+
+    # Start pipeline in background
+    asyncio.create_task(_run_story_pipeline(task_id))
+
+    return JSONResponse({
+        "task_id": task_id,
+        "status": "created",
+        "message": f"Story task '{req.story_title}' created with {len(state.characters)} characters and {len(state.scenes)} scenes",
+    })
+
+
+async def _run_story_pipeline(task_id: str) -> None:
+    """Background task runner for story pipeline."""
+    from models.task import StoryTaskState, parse_task_state
+    from core.api.agnes_video import AgnesVideoAPI
+    from core.screenwriter import Screenwriter
+    from core.pipelines.story_video import StoryVideoPipeline
+    import traceback
+
+    try:
+        logger.info("[Story] Starting pipeline for task %s", task_id)
+        state = TaskManager.load_state(task_id)
+        if not isinstance(state, StoryTaskState):
+            logger.error("[Story] Invalid state type for task %s", task_id)
+            return
+
+        # Convert character dicts to proper objects
+        if state.characters and isinstance(state.characters[0], dict):
+            state.characters = [
+                StoryCharacter(**c) if isinstance(c, dict) else c
+                for c in state.characters
+            ]
+
+        # Convert scene dicts to proper objects
+        if state.scenes and isinstance(state.scenes[0], dict):
+            state.scenes = [
+                StoryScene(**s) if isinstance(s, dict) else s
+                for s in state.scenes
+            ]
+
+        api_key = get_api_key()
+        style_hint = state.style.art_style if state.style else ""
+
+        video_api = AgnesVideoAPI(
+            api_key=api_key,
+            _make_key_refresh_callback=lambda: api_key,
+        )
+        screenwriter = Screenwriter(api_key=api_key)
+        style_hint = ""
+
+        pipeline = StoryVideoPipeline(
+            task_state=state,
+            video_api=video_api,
+            task_manager=TaskManager(task_id),
+            style_hint=style_hint,
+        )
+        pipeline._screenwriter = screenwriter
+
+        final_path = await pipeline.run(state)
+        logger.info("[Story] Pipeline completed: %s → %s", task_id, final_path)
+
+    except Exception as e:
+        logger.error("[Story] Pipeline error for task %s: %s\n%s", task_id, e, traceback.format_exc())
+        try:
+            TaskManager.update_state(task_id, status="failed", current_message=str(e))
+        except Exception:
+            pass
 
 
 @app.get("/api/poetry-scene-prompt")
