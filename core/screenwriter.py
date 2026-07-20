@@ -49,11 +49,11 @@ class Screenwriter:
         """根据 language 设置返回中文或英文提示词。"""
         return zh_text if self.language == "zh" else en_text
 
-    def _chat(self, system_prompt: str, user_prompt: str) -> str:
-        return self.chat_api.chat(system_prompt, user_prompt)
+    def _chat(self, system_prompt: str, user_prompt: str, timeout: int = 300) -> str:
+        return self.chat_api.chat(system_prompt, user_prompt, timeout=timeout)
 
-    def _chat_json(self, system_prompt: str, user_prompt: str) -> dict:
-        return self.chat_api.chat_json(system_prompt, user_prompt)
+    def _chat_json(self, system_prompt: str, user_prompt: str, timeout: int = 300) -> dict:
+        return self.chat_api.chat_json(system_prompt, user_prompt, timeout=timeout)
 
     def _image_to_b64_uri(self, path: str) -> str:
         return self.chat_api._image_to_b64_uri(path)

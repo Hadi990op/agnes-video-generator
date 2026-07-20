@@ -1,0 +1,69 @@
+======================================================================
+  BEAT SHEET: The Chronos Paradox
+======================================================================
+Structure: Three-Act Structure
+Genre: thriller
+
+  1. [5%] Setup: The Silent Witness
+     Detective Elias Thorne, a weary 1940s NYC cop struggling with insomnia and a cold case from the war, is called to an opulent apartment. The room is locked from the inside. The victim, a reclusive horologist, lies dead.
+     Purpose: Establish the protagonist's flaw (insomnia/obsession with time) and the inciting incident (the impossible murder).
+     Audience feels: Curiosity mixed with unease.
+
+  2. [10%] Inciting Incident: The Backward Tick
+     Thorne examines the body and notices the victim's prized pocket watch is ticking backwards. When he touches it, he experiences a fleeting, disorienting vision of the murder seconds before it happens, but the killer's face is obscured by shadow.
+     Purpose: Introduce the supernatural/sci-fi element and raise the stakes beyond a standard murder mystery.
+     Audience feels: Shock and disbelief.
+
+  3. [15%] Debate: Rationality vs. Madness
+     Thorne tries to rationalize the event as stress-induced hallucination. His partner dismisses it as a prank. Thorne decides to investigate the horologist's recent purchases, stepping out of his comfort zone.
+     Purpose: Show the protagonist resisting the call to adventure initially, grounding the fantasy in noir realism.
+     Audience feels: Confusion and isolation.
+
+  4. [20%] Break into Act II: The Tinkerer's Guild
+     Thorne tracks the watch's unique mechanism to an underground black market of 'time-weavers' and rogue scientists experimenting with temporal mechanics. He realizes the murder was a message, not a crime of passion.
+     Purpose: Transition the story from a local police procedural to a conspiracy thriller involving hidden technologies.
+     Audience feels: Determination and intrigue.
+
+  5. [25%] B Story: The Ally
+     Thorne meets Dr. Aris Vane, a disgraced physicist who explains that the watch is a prototype 'Chronos Anchor.' Vane warns Thorne that tampering with the timeline attracts 'Echoes'—entities that hunt those who disrupt causality.
+     Purpose: Provide exposition on the rules of the world and create a mentor/ally dynamic.
+     Audience feels: Intellectual excitement tempered by dread.
+
+  6. [40%] Fun and Games: The Loop
+     Thorne uses the recovered watch fragment to rewind small events, solving minor clues. However, each use causes physical degradation and attracts the attention of the antagonist, a shadowy figure known only as 'The Architect,' who wants to rewrite history to save his dying daughter.
+     Purpose: Explore the 'premise' of the thriller: the thrill of solving the puzzle vs. the cost of cheating death/time.
+     Audience feels: Addictive rush followed by anxiety.
+
+  7. [50%] Midpoint: The Trap Springs
+     Thorne confronts a suspect, but the situation reverses. The Architect reveals he knew Thorne would come. Thorne is captured, and the Architect forces him to witness a future where his own death caused a temporal collapse. Thorne escapes only by letting himself be 'unmade' momentarily, returning to a slightly altered present.
+     Purpose: Shift the goal from solving the murder to stopping the Architect. Raise the stakes personally.
+     Audience feels: Betrayal and vertigo.
+
+  8. [75%] All Is Lost: The Fracture
+     Thorne returns to his precinct, but no one recognizes him. His partner doesn't know him. He realizes the Architect has been rewriting the timeline continuously, erasing Thorne's existence from history. The only proof of his reality is the backward-ticking watch, which is now slowing down, running out of battery/life.
+     Purpose: Strip the protagonist of his support system and identity, creating maximum despair.
+     Audience feels: Existential horror and loneliness.
+
+  9. [80%] Dark Night of the Soul: Acceptance
+     Hiding in the shadows of a changing city, Thorne accepts that he cannot fix the past. He must break the cycle entirely. He remembers the horologist's final note: 'Time is not a line, but a knot.' He plans to overload the Chronos Anchor at the source.
+     Purpose: Protagonist finds inner strength and a new strategy based on sacrifice rather than control.
+     Audience feels: Resignation turning into resolve.
+
+  10. [85%] Break into Act III: The Convergence
+     Thorne locates the Architect's lair, a facility built around a massive experimental engine in the subway depths. He infiltrates during a storm, using the chaos to mask his approach.
+     Purpose: Launch the final confrontation.
+     Audience feels: Tension and anticipation.
+
+  11. [92%] Climax: The Unraveling
+     A battle of wits and wills. The Architect tries to trap Thorne in an infinite loop. Thorne uses the backward watch to reverse the Architect's own memories of grief, forcing him to let go of his daughter. Thorne smashes the core, causing a temporal backlash that restores the original timeline but erases the Architect's work—and Thorne's knowledge of it.
+     Purpose: Resolve the central conflict. The hero wins by sacrificing his special advantage.
+     Audience feels: Relief and bittersweet victory.
+
+  12. [98%] Resolution: The Tick Returns
+     Back in the normal timeline, Thorne is back in his apartment, sober and rested. The case is closed officially as a heart attack. He picks up the victim's watch from evidence (which somehow remained). It ticks forward normally. But when he looks in the mirror, he sees a faint scar on his hand—the only physical proof of the alternate reality.
+     Purpose: Restore status quo with a lingering sense of mystery. Confirm the hero has changed internally.
+     Audience feels: Ambiguous peace.
+
+======================================================================
+Pacing: The pacing begins slow and atmospheric, typical of Noir, accelerating rapidly after the Midpoint as the temporal stakes escalate. The sequence between 40%-75% features rapid-fire twists and reality shifts, creating a dizzying rhythm that mirrors the protagonist's mental state. The final act slows down slightly for the climax to emphasize the emotional weight of the choice, ending on a quiet, reflective note.
+Recommended scenes: 7

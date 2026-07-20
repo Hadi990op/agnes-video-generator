@@ -7,8 +7,10 @@
 <link rel="icon" type="image/x-icon" href="static/favicon.ico">
 <link rel="icon" type="image/png" sizes="1024x1024" href="static/icon.png">
 <link rel="apple-touch-icon" href="static/icon.png">
-<script src="https://cdn.tailwindcss.com">
-// ═══════ Story Creator (Type 4) ═══════
+<script src="https://cdn.tailwindcss.com"></script>
+
+<!-- Story Creator JS -->
+<script>
 
 let _storyCharacterCount = 0;
 let _storySceneCount = 0;
@@ -60,6 +62,43 @@ function handleCharImageUpload(input, idx) {
     document.getElementById('char_img_status_' + idx).textContent = '✓ Loaded (' + (b64.length/1024).toFixed(0) + 'KB)';
   };
   reader.readAsDataURL(file);
+}
+
+// Compress image to base64 JPEG at max size (default 150KB)
+function compressImage(file, maxSizeKB = 150) {
+  return new Promise((resolve) => {
+    const reader = new FileReader();
+    reader.onload = function(e) {
+      const img = new Image();
+      img.onload = function() {
+        const canvas = document.createElement('canvas');
+        let w = img.width, h = img.height;
+        // Scale down if too large (max 512px)
+        const maxDim = 512;
+        if (w > maxDim || h > maxDim) {
+          const ratio = Math.min(maxDim / w, maxDim / h);
+          w = Math.round(w * ratio);
+          h = Math.round(h * ratio);
+        }
+        canvas.width = w;
+        canvas.height = h;
+        const ctx = canvas.getContext('2d');
+        ctx.drawImage(img, 0, 0, w, h);
+
+        // Binary search for quality that fits maxSizeKB
+        let quality = 0.8;
+        let dataUrl = canvas.toDataURL('image/jpeg', quality);
+        // If initial attempt is still too large, lower quality
+        while (dataUrl.length > maxSizeKB * 1024 && quality > 0.1) {
+          quality -= 0.1;
+          dataUrl = canvas.toDataURL('image/jpeg', quality);
+        }
+        resolve(dataUrl);
+      };
+      img.src = e.target.result;
+    };
+    reader.readAsDataURL(file);
+  });
 }
 
 function addStoryScene() {
@@ -184,12 +223,12 @@ async function submitStory() {
     for (const idx of Object.keys(charIdxMap)) {
       const promise = new Promise((resolve) => {
         const input = charIdxMap[idx];
-        const reader = new FileReader();
-        reader.onload = (e) => {
-          characters[idx - 1].image_base64 = e.target.result;
+        compressImage(input.files[0], 150).then((b64) => {
+          characters[idx - 1].image_base64 = b64;
+          const statusEl = document.getElementById('char_img_status_' + idx);
+          if (statusEl) statusEl.textContent = '✓ Compressed (' + (b64.length/1024).toFixed(0) + 'KB)';
           resolve();
-        };
-        reader.readAsDataURL(input.files[0]);
+        });
       });
       uploadPromises.push(promise);
     }
@@ -229,7 +268,7 @@ async function submitStory() {
     const taskId = data.task_id;
 
     // Switch to progress panel
-    showProgressPanel(taskId);
+    showProgress(taskId, "story_" + taskId);
     showToast(`Story "${title}" created! Starting video generation...`);
 
   } catch (e) {

@@ -176,7 +176,7 @@ class AgnesChatAPI:
             raise
         return resp.json()  # type: ignore[possibly-undefined]
 
-    def chat(self, system_prompt: str, user_prompt: str, max_tokens: int = 4096) -> str:
+    def chat(self, system_prompt: str, user_prompt: str, max_tokens: int = 4096, timeout: int = 300) -> str:
         """纯文本 Chat 调用（含重试）。"""
         logger.info(f"[AgnesChat] Calling chat ({self.model}), prompt: {len(user_prompt)} chars...")
         data = self._request_with_retry(
@@ -189,11 +189,11 @@ class AgnesChatAPI:
                 "temperature": 0.7,
                 "max_tokens": max_tokens,
             },
-            timeout=120,
+            timeout=timeout,
         )
         return data["choices"][0]["message"]["content"]
 
-    def chat_json(self, system_prompt: str, user_prompt: str, max_tokens: int = 4096) -> dict:
+    def chat_json(self, system_prompt: str, user_prompt: str, max_tokens: int = 4096, timeout: int = 300) -> dict:
         """Chat 调用并解析 JSON 响应（健壮版）。
 
         处理流程：
@@ -216,7 +216,7 @@ class AgnesChatAPI:
             ValueError: JSON 解析最终失败。
         """
         for retry in range(2):
-            content = self.chat(system_prompt, user_prompt, max_tokens=max_tokens)
+            content = self.chat(system_prompt, user_prompt, max_tokens=max_tokens, timeout=timeout)
             # Step 1: 去围栏
             cleaned = strip_code_fence(content)
             # Step 2: 直接解析

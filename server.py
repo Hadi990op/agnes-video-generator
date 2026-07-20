@@ -1992,6 +1992,11 @@ async def create_story_task(
     char_list = json.loads(characters)
     scene_list = json.loads(scenes)
 
+    # Normalize character fields: description → appearance (model expects "appearance")
+    for c in char_list:
+        if isinstance(c, dict) and "description" in c:
+            c["appearance"] = c.pop("description")
+
     # Build style
     style = StoryStyle(
         art_style=art_style,
@@ -2084,7 +2089,11 @@ async def _create_story_task_impl(req, video_width: int, video_height: int) -> J
     )
 
     # Create task and start pipeline
-    task_id = await TaskManager.create_task(state)
+    import uuid, os, time
+    task_id = f"story_{uuid.uuid4().hex[:12]}"
+    dir_name = f"story_{int(time.time()*1000)}"
+    tm = TaskManager(task_id, dir_name=dir_name)
+    tm.create(state)
 
     logger.info(
         "[Story] Task %s created: '%s' (%d characters, %d scenes)",
@@ -2092,7 +2101,7 @@ async def _create_story_task_impl(req, video_width: int, video_height: int) -> J
     )
 
     # Start pipeline in background
-    asyncio.create_task(_run_story_pipeline(task_id))
+    asyncio.create_task(_run_story_pipeline(task_id, dir_name))
 
     return JSONResponse({
         "task_id": task_id,
@@ -2101,7 +2110,7 @@ async def _create_story_task_impl(req, video_width: int, video_height: int) -> J
     })
 
 
-async def _run_story_pipeline(task_id: str) -> None:
+async def _run_story_pipeline(task_id: str, dir_name: str) -> None:
     """Background task runner for story pipeline."""
     from models.task import StoryTaskState, parse_task_state
     from core.api.agnes_video import AgnesVideoAPI
@@ -2111,7 +2120,8 @@ async def _run_story_pipeline(task_id: str) -> None:
 
     try:
         logger.info("[Story] Starting pipeline for task %s", task_id)
-        state = TaskManager.load_state(task_id)
+        tm = TaskManager(task_id, dir_name=dir_name)
+        state = tm.load()
         if not isinstance(state, StoryTaskState):
             logger.error("[Story] Invalid state type for task %s", task_id)
             return
@@ -2133,20 +2143,16 @@ async def _run_story_pipeline(task_id: str) -> None:
         api_key = get_api_key()
         style_hint = state.style.art_style if state.style else ""
 
-        video_api = AgnesVideoAPI(
-            api_key=api_key,
-            _make_key_refresh_callback=lambda: api_key,
-        )
-        screenwriter = Screenwriter(api_key=api_key)
-        style_hint = ""
+        video_api = AgnesVideoAPI(api_key=api_key)
+        video_api.set_refresh_key_callback(get_api_key)
 
         pipeline = StoryVideoPipeline(
-            task_state=state,
-            video_api=video_api,
-            task_manager=TaskManager(task_id),
-            style_hint=style_hint,
+            api_key=api_key,
+            task_id=task_id,
+            dir_name=dir_name,
         )
-        pipeline._screenwriter = screenwriter
+        pipeline._screenwriter = Screenwriter(api_key=api_key)
+        pipeline.video_api = video_api
 
         final_path = await pipeline.run(state)
         logger.info("[Story] Pipeline completed: %s → %s", task_id, final_path)
@@ -2154,7 +2160,8 @@ async def _run_story_pipeline(task_id: str) -> None:
     except Exception as e:
         logger.error("[Story] Pipeline error for task %s: %s\n%s", task_id, e, traceback.format_exc())
         try:
-            TaskManager.update_state(task_id, status="failed", current_message=str(e))
+            tm = TaskManager(task_id, dir_name=dir_name)
+            tm.update_state(status="failed", current_message=str(e))
         except Exception:
             pass
 

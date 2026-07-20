@@ -45,20 +45,20 @@ class StoryVideoPipeline(MultiScenePipeline):
 
     def __init__(
         self,
-        task_state: StoryTaskState,
-        video_api: AgnesVideoAPI,
-        task_manager,
-        style_hint: str = "",
-        progress_callback: Optional[Callable] = None,
+        api_key: str,
+        task_id: str,
+        dir_name: str = None,
+        progress_callback=None,
+        shutdown_event=None,
     ):
         super().__init__(
-            task_state=task_state,
-            video_api=video_api,
-            task_manager=task_manager,
-            style_hint=style_hint,
+            api_key=api_key,
+            task_id=task_id,
+            dir_name=dir_name,
             progress_callback=progress_callback,
+            shutdown_event=shutdown_event,
         )
-        self._state = task_state  # type: ignore[assignment]
+        self._state: Optional[StoryTaskState] = None  # type: ignore[assignment]
 
     # ═══════════════════════════════════════════════════
     # 模板方法覆写
@@ -256,11 +256,82 @@ class StoryVideoPipeline(MultiScenePipeline):
 
         # Store as character reference for the pipeline
         if char_refs:
-            self._state.reference_image = char_refs[0] if len(char_refs) == 1 else ",".join(char_refs[:5])
+            object.__setattr__(self._state, "reference_image", char_refs[0] if len(char_refs) == 1 else ",".join(char_refs[:5]))
         else:
-            self._state.reference_image = ""
+            object.__setattr__(self._state, "reference_image", "")
 
         logger.info("[Story] Total character references: %d", len(char_refs))
+
+    async def _wait_for_videos(
+        self, pending: list, total: int, timeout: int = 900
+    ) -> None:
+        """Wait for batch video submissions with retry.
+
+        Polls all pending videos in parallel with per-video timeout.
+        """
+        import time
+        deadline = time.time() + timeout
+
+        # Keep track of which videos have timed out
+        timed_out = set()
+
+        while pending:
+            self._check_shutdown()
+            if time.time() > deadline:
+                logger.warning("[Story] Video generation timeout, cancelling remaining")
+                break
+
+            still_pending = []
+            # Gather all video polls in parallel
+            async def _check_one(scene_idx, video_id, video_path):
+                """Check a single video, returns result or None."""
+                if not video_id:
+                    return None
+                try:
+                    result = await asyncio.wait_for(
+                        self.video_api.wait_for_video(video_id),
+                        timeout=60,  # Per-video timeout
+                    )
+                    if result:
+                        if hasattr(result, 'save'):
+                            result.save(video_path)
+                        elif hasattr(result, 'url') and result.url:
+                            import urllib.request
+                            urllib.request.urlretrieve(result.url, video_path)
+                        logger.info("[Story] Video %d ready: %s", scene_idx, video_path)
+                        return (scene_idx, video_id, video_path, True)
+                except asyncio.TimeoutError:
+                    logger.warning("[Story] Video %d timeout (60s), will retry", scene_idx)
+                    timed_out.add(scene_idx)
+                except Exception as e:
+                    logger.error("[Story] Failed to get video %d: %s", scene_idx, e)
+
+                return (scene_idx, video_id, video_path, False)
+
+            tasks = [
+                _check_one(idx, vid, path)
+                for idx, vid, path in pending
+            ]
+            results = await asyncio.gather(*tasks)
+
+            # Separate completed from pending
+            for scene_idx, video_id, video_path, ok in results:
+                if ok and (scene_idx, video_id, video_path) in pending:
+                    pending.remove((scene_idx, video_id, video_path))
+                else:
+                    still_pending.append((scene_idx, video_id, video_path))
+
+            pending = still_pending
+            if pending:
+                # Respect rate limiter between polls
+                await asyncio.sleep(15)
+
+        completed = total - len(pending)
+        await self._emit(
+            "video_gen", "running",
+            f"Videos ready: {completed}/{total}",
+            0.40 + 0.30 * completed / max(total, 1),
+        )
 
     async def _generate_videos(self) -> None:
         """Generate videos for each scene."""
@@ -391,8 +462,6 @@ class StoryVideoPipeline(MultiScenePipeline):
 
         # Generate TTS for each scene's narration
         tts_engine = EdgeTTSEngine()
-        if not await tts_engine.is_available():
-            tts_engine = SilentTTSEngine()
 
         for scene in self._state.scenes_output:
             self._check_shutdown()
@@ -431,15 +500,11 @@ class StoryVideoPipeline(MultiScenePipeline):
             with open(path, "wb") as f:
                 f.write(b"")
 
-    async def _generate_subtitles(self) -> None:
+    async def _generate_subtitles(self, sub_maker=None) -> None:
         """Generate SRT subtitles for all scenes."""
         if self._state.subtitle_config and not self._state.subtitle_config.enabled:
             logger.info("[Story] Subtitles disabled, skipping")
             return
-
-        from core.compositor.subtitle_generator import SubtitleGenerator
-        gen = SubtitleGenerator()
-        subtitle_styles_path = os.path.join(self.working_dir, "subtitle_styles.json")
 
         for scene in self._state.scenes_output:
             self._check_shutdown()
@@ -476,30 +541,27 @@ class StoryVideoPipeline(MultiScenePipeline):
         try:
             # Sort by index
             completed.sort(key=lambda s: s.index)
+            scene_paths = [s.video_file for s in completed if s.video_file and os.path.exists(s.video_file)]
 
-            concat = VideoConcatenator()
-            output_path = os.path.join(self.working_dir, "final.mp4")
+            output_path = os.path.join(self.working_dir, "final_video.mp4")
 
-            scene_paths = []
-            audio_paths = []
-            subtitle_paths = []
+            # Step 1: Concatenate videos using the static method
+            final_path = VideoConcatenator.concat_videos(scene_paths, output_path)
 
-            for s in completed:
-                if s.video_file and os.path.exists(s.video_file):
-                    scene_paths.append(s.video_file)
-                if hasattr(s, 'narration_audio') and s.narration_audio and os.path.exists(s.narration_audio):
-                    audio_paths.append(s.narration_audio)
-                if hasattr(s, 'subtitle_srt') and s.subtitle_srt and os.path.exists(s.subtitle_srt):
-                    subtitle_paths.append(s.subtitle_srt)
-
-            final_path = await concat.concatenate(
-                video_paths=scene_paths,
-                audio_paths=audio_paths,
-                subtitle_paths=subtitle_paths,
-                output_path=output_path,
-                video_width=self._state.video_width,
-                video_height=self._state.video_height,
-            )
+            # Step 2: If we have combined audio, overlay it and save as final
+            if self._state.combined_audio and os.path.exists(self._state.combined_audio):
+                logger.info("[Story] Overlaying audio into final video")
+                audio_path = os.path.join(self.working_dir, "final_with_audio.mp4")
+                final_path = VideoConcatenator.concat_videos_with_audio_overlay(
+                    video_paths=scene_paths,
+                    audio_path=self._state.combined_audio,
+                    srt_path=self._state.subtitle_file,
+                    output_path=audio_path,
+                )
+                # Move to final name
+                if audio_path != final_path:
+                    os.replace(audio_path, output_path)
+                    final_path = output_path
 
             self._state.final_video_path = final_path
             self._state.final_video_file = final_path
@@ -508,3 +570,54 @@ class StoryVideoPipeline(MultiScenePipeline):
         except Exception as e:
             logger.error("[Story] Concatenation failed: %s", e, exc_info=True)
             self._state.status = StepStatus.FAILED
+
+    async def _build_reference_images(self) -> None:
+        """Build reference images from character descriptions and images."""
+        logger.info("[Story] Building reference images from %d characters", len(self._state.characters))
+        object.__setattr__(self._state, "reference_image", "")
+
+        ref_paths = []
+        for char in self._state.characters:
+            self._check_shutdown()
+            if char.image_base64:
+                # Save reference image
+                img_dir = os.path.join(self.working_dir, "characters")
+                os.makedirs(img_dir, exist_ok=True)
+                import base64
+                img_data = base64.b64decode(char.image_base64.split(",")[1]) if "," in char.image_base64 else base64.b64decode(char.image_base64)
+                img_path = os.path.join(img_dir, f"{char.name or 'char'}_{len(ref_paths)}.png")
+                with open(img_path, "wb") as f:
+                    f.write(img_data)
+                ref_paths.append(img_path)
+                logger.info("[Story] Added character reference: %s → %s", char.name, img_path)
+            elif char.appearance:
+                # Generate character reference image from description
+                # Note: API may not support image generation yet
+                try:
+                    # Try submit_image_gen if available
+                    if hasattr(self.video_api, 'submit_image_gen'):
+                        result = await self.video_api.submit_image_gen(prompt=prompt, style="", ratio="1:1")
+                        vid_id = result.get("video_id") or result.get("id")
+                        if vid_id:
+                            url = await self.video_api.get_result(vid_id)
+                            if url:
+                                img_path = os.path.join(self.working_dir, f"char_ref_{len(ref_paths)}.png")
+                                import urllib.request
+                                urllib.request.urlretrieve(url, img_path)
+                                ref_paths.append(img_path)
+                                logger.info("[Story] Generated character reference for %s", char.name)
+                    else:
+                        logger.warning("[Story] submit_image_gen not available for character %s, skipping reference generation", char.name)
+                except Exception as e:
+                    logger.warning("[Story] Failed to generate reference for %s: %s", char.name, e)
+
+        # Join paths with commas
+        if ref_paths:
+            object.__setattr__(self._state, "reference_image", ",".join(ref_paths))
+        logger.info("[Story] Total reference images: %d", len(ref_paths))
+
+    async def _composite_final(self) -> str:
+        """Concatenate all scene videos into the final video."""
+        logger.info("[Story] Concatenating final video")
+        await self._concatenate_scenes()
+        return self._state.final_video_file

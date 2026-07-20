@@ -53,6 +53,7 @@ class EdgeTTSEngine(TTSEngine):
 
         os.makedirs(os.path.dirname(output_path) or ".", exist_ok=True)
 
+        tmp_path = None
         max_attempts = 2
         for attempt in range(max_attempts):
             try:
@@ -74,7 +75,7 @@ class EdgeTTSEngine(TTSEngine):
             except Exception as e:
                 # 清理半成品文件
                 for p in (tmp_path, output_path):
-                    if os.path.exists(p):
+                    if p and os.path.exists(p):
                         try:
                             os.remove(p)
                         except OSError:
