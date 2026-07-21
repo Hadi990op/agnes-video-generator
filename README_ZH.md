@@ -16,6 +16,22 @@
 
 > **🖥️ 在线体验 — 免安装：** 打开 [video.lichuanyang.top](https://video.lichuanyang.top) 即可在浏览器中使用 **简单视频** 模式。输入提示词，立刻生成免费的 AI 视频。
 
+## ⭐ 支持与贡献
+
+如果你觉得这个项目有用，请给 **[GitHub 仓库](https://github.com/lcy362/agnes-video-generator)点个 Star** ⭐ —— 你的支持能让更多人发现这个免费开源的 AI 视频生成工具。
+
+欢迎通过 [GitHub Issues](https://github.com/lcy362/agnes-video-generator/issues) 提交问题反馈或功能建议。
+
+### 💝 支持开发者
+
+Agnes Video Generator 完全免费且开源，**本项目绝不会提供付费计划、增值服务或订阅模式**——无论现在还是将来。
+
+如果你觉得这个项目对你有帮助，可以通过以下方式支持它持续发展：
+
+- **⭐ 在 GitHub 上点 Star** — 给[仓库](https://github.com/lcy362/agnes-video-generator)点个 Star，帮助更多人发现这个项目。
+- **🌐 在官网关闭去广告插件** — 在 [video.lichuanyang.top](https://video.lichuanyang.top) 上关闭 AdBlock 等去广告工具，看到感兴趣的广告可以点一下。举手之劳，却是实实在在的支持。
+- **📢 分享你的创作** — 将你用 Agnes Video Generator 生成的视频发布到社交媒体（抖音、YouTube、小红书等）并标注本项目。让更多人知道这个工具，更多的用户意味着更多的反馈，项目也会变得更好。
+
 ## 🎥 Demo
 
 ### 1. 创意视频 — 无配音
@@ -50,7 +66,7 @@
 
 | 特性 | Agnes Video Generator | Runway Gen-3 | Pika 2.0 | OpenAI Sora | 可灵 Kling 1.6 |
 |------|:---:|:---:|:---:|:---:|:---:|
-| **价格** | 完全免费 | $15–$95/月 | $10–$28/月 | $20+/月（限量） | 免费额度后按秒计费 |
+| **价格** | 完全免费 | $15–$95/月 | $10–$95/月 | $20+/月（限量） | 免费额度后按秒计费 |
 | **开源** | ✅ 是（MIT） | ❌ 否 | ❌ 否 | ❌ 否 | ❌ 否 |
 | **自托管** | ✅ 支持 | ❌ 不支持 | ❌ 不支持 | ❌ 不支持 | ❌ 不支持 |
 | **单段最长时长** | 20秒，场景数不限 | 10秒 | 10秒 | 20秒 | 10秒 |
@@ -128,7 +144,7 @@
 
 ### 🌐 多语言 Web UI
 
-一键启动后在浏览器中完成所有操作。界面支持 **7 种语言**：中文、English、Русский、日本語、한국어、Bahasa Melayu、Bahasa Indonesia。
+一键启动后在浏览器中完成所有操作。界面支持 **13 种语言**：中文、English、Deutsch、Français、Nederlands、Español、Português、Italiano、Русский、日本語、한국어、Bahasa Melayu、Bahasa Indonesia。
 
 ## 🚀 快速开始
 
@@ -273,7 +289,7 @@ agnes-video-generator/
 ├── requirements.txt                  # Python 依赖
 ├── server.py                         # FastAPI 主服务 (REST + WebSocket)
 ├── static/
-│   └── index.html                    # 前端 SPA — 五种任务 Tab，7 种语言 (Tailwind CSS)
+│   └── index.html                    # 前端 SPA — 五种任务 Tab，13 种语言 (Tailwind CSS)
 ├── core/
 │   ├── config.py                     # API Key、字体解析、默认配置
 │   ├── screenwriter.py               # 编剧 Agent (LLM 驱动的故事/脚本/旁白生成)
@@ -410,19 +426,6 @@ agnes-video-generator/
 
 特别感谢 [Agnes AI](https://platform.agnes-ai.com) 提供**完全免费**、高质量的 AI 模型 API（文本生成、图片生成、视频生成），让这个项目得以零成本运行。
 
-## 反馈与贡献
-
-欢迎通过 [GitHub Issues](../../issues) 提交问题反馈或功能建议。
-
-## 💝 支持开发者
-
-Agnes Video Generator 完全免费且开源，**本项目绝不会提供付费计划、增值服务或订阅模式**——无论现在还是将来。
-
-如果你觉得这个项目对你有帮助，可以通过以下方式支持它持续发展：
-
-- **在官网关闭去广告插件** — 在 [video.lichuanyang.top](https://video.lichuanyang.top) 上关闭 AdBlock 等去广告工具，看到感兴趣的广告可以点一下。举手之劳，却是实实在在的支持。
-- **分享你的创作** — 将你用 Agnes Video Generator 生成的视频发布到社交媒体（抖音、YouTube、小红书等）并标注本项目。让更多人知道这个工具，更多的用户意味着更多的反馈，项目也会变得更好。
-
 ## 📄 License
 
 MIT
@@ -453,7 +456,7 @@ MIT
 
 ### Web UI 支持哪些语言？
 
-界面支持 7 种语言：中文、English、Русский、日本語、한국어、Bahasa Melayu、Bahasa Indonesia。字幕以源文本语言生成，内置 CJK 字体支持。
+界面支持 13 种语言：中文、English、Deutsch、Français、Nederlands、Español、Português、Italiano、Русский、日本語、한국어、Bahasa Melayu、Bahasa Indonesia。字幕以源文本语言生成，内置 CJK 字体支持。
 
 ### 可以部署在自己的服务器上吗？
 

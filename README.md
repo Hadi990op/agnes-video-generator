@@ -16,6 +16,22 @@
 
 > **🖥️ Try it now — no install needed:** Visit [video.lichuanyang.top](https://video.lichuanyang.top) and experience **Simple Video** mode directly in your browser. Just enter a prompt and generate a free AI video instantly.
 
+## ⭐ Support & Contribute
+
+If you find this project useful, please **star the [GitHub repository](https://github.com/lcy362/agnes-video-generator)** ⭐ — your support helps more people discover this free and open-source AI video generator.
+
+Bug reports and feature suggestions are welcome via [GitHub Issues](https://github.com/lcy362/agnes-video-generator/issues).
+
+### 💝 Support the Developer
+
+Agnes Video Generator is and will always remain completely free and open-source. There will be **no paid plans, no premium features, and no subscription services** — now or in the future.
+
+If you find this project helpful, here are a few ways to support its continued development:
+
+- **⭐ Star on GitHub** — Star the [repository](https://github.com/lcy362/agnes-video-generator) to help others discover this project.
+- **🌐 Whitelist the official website** — Turn off your ad blocker on [video.lichuanyang.top](https://video.lichuanyang.top) and click on an ad if something catches your eye. A small gesture that makes a real difference.
+- **📢 Share your creations** — Post videos made with Agnes Video Generator on social media (Douyin, YouTube, Xiaohongshu, etc.) and tag the project. More exposure means more users, more feedback, and a better tool for everyone.
+
 ## 🎥 Demo
 
 ### 1. Creative Video — No Narration
@@ -50,7 +66,7 @@ To be honest, Agnes's video model isn't perfect yet. The generated frames are so
 
 | Feature | Agnes Video Generator | Runway Gen-3 | Pika 2.0 | OpenAI Sora | Kling 1.6 |
 |---------|:---:|:---:|:---:|:---:|:---:|
-| **Price** | Free | $15–$95/month | $10–$28/month | $20+/month (limited) | Free quota, then pay-per-second |
+| **Price** | Free | $15–$95/month | $10–$95/month | $20+/month (limited) | Free quota, then pay-per-second |
 | **Open Source** | ✅ Yes (MIT) | ❌ No | ❌ No | ❌ No | ❌ No |
 | **Self-Hosted** | ✅ Yes | ❌ No | ❌ No | ❌ No | ❌ No |
 | **Max Video Length** | 20s per clip, unlimited scenes | 10s per clip | 10s per clip | 20s per clip | 10s per clip |
@@ -128,7 +144,7 @@ Designed specifically for AI coding assistants (Claude, Cursor, QoderWork, etc.)
 
 ### 🌐 Multilingual Web UI
 
-One-click launch, operate entirely in the browser. Interface available in **7 languages**: 中文, English, Русский, 日本語, 한국어, Bahasa Melayu, Bahasa Indonesia.
+One-click launch, operate entirely in the browser. Interface available in **13 languages**: 中文, English, Deutsch, Français, Nederlands, Español, Português, Italiano, Русский, 日本語, 한국어, Bahasa Melayu, Bahasa Indonesia.
 
 ## 🚀 Quick Start
 
@@ -273,7 +289,7 @@ agnes-video-generator/
 ├── requirements.txt                  # Python dependencies
 ├── server.py                         # FastAPI server (REST + WebSocket)
 ├── static/
-│   └── index.html                    # Frontend SPA — 5 task tabs, 7 languages (Tailwind CSS)
+│   └── index.html                    # Frontend SPA — 5 task tabs, 13 languages (Tailwind CSS)
 ├── core/
 │   ├── config.py                     # API key, font resolution, default configs
 │   ├── screenwriter.py               # Screenwriter Agent (LLM-powered story/script/narration)
@@ -410,19 +426,6 @@ This project is built upon the following open-source projects:
 
 Special thanks to [Agnes AI](https://platform.agnes-ai.com) for providing **completely free**, high-quality AI model APIs (text, image, and video generation) — this project runs at absolute zero cost thanks to their generosity.
 
-## Feedback & Contributing
-
-Bug reports and feature suggestions are welcome via [GitHub Issues](../../issues).
-
-## 💝 Support the Developer
-
-Agnes Video Generator is and will always remain completely free and open-source. There will be **no paid plans, no premium features, and no subscription services** — now or in the future.
-
-If you find this project helpful, here are a few ways to support its continued development:
-
-- **Whitelist the official website** — Turn off your ad blocker on [video.lichuanyang.top](https://video.lichuanyang.top) and click on an ad if something catches your eye. A small gesture that makes a real difference.
-- **Share your creations** — Post videos made with Agnes Video Generator on social media (Douyin, YouTube, Xiaohongshu, etc.) and tag the project. More exposure means more users, more feedback, and a better tool for everyone.
-
 ## 📄 License
 
 MIT
@@ -453,7 +456,7 @@ Yes. You can upload reference images for character or scene consistency across s
 
 ### What languages does the UI support?
 
-The Web UI supports 7 languages: 中文, English, Русский, 日本語, 한국어, Bahasa Melayu, and Bahasa Indonesia. Subtitles are generated in the source text language with CJK font support built-in.
+The Web UI supports 13 languages: 中文, English, Deutsch, Français, Nederlands, Español, Português, Italiano, Русский, 日本語, 한국어, Bahasa Melayu, and Bahasa Indonesia. Subtitles are generated in the source text language with CJK font support built-in.
 
 ### Can I host this on my own server?
 
