@@ -256,9 +256,9 @@ class StoryVideoPipeline(MultiScenePipeline):
 
         # Store as character reference for the pipeline
         if char_refs:
-            object.__setattr__(self._state, "reference_image", char_refs[0] if len(char_refs) == 1 else ",".join(char_refs[:5]))
+            self._state.reference_image = char_refs[0] if len(char_refs) == 1 else ",".join(char_refs[:5])
         else:
-            object.__setattr__(self._state, "reference_image", "")
+            self._state.reference_image = ""
 
         logger.info("[Story] Total character references: %d", len(char_refs))
 
@@ -424,7 +424,7 @@ class StoryVideoPipeline(MultiScenePipeline):
             )
             await self._wait_for_videos(pending, total, 900)  # 15 min timeout
 
-        # Update file paths after videos are done
+        # Update file paths for all completed scenes (from both cached and freshly generated)
         for idx, video_id, video_path in pending:
             if idx < len(self._state.scenes_output):
                 st = self._state.scenes_output[idx]
@@ -434,6 +434,22 @@ class StoryVideoPipeline(MultiScenePipeline):
                 elif st.video_id == video_id and st.video_id:
                     # Downloaded elsewhere
                     st.video_status = StepStatus.COMPLETED
+
+        # Also mark scenes that were already completed and cached (their videos were already downloaded
+        # but they were removed from pending during _wait_for_videos, so they need explicit marking)
+        for i, st in enumerate(self._state.scenes_output):
+            if st.video_id and st.video_status != StepStatus.COMPLETED:
+                scene_dir = os.path.join(self.working_dir, f"scene_{st.index}")
+                video_path = os.path.join(scene_dir, "video.mp4")
+                if os.path.exists(video_path):
+                    st.video_file = video_path
+                    st.video_status = StepStatus.COMPLETED
+                    logger.info("[Story] Scene %d video found cached, marking complete", st.index)
+
+        # Persist updated scene states to disk for resume/retry
+        self.task_manager.update_state(
+            scenes_output=[s.model_dump() for s in self._state.scenes_output]
+        )
 
     async def _generate_audio(self) -> None:
         """Generate TTS narration for all scenes."""
@@ -574,7 +590,7 @@ class StoryVideoPipeline(MultiScenePipeline):
     async def _build_reference_images(self) -> None:
         """Build reference images from character descriptions and images."""
         logger.info("[Story] Building reference images from %d characters", len(self._state.characters))
-        object.__setattr__(self._state, "reference_image", "")
+        self._state.reference_image = ""
 
         ref_paths = []
         for char in self._state.characters:
@@ -613,7 +629,7 @@ class StoryVideoPipeline(MultiScenePipeline):
 
         # Join paths with commas
         if ref_paths:
-            object.__setattr__(self._state, "reference_image", ",".join(ref_paths))
+            self._state.reference_image = ",".join(ref_paths)
         logger.info("[Story] Total reference images: %d", len(ref_paths))
 
     async def _composite_final(self) -> str:

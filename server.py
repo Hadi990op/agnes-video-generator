@@ -54,6 +54,7 @@ from core.pipelines import (
     CreativeVideoPipeline,
     ManuscriptVideoPipeline,
     PoetryVideoPipeline,
+    StoryVideoPipeline,
 )
 from core.pipelines.poetry_video import POETRY_SUBTITLE_STYLE
 from core.api.agnes_image import AgnesImageAPI
@@ -341,6 +342,32 @@ def get_upload_dir() -> str:
 static_dir = os.path.join(os.path.dirname(__file__), "static")
 if os.path.exists(static_dir):
     app.mount("/static", StaticFiles(directory=static_dir), name="static")
+
+# Serve workspace uploads via a simple route (outside app dir)
+workspace_uploads_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "uploads"))
+if os.path.exists(workspace_uploads_dir):
+    @app.get("/uploads/")
+    async def list_uploads():
+        """List uploaded files."""
+        files = []
+        for f in sorted(os.listdir(workspace_uploads_dir)):
+            fp = os.path.join(workspace_uploads_dir, f)
+            if os.path.isfile(fp):
+                size = os.path.getsize(fp)
+                files.append({"name": f, "size": size})
+        return {"files": files, "dir": "/uploads/"}
+
+    @app.get("/uploads/{filename:path}")
+    async def serve_upload(filename: str):
+        """Serve an uploaded file."""
+        filepath = os.path.join(workspace_uploads_dir, filename)
+        # Security: prevent path traversal
+        real_path = os.path.realpath(filepath)
+        if not real_path.startswith(os.path.realpath(workspace_uploads_dir)):
+            return {"error": "Access denied"}
+        if os.path.isfile(real_path):
+            return FileResponse(real_path)
+        return {"error": "File not found"}
 
 
 @app.get("/")
@@ -749,10 +776,27 @@ async def get_task(task_id: str):
 async def serve_video(task_id: str):
     dir_name = _find_dir_name(task_id)
     task_dir = os.path.join(get_working_dir(), dir_name)
-    video_path = os.path.join(task_dir, "final_video.mp4")
-    if not os.path.exists(video_path):
-        raise HTTPException(status_code=404, detail="Video not found")
-    return FileResponse(video_path, media_type="video/mp4")
+    tm = TaskManager(task_id, dir_name=dir_name)
+    state = tm.load()
+    
+    # Try the task state's final_video_file first (handles various naming conventions)
+    candidate_files = []
+    if state and state.final_video_file:
+        candidate_files.append(state.final_video_file)
+    
+    # Also try common filenames in the task directory
+    common_names = ["final_video.mp4", "final.mp4", "final_with_audio.mp4"]
+    for name in common_names:
+        path = os.path.join(task_dir, name)
+        if os.path.exists(path) and path not in candidate_files:
+            candidate_files.append(path)
+    
+    # Try all candidates
+    for video_path in candidate_files:
+        if os.path.exists(video_path):
+            return FileResponse(video_path, media_type="video/mp4")
+    
+    raise HTTPException(status_code=404, detail="Video not found")
 
 
 # ═══════════════════════════════════════════════════
@@ -994,6 +1038,13 @@ def _create_pipeline_for_type(
     """根据任务类型创建对应的 Pipeline 实例。"""
     if task_type == TaskType.SIMPLE:
         return SimpleVideoPipeline(
+            api_key=api_key,
+            task_id=task_id,
+            dir_name=dir_name,
+            shutdown_event=shutdown_event,
+        )
+    elif task_type == TaskType.STORY:
+        return StoryVideoPipeline(
             api_key=api_key,
             task_id=task_id,
             dir_name=dir_name,
@@ -2252,6 +2303,31 @@ async def stop_task(task_id: str):
 
     logger.info(f"[Stop] Task {task_id} stop requested")
     return {"ok": True, "task_id": task_id}
+
+
+@app.delete("/api/tasks/{task_id}")
+async def delete_task(task_id: str):
+    """Delete a task and all its generated files from disk."""
+    # Check if task is running
+    if task_id in active_pipelines:
+        raise HTTPException(status_code=400, detail="Cannot delete a running task. Stop it first.")
+    if task_id in _queued_tasks:
+        _queued_tasks.pop(task_id)
+        logger.info(f"[Delete] Removed queued task {task_id}")
+
+    # Find and remove working directory
+    dir_name = _find_dir_name(task_id)
+    if dir_name:
+        task_dir = os.path.join(get_working_dir(), dir_name)
+        if os.path.exists(task_dir):
+            import shutil
+            shutil.rmtree(task_dir, ignore_errors=True)
+            logger.info(f"[Delete] Removed task directory: {task_dir}")
+
+    # Remove from active_pipelines if present
+    active_pipelines.pop(task_id, None)
+
+    return {"ok": True, "task_id": task_id, "message": "Task deleted"}
 
 
 # ═══════════════════════════════════════════════════

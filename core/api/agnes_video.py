@@ -356,7 +356,7 @@ class AgnesVideoAPI:
 
                 if resp.status_code == 429:
                     # 多 key 轮转：标记当前 key 冷却 + 尝试切换到下一个 key
-                    mark_key_429(self.api_key, cooldown_seconds=120)
+                    mark_key_429(self.api_key, cooldown_seconds=60)
                     if self._refresh_key():
                         logger.info(
                             f"[AgnesVideo] 429 → rotated to new key, "

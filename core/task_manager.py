@@ -157,6 +157,11 @@ class TaskManager:
                             SceneTask(**s) if isinstance(s, dict) else s
                             for s in value
                         ]
+                    elif key == "scenes_output" and isinstance(value, list):
+                        value = [
+                            SceneTask(**s) if isinstance(s, dict) else s
+                            for s in value
+                        ]
                     elif key == "paragraphs" and isinstance(value, list):
                         value = [
                             ManuscriptParagraph(**p) if isinstance(p, dict) else p

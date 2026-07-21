@@ -279,6 +279,662 @@ async function submitStory() {
   }
 }
 
+// ═══════════════════════════════════════════════════════
+//  Import / Export Story Data
+// ═══════════════════════════════════════════════════════
+
+// ═══ Store current import section for the modal buttons ═══
+var _importSection = 'all';
+
+function showImportModal(section) {
+  _importSection = section || 'all';
+  const modal = document.getElementById('import-modal');
+  if (!modal) {
+    createImportModal();
+    return;
+  }
+  modal.classList.remove('hidden');
+  // Reset to JSON tab
+  showImportTab('json');
+}
+
+function createImportModal() {
+  const modal = document.createElement('div');
+  modal.id = 'import-modal';
+  modal.className = 'fixed inset-0 z-[9999] flex items-center justify-center p-4 hidden';
+  modal.onclick = function(e) {
+    if (e.target === modal) closeImportModal();
+  };
+
+  modal.innerHTML = `
+    <div class="glass-card rounded-2xl p-6 w-full max-w-2xl max-h-[90vh] overflow-y-auto border border-purple-500/30">
+      <div class="flex items-center justify-between mb-4">
+        <h3 class="text-lg font-semibold text-purple-300">📥 Import Story Data</h3>
+        <button onclick="closeImportModal()" class="text-gray-400 hover:text-white text-xl">✕</button>
+      </div>
+
+      <!-- Import Format Tabs -->
+      <div class="flex gap-2 mb-4">
+        <button type="button" onclick="showImportTab('json')" class="import-tab px-3 py-1.5 text-xs rounded-lg bg-purple-700/50 text-purple-200 hover:bg-purple-600/60 transition" data-tab="json">JSON</button>
+        <button type="button" onclick="showImportTab('csv')" class="import-tab px-3 py-1.5 text-xs rounded-lg bg-gray-700/50 text-gray-400 hover:bg-purple-600/60 transition" data-tab="csv">CSV</button>
+        <button type="button" onclick="showImportTab('text')" class="import-tab px-3 py-1.5 text-xs rounded-lg bg-gray-700/50 text-gray-400 hover:bg-purple-600/60 transition" data-tab="text">Text</button>
+        <button type="button" onclick="showImportTab('file')" class="import-tab px-3 py-1.5 text-xs rounded-lg bg-gray-700/50 text-gray-400 hover:bg-purple-600/60 transition" data-tab="file">File Upload</button>
+      </div>
+
+      <!-- JSON Import -->
+      <div id="import-tab-json" class="import-panel">
+        <p class="text-xs text-gray-500 mb-2">Paste JSON with characters and scenes arrays.</p>
+        <textarea id="import-json-data" rows="10" class="w-full glass-input rounded-lg px-3 py-2 text-xs text-gray-200 font-mono resize-y" placeholder='{
+  "story_title": "My Story",
+  "characters": [{"name": "Hero", "appearance": "..."}],
+  "scenes": [{"location": "Castle", "action": "..."}]
+}'></textarea>
+      </div>
+
+      <!-- CSV Import -->
+      <div id="import-tab-csv" class="import-panel hidden">
+        <p class="text-xs text-gray-500 mb-2">CSV for scenes. Columns: location, action, dialogue, characters, duration, mood</p>
+        <textarea id="import-csv-data" rows="10" class="w-full glass-input rounded-lg px-3 py-2 text-xs text-gray-200 font-mono resize-y" placeholder='location,Forest
+action,Hero walks
+dialogue,"Let us go"
+characters,Hero
+duration,5
+mood,Mysterious'></textarea>
+      </div>
+
+      <!-- Text Import -->
+      <div id="import-tab-text" class="import-panel hidden">
+        <p class="text-xs text-gray-500 mb-2">Paste story text with headings like "Characters:", "Scene 1:", "Location:", etc.</p>
+        <textarea id="import-text-data" rows="10" class="w-full glass-input rounded-lg px-3 py-2 text-xs text-gray-200 font-mono resize-y" placeholder='Title: My Story
+
+Characters:
+- Alice: A brave explorer
+- Bob: His mentor
+
+Scenes:
+
+Scene 1:
+Location: Forest
+Action: They walk into the forest
+Characters: Alice, Bob
+Duration: 5
+Mood: Tense'></textarea>
+      </div>
+
+      <!-- File Upload -->
+      <div id="import-tab-file" class="import-panel hidden">
+        <p class="text-xs text-gray-500 mb-2">Upload a .json, .csv, or .txt file from your computer.</p>
+        <input type="file" id="import-file-input" accept=".json,.csv,.txt" style="width:100%;padding:10px;border:2px dashed #7c3aed;border-radius:10px;background:rgba(124,58,237,0.1);color:#c4b5fd;font-size:13px;cursor:pointer;margin-bottom:8px;">
+        <p class="text-xs text-amber-400 mb-3">📎 After selecting a file, its content loads automatically into the JSON/CSV/Text tab above.</p>
+        <div id="import-file-status" class="hidden mb-3 px-3 py-2 rounded-lg bg-green-900/40 border border-green-500/30 text-xs text-green-300"></div>
+        <textarea id="import-file-data" rows="8" class="w-full glass-input rounded-lg px-3 py-2 text-xs text-gray-200 font-mono resize-y hidden" readonly></textarea>
+      </div>
+
+      <!-- Quick Load from Server -->
+      <div class="mt-3 pt-3 border-t border-gray-700/50">
+        <p class="text-xs text-gray-500 mb-2">Or load a file already on the server:</p>
+        <div id="server-files-list" class="flex flex-wrap gap-2"></div>
+      </div>
+
+      <!-- Import Action -->
+      <div class="mt-4 flex gap-3">
+        <button type="button" onclick="doExecuteImport()" class="px-6 py-2.5 bg-green-700/60 hover:bg-green-600/80 rounded-lg text-sm text-white transition font-semibold">
+          📥 Import Into Form
+        </button>
+        <button type="button" onclick="closeImportModal()" class="px-4 py-2.5 bg-gray-700/40 hover:bg-gray-600/60 rounded-lg text-sm text-gray-400 transition">
+          Cancel
+        </button>
+      </div>
+    </div>
+  `;
+  document.body.appendChild(modal);
+
+  // Wire up file input change event — fires when user picks a file, no "Load File" button needed
+  setTimeout(function() {
+    const fin = document.getElementById('import-file-input');
+    if (fin) {
+      fin.addEventListener('change', function(e) {
+        if (e.target.files && e.target.files[0]) {
+          console.log('[Import] File selected:', e.target.files[0].name);
+          loadImportFile();
+        }
+      });
+    }
+  }, 50);
+}
+
+function closeImportModal() {
+  const modal = document.getElementById('import-modal');
+  if (modal) modal.classList.add('hidden');
+}
+
+function showImportTab(tab) {
+  document.querySelectorAll('.import-panel').forEach(p => p.classList.add('hidden'));
+  document.querySelectorAll('.import-tab').forEach(t => {
+    t.classList.remove('bg-purple-700/50', 'text-purple-200');
+    t.classList.add('bg-gray-700/50', 'text-gray-400');
+  });
+  const panel = document.getElementById('import-tab-' + tab);
+  if (panel) panel.classList.remove('hidden');
+  const btn = document.querySelector(`.import-tab[data-tab="${tab}"]`);
+  if (btn) {
+    btn.classList.remove('bg-gray-700/50', 'text-gray-400');
+    btn.classList.add('bg-purple-700/50', 'text-purple-200');
+  }
+
+  // When File tab opens, load available server files
+  if (tab === 'file') {
+    loadServerFilesList();
+  }
+}
+
+function loadServerFilesList() {
+  fetch('/uploads/')
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+      const files = data.files || [];
+      const container = document.getElementById('server-files-list');
+      if (!container) return;
+      container.innerHTML = '';
+      if (files.length === 0) {
+        container.innerHTML = '<span class="text-xs text-gray-500">No uploaded files found. Upload via the file picker above.</span>';
+        return;
+      }
+      files.forEach(function(f) {
+        if (/\.(json|csv|txt)$/i.test(f.name)) {
+          const btn = document.createElement('button');
+          btn.type = 'button';
+          btn.className = 'px-3 py-1.5 bg-purple-700/40 hover:bg-purple-600/60 rounded-lg text-xs text-purple-200 transition';
+          btn.textContent = '📄 ' + f.name;
+          btn.onclick = function() { loadServerFile(f.name); };
+          container.appendChild(btn);
+        }
+      });
+    })
+    .catch(function() {
+      const container = document.getElementById('server-files-list');
+      if (container) container.innerHTML = '<span class="text-xs text-gray-500">Server files unavailable</span>';
+    });
+}
+
+function loadImportFile() {
+  const input = document.getElementById('import-file-input');
+  const modal = document.getElementById('import-modal');
+  const modalInput = modal ? modal.querySelector('#import-file-input') : null;
+  const actualInput = modalInput || input;
+
+  if (!actualInput || !actualInput.files || !actualInput.files[0]) {
+    showToast('⚠️ Please select a file first');
+    return;
+  }
+  const file = actualInput.files[0];
+  console.log('[Import] Loading file:', file.name, file.size, 'bytes');
+
+  const reader = new FileReader();
+  reader.onload = function(e) {
+    const content = e.target.result;
+    console.log('[Import] File loaded:', content.length, 'chars');
+
+    // Show content in textarea
+    const fileData = document.getElementById('import-file-data');
+    fileData.value = content;
+    fileData.classList.remove('hidden');
+
+    const status = document.getElementById('import-file-status');
+    status.classList.remove('hidden');
+    status.textContent = '✅ ' + file.name + ' (' + (file.size / 1024).toFixed(1) + ' KB) — ' + content.length + ' chars';
+    status.className = 'mb-3 px-3 py-2 rounded-lg bg-green-900/40 border border-green-500/30 text-xs text-green-300';
+
+    // Auto-switch to correct tab based on extension
+    const ext = file.name.split('.').pop().toLowerCase();
+    console.log('[Import] File extension:', ext);
+    if (ext === 'json') showImportTab('json');
+    else if (ext === 'csv') showImportTab('csv');
+    else showImportTab('text');
+
+    showToast('✅ File loaded! Content is in the ' + (ext === 'json' ? 'JSON' : ext === 'csv' ? 'CSV' : 'Text') + ' tab — click "📥 Import Into Form" to import.');
+  };
+  reader.onerror = function() {
+    showToast('❌ Error reading file');
+  };
+  reader.readAsText(file);
+}
+
+// Load a file from the server API (already uploaded)
+function loadServerFile(filename) {
+  console.log('[Import] Loading server file:', filename);
+  fetch('/uploads/' + filename)
+    .then(function(r) {
+      if (!r.ok) throw new Error('File not found: ' + filename);
+      return r.text();
+    })
+    .then(function(content) {
+      // Determine tab by extension
+      const ext = filename.split('.').pop().toLowerCase();
+
+      if (ext === 'json') {
+        const ta = document.getElementById('import-json-data');
+        ta.value = content;
+        showImportTab('json');
+      } else if (ext === 'csv') {
+        const ta = document.getElementById('import-csv-data');
+        ta.value = content;
+        showImportTab('csv');
+      } else if (ext === 'txt') {
+        const ta = document.getElementById('import-text-data');
+        ta.value = content;
+        showImportTab('text');
+      }
+
+      showToast('✅ ' + filename + ' loaded! Click "📥 Import Into Form" to import.');
+    })
+    .catch(function(e) {
+      console.error('[Import] Server file error:', e);
+      showToast('❌ Could not load: ' + e.message);
+    });
+}
+
+function doExecuteImport() {
+  console.log('[Import] doExecuteImport called, section:', _importSection);
+  const activePanel = document.querySelector('.import-panel:not(.hidden)');
+  if (!activePanel) {
+    showToast('⚠️ No import format selected');
+    return;
+  }
+
+  let data = null;
+  const tab = activePanel.id.replace('import-tab-', '');
+  console.log('[Import] Active tab:', tab);
+
+  try {
+    if (tab === 'json') {
+      const raw = document.getElementById('import-json-data').value.trim();
+      if (!raw) { showToast('⚠️ Please paste JSON data or load a file'); return; }
+      data = JSON.parse(raw);
+      console.log('[Import] JSON parsed OK:', Object.keys(data));
+    } else if (tab === 'csv') {
+      const raw = document.getElementById('import-csv-data').value.trim();
+      if (!raw) { showToast('⚠️ Please paste CSV data or load a file'); return; }
+      data = parseCSV(raw);
+      console.log('[Import] CSV parsed OK:', data.scenes.length, 'scenes,', data.characters.length, 'chars');
+    } else if (tab === 'text') {
+      const raw = document.getElementById('import-text-data').value.trim();
+      if (!raw) { showToast('⚠️ Please paste text data or load a file'); return; }
+      data = parseStoryText(raw);
+      console.log('[Import] Text parsed OK:', data.scenes.length, 'scenes,', data.characters.length, 'chars');
+    } else if (tab === 'file') {
+      const raw = document.getElementById('import-file-data').value.trim();
+      if (!raw) { showToast('⚠️ Please load a file first'); return; }
+      const fileInput = document.getElementById('import-file-input');
+      const ext = fileInput.files[0]?.name.split('.').pop().toLowerCase();
+      console.log('[Import] File tab, ext:', ext);
+      if (ext === 'json') data = JSON.parse(raw);
+      else if (ext === 'csv') data = parseCSV(raw);
+      else if (ext === 'txt') data = parseStoryText(raw);
+      else { showToast('⚠️ Unsupported file type: ' + ext); return; }
+      console.log('[Import] File parsed OK');
+    }
+  } catch (e) {
+    console.error('[Import] Parse error:', e);
+    showToast('❌ Error: ' + e.message);
+    return;
+  }
+
+  if (!data) {
+    showToast('⚠️ Could not parse any data from input');
+    return;
+  }
+
+  console.log('[Import] Executing import for section:', _importSection);
+
+  if (_importSection === 'all') {
+    populateStoryForm(data);
+  } else if (_importSection === 'characters') {
+    importCharacters(data);
+  } else if (_importSection === 'scenes') {
+    importScenes(data);
+  }
+
+  closeImportModal();
+  const nChars = (data.characters || []).length;
+  const nScenes = (data.scenes || []).length;
+  showToast('✅ Imported: ' + nChars + ' characters, ' + nScenes + ' scenes');
+}
+
+// ═══════════════════════════════════════════════════════
+//  Parsers
+// ═══════════════════════════════════════════════════════
+
+function parseCSV(raw) {
+  const lines = raw.split('\n').map(l => l.trim()).filter(Boolean);
+  const data = { characters: [], scenes: [], story_title: '', story_genre: '', story_synopsis: '' };
+  const isSceneCSV = lines.length > 0 && lines[0].toLowerCase().includes('location');
+
+  if (!isSceneCSV) {
+    // First check if it's JSON (user might have pasted JSON in CSV tab)
+    try { return JSON.parse(raw); } catch { /* not JSON, fall through */ }
+  }
+
+  // Detect delimiter
+  const firstLine = lines[0].toLowerCase();
+  let delimiter = ',';
+  if (firstLine.includes('\t') && !firstLine.includes(',')) delimiter = '\t';
+  else if (firstLine.includes(';') && firstLine.split(';').length > firstLine.split(',').length) delimiter = ';';
+
+  for (const line of lines) {
+    const parts = line.split(delimiter).map(p => p.trim()).filter(Boolean);
+    if (parts.length < 2) continue;
+
+    const key = parts[0].toLowerCase().replace(/^"|"$/g, '');
+    const value = parts.slice(1).join(delimiter).replace(/^"|"$/g, '').trim();
+
+    // Handle compound keys like "story_title"
+    const compoundKeys = ['story_title', 'story_genre', 'story_theme', 'story_summary', 'story_synopsis'];
+    if (compoundKeys.includes(key)) {
+      const base = compoundKeys.find(k => k === key);
+      if (base) { data[base] = value; continue; }
+    }
+
+    if (isSceneCSV) {
+      if (!data.scenes.length) data.scenes.push({
+        index: 0, location: '', action: '', dialogue: '', characters: [], duration: 5, mood: '',
+        visual_prompt: '', image_base64: '', image_url: ''
+      });
+      const scene = data.scenes[data.scenes.length - 1];
+      if (key === 'location') scene.location = value;
+      else if (key === 'action') scene.action = value;
+      else if (key === 'dialogue') scene.dialogue = value;
+      else if (key === 'characters') scene.characters = value.split(',').map(s => s.trim()).filter(Boolean);
+      else if (key === 'duration') scene.duration = parseInt(value) || 5;
+      else if (key === 'mood') scene.mood = value;
+      else if (key === 'visual_prompt') scene.visual_prompt = value;
+    }
+  }
+
+  return data;
+}
+
+function parseStoryText(raw) {
+  const lines = raw.split('\n');
+  const data = { characters: [], scenes: [], story_title: '' };
+  let section = null; // 'title', 'characters', 'scenes'
+  let currentChar = null;
+  let currentScene = null;
+
+  for (const line of lines) {
+    const trimmed = line.trim();
+    if (!trimmed) continue;
+
+    const lower = trimmed.toLowerCase();
+
+    // Story title
+    if (lower.startsWith('title:') || lower.startsWith('title :')) {
+      data.story_title = trimmed.split(/:\s*/)[1]?.trim() || '';
+      section = null;
+      continue;
+    }
+
+    // Characters section
+    if (lower.match(/^(characters?|cast?|personas?):?\s*$/)) {
+      section = 'characters';
+      currentChar = null;
+      continue;
+    }
+
+    // Scenes section
+    if (lower.match(/^(scenes?|scenarios?):?\s*$/)) {
+      section = 'scenes';
+      currentScene = null;
+      continue;
+    }
+
+    // Individual scene header
+    if (section === 'scenes' && lower.match(/^scene\s*\d*[:.\-]?\s*/)) {
+      if (currentScene) data.scenes.push(currentScene);
+      currentScene = { index: data.scenes.length, location: '', action: '', dialogue: '', characters: [], duration: 5, mood: '', visual_prompt: '', image_base64: '', image_url: '' };
+      continue;
+    }
+
+    // Individual character header
+    if (section === 'characters' && trimmed.match(/^[-*]\s*\w/)) {
+      if (currentChar) data.characters.push(currentChar);
+      const nameMatch = trimmed.match(/^[-*]\s*([^\s:—-]+)/);
+      currentChar = {
+        name: nameMatch ? nameMatch[1] : '',
+        role: '', appearance: '', personality: '', voice: '',
+        image_base64: '', image_url: ''
+      };
+      // Check if rest after name is description
+      const afterName = trimmed.replace(/^[-*]\s*\S+\s*[:—–]?\s*/, '');
+      if (afterName) currentChar.appearance = afterName;
+      continue;
+    }
+
+    // Scene sub-fields
+    if (section === 'scenes' && currentScene) {
+      if (lower.startsWith('location:')) currentScene.location = trimmed.split(/:\s*/).slice(1).join(':').trim();
+      else if (lower.startsWith('action:')) currentScene.action = trimmed.split(/:\s*/).slice(1).join(':').trim();
+      else if (lower.startsWith('dialogue:')) currentScene.dialogue = trimmed.split(/:\s*/).slice(1).join(':').trim();
+      else if (lower.startsWith('duration:')) currentScene.duration = parseInt(trimmed.split(/:\s*/)[1]) || 5;
+      else if (lower.startsWith('mood:')) currentScene.mood = trimmed.split(/:\s*/).slice(1).join(':').trim();
+      else if (lower.startsWith('characters:') || lower.startsWith('cast:')) {
+        currentScene.characters = trimmed.split(/:\s*/).slice(1).join(':').trim().split(',').map(s => s.trim()).filter(Boolean);
+      }
+      continue;
+    }
+
+    // Character sub-fields
+    if (section === 'characters' && currentChar) {
+      if (lower.startsWith('role:')) currentChar.role = trimmed.split(/:\s*/).slice(1).join(':').trim();
+      else if (lower.startsWith('appearance:') || lower.startsWith('description:')) currentChar.appearance = trimmed.split(/:\s*/).slice(1).join(':').trim();
+      else if (lower.startsWith('personality:')) currentChar.personality = trimmed.split(/:\s*/).slice(1).join(':').trim();
+      else if (lower.startsWith('voice:')) currentChar.voice = trimmed.split(/:\s*/).slice(1).join(':').trim();
+      else {
+        // First line under character is usually appearance
+        if (!currentChar.appearance) currentChar.appearance = trimmed;
+      }
+      continue;
+    }
+  }
+
+  // Flush last character and scene
+  if (currentChar) data.characters.push(currentChar);
+  if (currentScene) data.scenes.push(currentScene);
+
+  return data;
+}
+
+// ═══════════════════════════════════════════════════════
+//  Form Population
+// ═══════════════════════════════════════════════════════
+
+function populateStoryForm(data) {
+  // Basic info
+  if (data.story_title) document.getElementById('story_title').value = data.story_title;
+  if (data.story_genre) document.getElementById('story_genre').value = data.story_genre;
+  if (data.story_theme) document.getElementById('story_theme').value = data.story_theme;
+  if (data.story_summary) document.getElementById('story_summary').value = data.story_summary;
+  if (data.story_synopsis) document.getElementById('story_synopsis').value = data.story_synopsis;
+
+  // Clear existing characters and scenes
+  document.getElementById('story_characters_list').innerHTML = '';
+  document.getElementById('story_scenes_list').innerHTML = '';
+  _storyCharacterCount = 0;
+  _storySceneCount = 0;
+
+  // Characters
+  if (data.characters && Array.isArray(data.characters)) {
+    for (const c of data.characters) {
+      _storyCharacterCount++;
+      const idx = _storyCharacterCount;
+      const html = `
+        <div class="glass-card rounded-lg p-3 border border-purple-500/20" data-char-idx="${idx}">
+          <div class="flex items-start justify-between mb-2">
+            <span class="text-xs text-purple-300 font-semibold">Character #${idx}</span>
+            <button type="button" onclick="this.closest('[data-char-idx]').remove()" class="text-xs text-red-400 hover:text-red-300">✕</button>
+          </div>
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-2 mb-2">
+            <div>
+              <label class="text-xs text-gray-500 block mb-0.5">Name</label>
+              <input type="text" class="char_name w-full glass-input rounded px-2 py-1 text-xs text-gray-200" value="${escHtml(c.name || '')}">
+            </div>
+            <div>
+              <label class="text-xs text-gray-500 block mb-0.5">Role</label>
+              <input type="text" class="char_role w-full glass-input rounded px-2 py-1 text-xs text-gray-200" value="${escHtml(c.role || '')}">
+            </div>
+          </div>
+          <div class="mb-2">
+            <label class="text-xs text-gray-500 block mb-0.5">Appearance Description</label>
+            <textarea class="char_appearance w-full glass-input rounded px-2 py-1 text-xs text-gray-200 resize-y" rows="2">${escHtml(c.appearance || c.description || '')}</textarea>
+          </div>
+          <div>
+            <label class="text-xs text-gray-500 block mb-0.5">Voice Style <span class="text-gray-600">(optional)</span></label>
+            <input type="text" class="char_voice w-full glass-input rounded px-2 py-1 text-xs text-gray-200" value="${escHtml(c.voice || '')}">
+          </div>
+          <div class="mt-2">
+            <label class="text-xs text-gray-500 block mb-0.5">Reference Image <span class="text-gray-600">(optional)</span></label>
+            <div class="flex items-center gap-2">
+              <input type="file" accept="image/*" onchange="handleCharImageUpload(this, ${idx})" class="text-xs text-gray-400 file:mr-2 file:py-1 file:px-2 file:rounded file:text-xs file:bg-purple-700/40 file:text-purple-300 file:border-0">
+              <span id="char_img_status_${idx}" class="text-xs text-green-400"></span>
+            </div>
+          </div>
+        </div>`;
+      document.getElementById('story_characters_list').insertAdjacentHTML('beforeend', html);
+    }
+  }
+
+  // Scenes
+  if (data.scenes && Array.isArray(data.scenes)) {
+    for (const s of data.scenes) {
+      _storySceneCount++;
+      const idx = _storySceneCount;
+      const chars = Array.isArray(s.characters) ? s.characters.join(', ') : '';
+      const html = `
+        <div class="glass-card rounded-lg p-3 border border-purple-500/20" data-scene-idx="${idx}">
+          <div class="flex items-start justify-between mb-2">
+            <span class="text-xs text-purple-300 font-semibold">Scene #${idx}</span>
+            <button type="button" onclick="this.closest('[data-scene-idx]').remove()" class="text-xs text-red-400 hover:text-red-300">✕</button>
+          </div>
+          <div class="grid grid-cols-1 md:grid-cols-3 gap-2 mb-2">
+            <div>
+              <label class="text-xs text-gray-500 block mb-0.5">Location</label>
+              <input type="text" class="scene_location w-full glass-input rounded px-2 py-1 text-xs text-gray-200" value="${escHtml(s.location || '')}">
+            </div>
+            <div>
+              <label class="text-xs text-gray-500 block mb-0.5">Characters <span class="text-gray-600">(comma sep)</span></label>
+              <input type="text" class="scene_characters w-full glass-input rounded px-2 py-1 text-xs text-gray-200" value="${escHtml(chars)}">
+            </div>
+            <div>
+              <label class="text-xs text-gray-500 block mb-0.5">Duration (sec)</label>
+              <input type="number" class="scene_duration w-full glass-input rounded px-2 py-1 text-xs text-gray-200" value="${s.duration || 5}" min="3" max="30">
+            </div>
+          </div>
+          <div class="mb-2">
+            <label class="text-xs text-gray-500 block mb-0.5">Action / What Happens</label>
+            <textarea class="scene_action w-full glass-input rounded px-2 py-1 text-xs text-gray-200 resize-y" rows="2">${escHtml(s.action || '')}</textarea>
+          </div>
+          <div class="mb-2">
+            <label class="text-xs text-gray-500 block mb-0.5">Dialogue <span class="text-gray-600">(what characters say)</span></label>
+            <textarea class="scene_dialogue w-full glass-input rounded px-2 py-1 text-xs text-gray-200 resize-y" rows="2">${escHtml(s.dialogue || '')}</textarea>
+          </div>
+          <div>
+            <label class="text-xs text-gray-500 block mb-0.5">Mood / Atmosphere <span class="text-gray-600">(optional)</span></label>
+            <input type="text" class="scene_mood w-full glass-input rounded px-2 py-1 text-xs text-gray-200" value="${escHtml(s.mood || '')}">
+          </div>
+        </div>`;
+      document.getElementById('story_scenes_list').insertAdjacentHTML('beforeend', html);
+    }
+  }
+}
+
+function importCharacters(data) {
+  const chars = data.characters || [];
+  for (const c of chars) {
+    _storyCharacterCount++;
+    const idx = _storyCharacterCount;
+    const html = `
+      <div class="glass-card rounded-lg p-3 border border-purple-500/20" data-char-idx="${idx}">
+        <div class="flex items-start justify-between mb-2">
+          <span class="text-xs text-purple-300 font-semibold">Character #${idx}</span>
+          <button type="button" onclick="this.closest('[data-char-idx]').remove()" class="text-xs text-red-400 hover:text-red-300">✕</button>
+        </div>
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-2 mb-2">
+          <div>
+            <label class="text-xs text-gray-500 block mb-0.5">Name</label>
+            <input type="text" class="char_name w-full glass-input rounded px-2 py-1 text-xs text-gray-200" value="${escHtml(c.name || '')}">
+          </div>
+          <div>
+            <label class="text-xs text-gray-500 block mb-0.5">Role</label>
+            <input type="text" class="char_role w-full glass-input rounded px-2 py-1 text-xs text-gray-200" value="${escHtml(c.role || '')}">
+          </div>
+        </div>
+        <div class="mb-2">
+          <label class="text-xs text-gray-500 block mb-0.5">Appearance Description</label>
+          <textarea class="char_appearance w-full glass-input rounded px-2 py-1 text-xs text-gray-200 resize-y" rows="2">${escHtml(c.appearance || c.description || '')}</textarea>
+        </div>
+        <div>
+          <label class="text-xs text-gray-500 block mb-0.5">Voice Style <span class="text-gray-600">(optional)</span></label>
+          <input type="text" class="char_voice w-full glass-input rounded px-2 py-1 text-xs text-gray-200" value="${escHtml(c.voice || '')}">
+        </div>
+        <div class="mt-2">
+          <label class="text-xs text-gray-500 block mb-0.5">Reference Image <span class="text-gray-600">(optional)</span></label>
+          <div class="flex items-center gap-2">
+            <input type="file" accept="image/*" onchange="handleCharImageUpload(this, ${idx})" class="text-xs text-gray-400 file:mr-2 file:py-1 file:px-2 file:rounded file:text-xs file:bg-purple-700/40 file:text-purple-300 file:border-0">
+            <span id="char_img_status_${idx}" class="text-xs text-green-400"></span>
+          </div>
+        </div>
+      </div>`;
+    document.getElementById('story_characters_list').insertAdjacentHTML('beforeend', html);
+  }
+}
+
+function importScenes(data) {
+  const scenes = data.scenes || [];
+  for (const s of scenes) {
+    _storySceneCount++;
+    const idx = _storySceneCount;
+    const chars = Array.isArray(s.characters) ? s.characters.join(', ') : '';
+    const html = `
+      <div class="glass-card rounded-lg p-3 border border-purple-500/20" data-scene-idx="${idx}">
+        <div class="flex items-start justify-between mb-2">
+          <span class="text-xs text-purple-300 font-semibold">Scene #${idx}</span>
+          <button type="button" onclick="this.closest('[data-scene-idx]').remove()" class="text-xs text-red-400 hover:text-red-300">✕</button>
+        </div>
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-2 mb-2">
+          <div>
+            <label class="text-xs text-gray-500 block mb-0.5">Location</label>
+            <input type="text" class="scene_location w-full glass-input rounded px-2 py-1 text-xs text-gray-200" value="${escHtml(s.location || '')}">
+          </div>
+          <div>
+            <label class="text-xs text-gray-500 block mb-0.5">Characters <span class="text-gray-600">(comma sep)</span></label>
+            <input type="text" class="scene_characters w-full glass-input rounded px-2 py-1 text-xs text-gray-200" value="${escHtml(chars)}">
+          </div>
+          <div>
+            <label class="text-xs text-gray-500 block mb-0.5">Duration (sec)</label>
+            <input type="number" class="scene_duration w-full glass-input rounded px-2 py-1 text-xs text-gray-200" value="${s.duration || 5}" min="3" max="30">
+          </div>
+        </div>
+        <div class="mb-2">
+          <label class="text-xs text-gray-500 block mb-0.5">Action / What Happens</label>
+          <textarea class="scene_action w-full glass-input rounded px-2 py-1 text-xs text-gray-200 resize-y" rows="2">${escHtml(s.action || '')}</textarea>
+        </div>
+        <div class="mb-2">
+          <label class="text-xs text-gray-500 block mb-0.5">Dialogue <span class="text-gray-600">(what characters say)</span></label>
+          <textarea class="scene_dialogue w-full glass-input rounded px-2 py-1 text-xs text-gray-200 resize-y" rows="2">${escHtml(s.dialogue || '')}</textarea>
+        </div>
+        <div>
+          <label class="text-xs text-gray-500 block mb-0.5">Mood / Atmosphere <span class="text-gray-600">(optional)</span></label>
+          <input type="text" class="scene_mood w-full glass-input rounded px-2 py-1 text-xs text-gray-200" value="${escHtml(s.mood || '')}">
+        </div>
+      </div>`;
+    document.getElementById('story_scenes_list').insertAdjacentHTML('beforeend', html);
+  }
+}
+
+function escHtml(str) {
+  return (str || '').replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+}
+
 // Auto-add default character and scene
 document.addEventListener('DOMContentLoaded', () => {
   // Add one default character and scene for convenience
@@ -1892,7 +2548,14 @@ Steam rose from his coffee cup as he gazed out the window.
 
         <!-- Story Basic Info -->
         <div class="mb-6">
-          <h2 class="text-lg font-semibold text-purple-300 mb-4">📖 Story Basic Info</h2>
+          <div class="flex items-center justify-between mb-4">
+            <h2 class="text-lg font-semibold text-purple-300">📖 Story Basic Info</h2>
+            <div class="flex items-center gap-2">
+              <button type="button" onclick="showImportModal('all')" class="px-3 py-1.5 bg-green-700/40 hover:bg-green-600/60 rounded-lg text-xs text-green-200 transition flex items-center gap-1" title="Import story data from JSON, CSV, or text">
+                📥 Import
+              </button>
+            </div>
+          </div>
           <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
             <div>
               <label class="block text-sm text-gray-400 mb-1.5">Story Title <span class="text-gray-500">(optional)</span></label>
@@ -1924,6 +2587,11 @@ Steam rose from his coffee cup as he gazed out the window.
           <summary class="cursor-pointer text-base font-semibold text-purple-300 mb-2 flex items-center gap-2">
             👥 Characters <span class="text-xs text-gray-500 font-normal">— Add characters with descriptions & reference images</span>
           </summary>
+          <div class="flex justify-end mb-2">
+            <button type="button" onclick="showImportModal('characters')" class="px-3 py-1.5 bg-green-700/30 hover:bg-green-600/50 rounded-lg text-xs text-green-200 transition flex items-center gap-1">
+              📥 Import Characters
+            </button>
+          </div>
           <div id="story_characters_list" class="space-y-3 ml-4"></div>
           <button type="button" onclick="addStoryCharacter()" class="mt-3 px-4 py-2 bg-purple-700/40 hover:bg-purple-600/60 rounded-lg text-sm text-purple-300 transition flex items-center gap-2">
             ➕ Add Character
@@ -1935,6 +2603,11 @@ Steam rose from his coffee cup as he gazed out the window.
           <summary class="cursor-pointer text-base font-semibold text-purple-300 mb-2 flex items-center gap-2">
             🎬 Scenes <span class="text-xs text-gray-500 font-normal">— Define each scene with location, action, characters, and dialogue</span>
           </summary>
+          <div class="flex justify-end mb-2">
+            <button type="button" onclick="showImportModal('scenes')" class="px-3 py-1.5 bg-green-700/30 hover:bg-green-600/50 rounded-lg text-xs text-green-200 transition flex items-center gap-1">
+              📥 Import Scenes
+            </button>
+          </div>
           <div id="story_scenes_list" class="space-y-3 ml-4"></div>
           <button type="button" onclick="addStoryScene()" class="mt-3 px-4 py-2 bg-purple-700/40 hover:bg-purple-600/60 rounded-lg text-sm text-purple-300 transition flex items-center gap-2">
             ➕ Add Scene
@@ -2100,6 +2773,11 @@ Steam rose from his coffee cup as he gazed out the window.
     <div id="result-area" class="hidden mt-4 p-4 glass-card rounded-lg">
       <p class="text-green-400 text-sm font-medium mb-2" data-i18n="videoComplete">视频生成完成!</p>
       <video id="result-video" controls class="w-full rounded-lg max-h-96"></video>
+      <div class="mt-3 flex gap-2">
+        <a id="result-download" class="text-xs px-3 py-1.5 bg-green-700 hover:bg-green-600 rounded-lg transition cursor-pointer" onclick="downloadResultVideo()" href="#">⬇ Download Video</a>
+        <button id="result-open-new" class="text-xs px-3 py-1.5 bg-blue-700 hover:bg-blue-600 rounded-lg transition cursor-pointer" onclick="openResultVideoNew()">↗ Open in New Tab</button>
+      </div>
+      <p id="result-error" class="text-red-400 text-xs mt-2 hidden"></p>
     </div>
   </div>
 
@@ -2234,7 +2912,7 @@ const T = {
     durationMode: '各场景时长', uniformDuration: '统一', independentDuration: '独立', seconds: '秒',
     artifact: '产物', paragraphCount: '段落数',
     statusCompleted: '已完成', statusRunning: '进行中', statusFailed: '失败', statusPending: '待处理', statusQueued: '排队中',
-    btnView: '查看', btnViewProgress: '查看进度', btnResume: '续传', btnStop: '中断',
+    btnView: '查看', btnViewProgress: '查看进度', btnResume: '续传', btnStop: '中断', btnDelete: '删除任务',
     sceneUnit: '个场景', paraUnit: '段',
     typeSimple: '简单', typeCreative: '创意', typeManuscript: '稿件', typeImage: '图片',
     stopConfirm: '确定要中断当前任务吗？中断后可到任务列表续传。',
@@ -2280,7 +2958,7 @@ const T = {
     resPortraitHD: '竖屏 9:16 (HD)',
     subPositionHints: '字幕位置要求',
     subPositionHintsPlaceholder: '字幕放在画面下方三分之一区域，不要遮挡主播面部',
-    typeAnchor: '数字人',
+    typeAnchor: '数字人', typeStory: '故事创作者',
     audioSource: '音频来源',
     audioPostStitch: '后拼接音频',
     audioPostStitchDesc: '音频效果可控（可选语音、语速），但嘴型较难匹配',
@@ -2379,7 +3057,7 @@ const T = {
     durationMode: 'Scene Duration', uniformDuration: 'Uniform', independentDuration: 'Independent', seconds: 's',
     artifact: 'Output', paragraphCount: 'Paragraphs',
     statusCompleted: 'Completed', statusRunning: 'Running', statusFailed: 'Failed', statusPending: 'Pending', statusQueued: 'Queued',
-    btnView: 'View', btnViewProgress: 'Progress', btnResume: 'Resume', btnStop: 'Stop',
+    btnView: 'View', btnViewProgress: 'Progress', btnResume: 'Resume', btnStop: 'Stop', btnDelete: 'Delete Task',
     sceneUnit: ' scenes', paraUnit: ' paragraphs',
     typeSimple: 'Simple', typeCreative: 'Creative', typeManuscript: 'Article', typeImage: 'Image',
     stopConfirm: 'Stop the current task? It can be resumed from the task list.',
@@ -2422,7 +3100,7 @@ const T = {
     resPortraitHD: 'Portrait 9:16 (HD)',
     subPositionHints: 'Subtitle Position Hints',
     subPositionHintsPlaceholder: 'Place subtitles in the lower third, avoid covering the anchor\'s face',
-    typeAnchor: 'Anchor',
+    typeAnchor: 'Anchor', typeStory: 'Story Creator',
     audioSource: 'Audio Source',
     audioPostStitch: 'Post-stitch Audio',
     audioPostStitchDesc: 'Audio quality controllable (voice, speed), but lip sync harder to match',
@@ -4928,8 +5606,17 @@ function markCompletedStepsFromState(state) {
 
 function showResult(videoPath) {
   document.getElementById('result-area').classList.remove('hidden');
+  document.getElementById('result-error').classList.add('hidden');
   if (videoPath && currentTaskId) {
     document.getElementById('result-video').src = 'api/video/' + currentTaskId;
+    const videoUrl = 'api/video/' + currentTaskId;
+    document.getElementById('result-download').href = videoUrl;
+    document.getElementById('result-download').download = currentTaskId + '.mp4';
+    document.getElementById('result-open-new').onclick = () => window.open(videoUrl, '_blank');
+    document.getElementById('result-video').onerror = function() {
+      document.getElementById('result-error').textContent = 'Video could not be loaded. Try download or open in new tab.';
+      document.getElementById('result-error').classList.remove('hidden');
+    };
   }
 }
 
@@ -5008,14 +5695,15 @@ async function loadTaskList() {
     container.innerHTML = tasks.map(task => {
       const statusColors = { completed: 'text-green-400', running: 'text-yellow-400', failed: 'text-red-400', pending: 'text-gray-400', queued: 'text-cyan-400' };
       const statusLabels = { completed: t('statusCompleted'), running: t('statusRunning'), failed: t('statusFailed'), pending: t('statusPending'), queued: t('statusQueued') };
-      const typeLabels = { simple: t('typeSimple'), creative: t('typeCreative'), manuscript: t('typeManuscript'), anchor: t('typeAnchor'), poetry: t('typePoetry'), image: t('typeImage') };
-      const typeColors = { simple: 'bg-blue-900 text-blue-300', creative: 'bg-blue-900 text-blue-300', manuscript: 'bg-orange-900 text-orange-300', anchor: 'bg-amber-900 text-amber-300', poetry: 'bg-purple-900 text-purple-300' };
+      const typeLabels = { simple: t('typeSimple'), creative: t('typeCreative'), manuscript: t('typeManuscript'), anchor: t('typeAnchor'), poetry: t('typePoetry'), story: t('typeStory'), image: t('typeImage') };
+      const typeColors = { simple: 'bg-blue-900 text-blue-300', creative: 'bg-blue-900 text-blue-300', manuscript: 'bg-orange-900 text-orange-300', anchor: 'bg-amber-900 text-amber-300', poetry: 'bg-purple-900 text-purple-300', story: 'bg-pink-900 text-pink-300' };
       const isCompleted = task.status === 'completed';
       const isRunning = task.status === 'running' || task.status === 'queued';
       const btnLabel = isCompleted ? t('btnView') : (isRunning ? t('btnViewProgress') : t('btnResume'));
       const tidAttr = escapeAttr(task.task_id);
       const btnAction = isCompleted ? `viewTask('${tidAttr}')` : (isRunning ? `viewRunningTask('${tidAttr}')` : `resumeTask('${tidAttr}')`);
       const stopBtn = isRunning ? `<button onclick="stopTaskById('${tidAttr}')" class="text-xs px-3 py-1.5 bg-red-700 hover:bg-red-600 text-red-100 rounded-lg transition">${t('btnStop')}</button>` : '';
+      const deleteBtn = !isRunning && !isCompleted ? `<button onclick="deleteTaskById('${tidAttr}')" class="text-xs px-3 py-1.5 bg-red-800/50 hover:bg-red-700 text-red-200 rounded-lg transition">${t('btnDelete')}</button>` : '';
       // pending/failed 状态额外添加"查看"按钮（查看产物）
       const viewBtn = (!isCompleted && !isRunning) ? `<button onclick="viewTask('${tidAttr}')" class="text-xs px-3 py-1.5 bg-gray-700 hover:bg-gray-600 rounded-lg transition">${t('btnView')}</button>` : '';
       const typeBadge = `<span class="text-xs px-2 py-0.5 rounded-full ${typeColors[task.task_type] || 'bg-gray-800 text-gray-400'}">${escapeHtml(typeLabels[task.task_type] || task.task_type)}</span>`;
@@ -5032,6 +5720,7 @@ async function loadTaskList() {
           ${viewBtn}
           <button onclick="${btnAction}" class="text-xs px-3 py-1.5 bg-blue-600 hover:bg-blue-500 rounded-lg transition">${btnLabel}</button>
           ${stopBtn}
+          ${deleteBtn}
         </div>
       </div>`;
     }).join('');
@@ -5059,6 +5748,22 @@ async function viewRunningTask(taskId) {
   await showProgress(taskId, null);
   await startPolling(taskId);
   restoreProgressFromTask(taskId);
+}
+
+function downloadResultVideo() {
+  event.preventDefault();
+  const url = document.getElementById('result-video').src;
+  if (url) {
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = (currentTaskId || 'video') + '.mp4';
+    a.click();
+  }
+}
+
+function openResultVideoNew() {
+  const url = document.getElementById('result-video').src;
+  if (url) window.open(url, '_blank');
 }
 
 async function resumeTask(taskId) {
@@ -5110,6 +5815,23 @@ async function stopTaskById(taskId) {
     showToast(t('stoppedById'), 3000);
     loadTaskList();
   } catch(e) { alert(t('failStop') + ': ' + e.message); }
+}
+
+async function deleteTaskById(taskId) {
+  if (!confirm(t('deleteConfirm'))) return;
+  try {
+    const r = await fetch('api/tasks/' + taskId, { method: 'DELETE' });
+    const d = await r.json();
+    if (!d.ok) throw new Error(fmtErr(d.detail, 'Delete failed'));
+    showToast(t('deleteTaskDeleted'), 3000);
+    // If this was the currently viewed task, close the detail panel
+    const panel = document.getElementById('progress-panel');
+    if (panel && !panel.classList.contains('hidden')) {
+      panel.classList.add('hidden');
+    }
+    document.getElementById('result-area').classList.add('hidden');
+    loadTaskList();
+  } catch(e) { alert('Delete failed: ' + e.message); }
 }
 
 // ═══════════════════════════════════════════════════
@@ -5189,9 +5911,24 @@ function showTaskDetail(taskId, state) {
       ${state.final_video_file ? `<p class="text-gray-500">${t('artifact')}: <code class="text-xs bg-gray-800 px-1 py-0.5 rounded">${escapeHtml(state.final_video_file)}</code></p>` : ''}
     </div>`;
 
-  if (state.final_video_file) {
+  if (state.final_video_file || state.status === 'completed') {
     document.getElementById('result-area').classList.remove('hidden');
+    document.getElementById('result-error').classList.add('hidden');
     document.getElementById('result-video').src = 'api/video/' + taskId;
+
+    // Set up download and open links
+    const videoUrl = 'api/video/' + taskId;
+    document.getElementById('result-download').href = videoUrl;
+    document.getElementById('result-download').download = taskId + '.mp4';
+    document.getElementById('result-open-new').onclick = () => window.open(videoUrl, '_blank');
+
+    // Handle video load errors
+    document.getElementById('result-video').onerror = function() {
+      document.getElementById('result-error').textContent = 'Video could not be loaded. Try download or open in new tab.';
+      document.getElementById('result-error').classList.remove('hidden');
+    };
+  } else {
+    document.getElementById('result-area').classList.add('hidden');
   }
 
   // 加载中间产物

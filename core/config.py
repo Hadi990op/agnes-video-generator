@@ -209,8 +209,12 @@ def _next_key(keys: List[str]) -> str:
         return earliest_key
 
 
-def mark_key_429(key: str, cooldown_seconds: int = 120):
-    """标记某个 key 遇到 429，冷却一段时间不用。"""
+def mark_key_429(key: str, cooldown_seconds: int = 60):
+    """标记某个 key 遇到 429，冷却一段时间不用。
+
+    Free tier: 1 req/min per key → 60s cooldown is sufficient.
+    Pro tier: higher limits, but 60s is safe for all tiers.
+    """
     global _key_cooldown
     with _key_rotation_lock:
         _key_cooldown[key] = time.time() + cooldown_seconds

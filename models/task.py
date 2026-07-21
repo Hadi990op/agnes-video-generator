@@ -513,6 +513,7 @@ class StoryTaskState(BaseTaskState):
     total_duration: int = 0           # Calculated total duration
     step_build_scenes: StepStatus = StepStatus.PENDING
     step_reference_images: StepStatus = StepStatus.PENDING
+    reference_image: str = ""         # Character reference image path(s), comma-separated
     step_video_generation: StepStatus = StepStatus.PENDING
     scenes_output: List[SceneTask] = Field(default_factory=list)  # SceneTask list for pipeline
 
