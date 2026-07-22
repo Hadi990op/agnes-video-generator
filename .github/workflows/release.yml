@@ -114,7 +114,6 @@ jobs:
         env:
           DH_USER: ${{ secrets.DOCKERHUB_USERNAME }}
           DH_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
-          REPO_DESC: ${{ github.event.repository.description }}
         run: python3 .github/scripts/update_dockerhub_overview.py
 
       # ── Auto-generate GitHub Release notes ──

@@ -20,19 +20,12 @@ DOCKERHUB_API = "https://hub.docker.com/v2"
 def main() -> int:
     user = os.environ["DH_USER"]
     token = os.environ["DH_TOKEN"]
-    desc = (os.environ.get("REPO_DESC") or "").strip()
-    if not desc:
-        desc = (
-            "Open-source, self-hosted AI video generator - completely free. "
-            "Text to multi-scene video with narration, subtitles, and digital "
-            "anchor via Web UI, powered by Agnes AI."
-        )
-    # Docker Hub description cap: 100 bytes (not chars — em-dash is 3 bytes).
-    if len(desc.encode()) > 100:
-        # Truncate to ~96 chars then cut at last space to be safe under 100b.
-        safe = desc[:96]
-        cut = safe.rfind(" ")
-        desc = (safe[:cut] if cut > 0 else safe[:95]) + "…"
+
+    # Docker Hub description cap: 100 bytes. Use a hand-written concise summary.
+    desc = (
+        "Self-hosted AI video generator — "
+        "create multi-scene videos with narration and subtitles."
+    )
 
     image = os.environ.get("IMAGE_NAME", "free-short-video")
     repo_path = f"{user}/{image}"
