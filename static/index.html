@@ -1523,6 +1523,7 @@ const T = {
     modelTextLabel: '文本 / 对话模型', modelImageLabel: '图像模型（暂未开放）', modelVideoLabel: '视频模型（暂未开放）',
     modelSync: '刷新列表', modelSyncIdle: '未同步', modelSaved: '已保存',
     modelBetaHint: 'agnes-2.5-flash 内测中：需使用已开通内测权限的 API Key，否则调用会失败。',
+    modelBetaTag: '（内测）',
     modelTextRequired: '文本模型不能为空', modelSyncFailed: '拉取失败', modelSaveFailed: '保存失败',
     workspaceTitle: '工作目录', workspaceNone: '未设置', workspaceActive: '已激活', workspaceAdd: '添加',
     workspacePathPlaceholder: '点击右侧"浏览"选择目录', workspaceNamePlaceholder: '名称（可选）',
@@ -1664,6 +1665,7 @@ const T = {
     clearEnvHint: 'The API Key is set via environment variable AGNES_API_KEY and cannot be cleared from the UI.',
     modelTitle: 'Model Selection', modelHint: 'Choose the Agnes models used for generation. Image and video models are not yet open; their defaults are kept.',
     modelBetaHint: 'agnes-2.5-flash is in beta: requires an API Key with beta access, otherwise calls will fail.',
+    modelBetaTag: ' (Beta)',
     modelTextLabel: 'Text / Chat Model', modelImageLabel: 'Image Model (not yet open)', modelVideoLabel: 'Video Model (not yet open)',
     modelSync: 'Refresh List', modelSyncIdle: 'Not synced', modelSaved: 'Saved',
     modelTextRequired: 'Text model is required', modelSyncFailed: 'Fetch failed', modelSaveFailed: 'Save failed',
@@ -1800,6 +1802,7 @@ const T = {
     clearEnvHint: 'API Key задан через переменную AGNES_API_KEY и не может быть удалён из интерфейса.',
     modelTitle: 'Выбор модели', modelHint: 'Выберите модели Agnes для генерации. Модели изображений и видео пока не открыты; сохраняются значения по умолчанию.',
     modelBetaHint: 'agnes-2.5-flash в бета-версии: требуется API-ключ с бета-доступом, иначе вызовы завершатся ошибкой.',
+    modelBetaTag: ' (бета)',
     modelTextLabel: 'Текстовая / чат-модель', modelImageLabel: 'Модель изображений (пока не открыта)', modelVideoLabel: 'Видео-модель (пока не открыта)',
     modelSync: 'Обновить список', modelSyncIdle: 'Не синхронизировано', modelSaved: 'Сохранено',
     modelTextRequired: 'Текстовая модель обязательна', modelSyncFailed: 'Ошибка загрузки', modelSaveFailed: 'Ошибка сохранения',
@@ -1909,6 +1912,7 @@ const T = {
     clearEnvHint: 'API Keyは環境変数 AGNES_API_KEY で設定されているため、画面から削除できません。',
     modelTitle: 'モデル選択', modelHint: '生成に使用する Agnes モデルを選択します。画像・動画モデルはまだ開放されておらず、既定値が保持されます。',
     modelBetaHint: 'agnes-2.5-flash はベータ版です。ベータアクセス権を持つ API キーが必要です。それ以外では呼び出しに失敗します。',
+    modelBetaTag: '（ベータ）',
     modelTextLabel: 'テキスト / チャットモデル', modelImageLabel: '画像モデル（未公開）', modelVideoLabel: '動画モデル（未公開）',
     modelSync: 'リストを更新', modelSyncIdle: '未同期', modelSaved: '保存しました',
     modelTextRequired: 'テキストモデルは必須です', modelSyncFailed: '取得に失敗', modelSaveFailed: '保存に失敗',
@@ -2015,6 +2019,7 @@ const T = {
     clearEnvHint: 'API Key가 환경변수 AGNES_API_KEY로 설정되어 있어 화면에서 삭제할 수 없습니다.',
     modelTitle: '모델 선택', modelHint: '생성에 사용할 Agnes 모델을 선택하세요. 이미지 및 비디오 모델은 아직 공개되지 않았으며 기본값이 유지됩니다.',
     modelBetaHint: 'agnes-2.5-flash 는 베타 버전입니다. 베타 접근 권한이 있는 API 키가 필요하며, 그렇지 않으면 호출이 실패합니다.',
+    modelBetaTag: ' (베타)',
     modelTextLabel: '텍스트 / 채팅 모델', modelImageLabel: '이미지 모델 (아직 미공개)', modelVideoLabel: '비디오 모델 (아직 미공개)',
     modelSync: '목록 새로고침', modelSyncIdle: '미동기화', modelSaved: '저장됨',
     modelTextRequired: '텍스트 모델은 필수입니다', modelSyncFailed: '불러오기 실패', modelSaveFailed: '저장 실패',
@@ -2121,6 +2126,7 @@ const T = {
     clearEnvHint: 'API Key ditetapkan melalui pembolehubah AGNES_API_KEY dan tidak boleh dipadam dari UI.',
     modelTitle: 'Pemilihan Model', modelHint: 'Pilih model Agnes yang digunakan untuk penjanaan. Model imej dan video belum dibuka; nilai lalai kekal.',
     modelBetaHint: 'agnes-2.5-flash berada dalam beta: memerlukan Kunci API dengan akses beta, jika tidak panggilan akan gagal.',
+    modelBetaTag: ' (beta)',
     modelTextLabel: 'Model Teks / Sembang', modelImageLabel: 'Model Imej (belum dibuka)', modelVideoLabel: 'Model Video (belum dibuka)',
     modelSync: 'Segarkan Senarai', modelSyncIdle: 'Belum disegerak', modelSaved: 'Disimpan',
     modelTextRequired: 'Model teks diperlukan', modelSyncFailed: 'Pengambilan gagal', modelSaveFailed: 'Penyimpanan gagal',
@@ -2227,6 +2233,7 @@ const T = {
     clearEnvHint: 'API Key diatur melalui variabel AGNES_API_KEY dan tidak dapat dihapus dari UI.',
     modelTitle: 'Pemilihan Model', modelHint: 'Pilih model Agnes yang digunakan untuk pembuatan. Model gambar dan video belum dibuka; nilai default dipertahankan.',
     modelBetaHint: 'agnes-2.5-flash masih beta: memerlukan Kunci API dengan akses beta, jika tidak panggilan akan gagal.',
+    modelBetaTag: ' (beta)',
     modelTextLabel: 'Model Teks / Chat', modelImageLabel: 'Model Gambar (belum dibuka)', modelVideoLabel: 'Model Video (belum dibuka)',
     modelSync: 'Segarkan Daftar', modelSyncIdle: 'Belum disinkron', modelSaved: 'Tersimpan',
     modelTextRequired: 'Model teks wajib diisi', modelSyncFailed: 'Pengambilan gagal', modelSaveFailed: 'Penyimpanan gagal',
@@ -2332,6 +2339,7 @@ const T = {
     clearEnvHint: 'Der API-Key ist über die Umgebungsvariable AGNES_API_KEY gesetzt und kann nicht aus der UI gelöscht werden.',
     modelTitle: 'Modellauswahl', modelHint: 'Wählen Sie die für die Generierung verwendeten Agnes-Modelle. Bild- und Video-Modelle sind noch nicht geöffnet; ihre Standardwerte bleiben erhalten.',
     modelBetaHint: 'agnes-2.5-flash befindet sich in der Beta: erfordert einen API-Schlüssel mit Beta-Zugriff, sonst schlagen Aufrufe fehl.',
+    modelBetaTag: ' (Beta)',
     modelTextLabel: 'Text- / Chat-Modell', modelImageLabel: 'Bildmodell (noch nicht geöffnet)', modelVideoLabel: 'Videomodell (noch nicht geöffnet)',
     modelSync: 'Liste aktualisieren', modelSyncIdle: 'Nicht synchronisiert', modelSaved: 'Gespeichert',
     modelTextRequired: 'Textmodell ist erforderlich', modelSyncFailed: 'Abruf fehlgeschlagen', modelSaveFailed: 'Speichern fehlgeschlagen',
@@ -2443,6 +2451,7 @@ const T = {
     clearEnvHint: 'La clé API est définie via la variable AGNES_API_KEY et ne peut pas être supprimée depuis l\'interface.',
     modelTitle: 'Sélection du modèle', modelHint: 'Choisissez les modèles Agnes utilisés pour la génération. Les modèles image et vidéo ne sont pas encore ouverts ; leurs valeurs par défaut sont conservées.',
     modelBetaHint: 'agnes-2.5-flash est en bêta : nécessite une clé API avec accès bêta, sinon les appels échoueront.',
+    modelBetaTag: ' (bêta)',
     modelTextLabel: 'Modèle texte / chat', modelImageLabel: 'Modèle image (pas encore ouvert)', modelVideoLabel: 'Modèle vidéo (pas encore ouvert)',
     modelSync: 'Actualiser la liste', modelSyncIdle: 'Non synchronisé', modelSaved: 'Enregistré',
     modelTextRequired: 'Le modèle texte est requis', modelSyncFailed: 'Échec de la récupération', modelSaveFailed: 'Échec de l\'enregistrement',
@@ -2554,6 +2563,7 @@ const T = {
     clearEnvHint: 'De API-sleutel is ingesteld via omgevingsvariabele AGNES_API_KEY en kan niet uit de UI worden gewist.',
     modelTitle: 'Modelselectie', modelHint: 'Kies de Agnes-modellen die voor generatie worden gebruikt. Beeld- en videomodellen zijn nog niet geopend; hun standaardwaarden blijven behouden.',
     modelBetaHint: 'agnes-2.5-flash is in bèta: vereist een API-sleutel met bèta-toegang, anders mislukken de aanroepen.',
+    modelBetaTag: ' (bèta)',
     modelTextLabel: 'Tekst- / chatmodel', modelImageLabel: 'Beeldmodel (nog niet geopend)', modelVideoLabel: 'Videomodel (nog niet geopend)',
     modelSync: 'Lijst vernieuwen', modelSyncIdle: 'Niet gesynchroniseerd', modelSaved: 'Opgeslagen',
     modelTextRequired: 'Tekstmodel is vereist', modelSyncFailed: 'Ophalen mislukt', modelSaveFailed: 'Opslaan mislukt',
@@ -2665,6 +2675,7 @@ const T = {
     clearEnvHint: 'La clave API está configurada mediante la variable de entorno AGNES_API_KEY y no se puede eliminar desde la interfaz.',
     modelTitle: 'Selección de modelo', modelHint: 'Elija los modelos Agnes utilizados para la generación. Los modelos de imagen y vídeo aún no están abiertos; se conservan sus valores predeterminados.',
     modelBetaHint: 'agnes-2.5-flash está en beta: requiere una clave API con acceso beta; de lo contrario, las llamadas fallarán.',
+    modelBetaTag: ' (beta)',
     modelTextLabel: 'Modelo de texto / chat', modelImageLabel: 'Modelo de imagen (aún no abierto)', modelVideoLabel: 'Modelo de vídeo (aún no abierto)',
     modelSync: 'Actualizar lista', modelSyncIdle: 'No sincronizado', modelSaved: 'Guardado',
     modelTextRequired: 'El modelo de texto es obligatorio', modelSyncFailed: 'Error al obtener', modelSaveFailed: 'Error al guardar',
@@ -2776,6 +2787,7 @@ const T = {
     clearEnvHint: 'A chave API está definida via variável de ambiente AGNES_API_KEY e não pode ser removida pela interface.',
     modelTitle: 'Seleção de modelo', modelHint: 'Escolha os modelos Agnes usados para a geração. Os modelos de imagem e vídeo ainda não estão abertos; seus valores padrão são mantidos.',
     modelBetaHint: 'agnes-2.5-flash está em beta: requer uma chave API com acesso beta; caso contrário, as chamadas falharão.',
+    modelBetaTag: ' (beta)',
     modelTextLabel: 'Modelo de texto / chat', modelImageLabel: 'Modelo de imagem (ainda não aberto)', modelVideoLabel: 'Modelo de vídeo (ainda não aberto)',
     modelSync: 'Atualizar lista', modelSyncIdle: 'Não sincronizado', modelSaved: 'Salvo',
     modelTextRequired: 'O modelo de texto é obrigatório', modelSyncFailed: 'Falha ao obter', modelSaveFailed: 'Falha ao salvar',
@@ -2887,6 +2899,7 @@ const T = {
     clearEnvHint: 'La chiave API è impostata tramite la variabile d\'ambiente AGNES_API_KEY e non può essere rimossa dall\'interfaccia.',
     modelTitle: 'Selezione modello', modelHint: 'Scegli i modelli Agnes utilizzati per la generazione. I modelli immagine e video non sono ancora aperti; i loro valori predefiniti vengono mantenuti.',
     modelBetaHint: 'agnes-2.5-flash è in beta: richiede una chiave API con accesso beta, altrimenti le chiamate falliranno.',
+    modelBetaTag: ' (beta)',
     modelTextLabel: 'Modello testo / chat', modelImageLabel: 'Modello immagine (non ancora aperto)', modelVideoLabel: 'Modello video (non ancora aperto)',
     modelSync: 'Aggiorna elenco', modelSyncIdle: 'Non sincronizzato', modelSaved: 'Salvato',
     modelTextRequired: 'Il modello di testo è obbligatorio', modelSyncFailed: 'Recupero fallito', modelSaveFailed: 'Salvataggio fallito',
@@ -4896,7 +4909,7 @@ function isBetaModel(m) {
 function updateBetaHint() {
   const hint = document.getElementById('model-text-beta-hint');
   if (!hint) return;
-  const val = (document.getElementById('model-text').value || '').replace('（内测）', '');
+  const val = (document.getElementById('model-text').value || '').replace(t('modelBetaTag'), '');
   if (isBetaModel(val)) {
     hint.classList.remove('hidden');
   } else {
@@ -4912,7 +4925,7 @@ function populateModelSelect(selectEl, options, selected) {
   opts.forEach(m => {
     const opt = document.createElement('option');
     opt.value = m;
-    opt.textContent = isBetaModel(m) ? m + '（内测）' : m;
+    opt.textContent = isBetaModel(m) ? m + t('modelBetaTag') : m;
     if (isBetaModel(m)) opt.title = t('modelBetaHint');
     if (m === selected) opt.selected = true;
     selectEl.appendChild(opt);
