@@ -181,7 +181,52 @@ print('All subtitle multi-line tests passed!')
 "
 ```
 
-### 0.5 常见问题排查
+### 0.5 Docker 部署（无需 Python/FFmpeg）
+
+项目提供预构建多平台 Docker 镜像（`linux/amd64`, `linux/arm64`），推送至 **GHCR** 和 **Docker Hub**。每次 release 自动构建。
+
+```bash
+# GHCR
+docker run -d -p 8765:8765 \
+  -e AGNES_API_KEY="your-api-key" \
+  -v ~/agnes-data/working:/app/.working_dir \
+  -v ~/agnes-data/config:/app/.agnes_config \
+  ghcr.io/lcy362/free-short-video:latest
+
+# Docker Hub
+docker run -d -p 8765:8765 \
+  -e AGNES_API_KEY="your-api-key" \
+  -v ~/agnes-data/working:/app/.working_dir \
+  -v ~/agnes-data/config:/app/.agnes_config \
+  lcy362/free-short-video:latest
+```
+
+**数据持久化**：容器内 `/app/.working_dir`（视频/上传产物）和 `/app/.agnes_config`（API Key 等设置）需挂载到本机，否则容器重建后数据丢失。挂载后生成的视频直接在 `~/agnes-data/working/` 可拷出。
+
+也可用项目自带 `docker-compose.yml`：
+
+```bash
+git clone https://github.com/lcy362/agnes-video-generator.git
+cd agnes-video-generator
+AGNES_API_KEY="your-api-key" docker compose up -d
+```
+
+Docker 镜像已声明 `VOLUME`，纯 `docker run -p 8765:8765 <镜像>` 会将数据存入 Docker 管理的匿名卷，同一容器 `stop/start` 时保留，重建则丢失。
+
+镜像内已集成 ffmpeg（通过 imageio-ffmpeg 静态二进制），**无需宿主机安装 ffmpeg**。
+
+### 0.7 Docker 镜像发布流程
+
+每次推送 `v*` 标签（如 `v4.7.8`）时，CI（`.github/workflows/release.yml`）自动执行：
+
+1. **冒烟测试** — 本地构建 `linux/amd64` 镜像，启动容器验证 `GET /` 返回 200
+2. **GHCR** — `docker/metadata-action` 生成 OCI labels + semver tags（`4.7.8`/`4.7`/`latest`），GITHUB_TOKEN 推送至 `ghcr.io/lcy362/free-short-video`，自动关联到仓库
+3. **Docker Hub** — 同步推送至 `lcy362/free-short-video`（tag `v4.7.8` + `latest`），`.github/scripts/update_dockerhub_overview.py` 同步仓库描述与 README 概述
+4. **GitHub Release** — 生成 Release 页，附双语拉取命令与持久化启动说明
+
+**手动触发**：在 GitHub Actions → Release Docker Image → Run workflow。
+
+发布流程配置见 `.github/workflows/release.yml`。
 
 | 现象 | 原因 | 解决方案 |
 |------|------|---------|
@@ -191,6 +236,8 @@ print('All subtitle multi-line tests passed!')
 | 视频生成失败 401 | API Key 无效或未配置 | 检查 `AGNES_API_KEY` 环境变量或 `/api/config` |
 | 字幕中文显示为方块 | CJK 字体缺失 | 检查 `resource/fonts/STHeitiMedium.ttc` 是否存在 |
 | TTS 无声音 | edge_tts 版本过低 | `.venv/bin/pip install 'edge_tts>=6.1.0'` |
+| Docker 容器重建后数据丢失 | 未挂载工作目录 | 启动时加 `-v ~/agnes-data/working:/app/.working_dir -v ~/agnes-data/config:/app/.agnes_config` |
+| `docker pull` GHCR 401 | 包为私有 | 仓库 Settings → Packages → free-short-video → Change visibility → Public |
 
 ---
 
@@ -204,6 +251,7 @@ print('All subtitle multi-line tests passed!')
 | **"需求分析" / "只做 PRD"** | 启动 `software-product-manager` | 部分工作流 |
 | **"架构评审"** | 启动 `software-architect` | 部分工作流 |
 | **"部署项目" / "初始化环境"** | 按「〇、新环境部署与验证」执行 | 全新环境部署 |
+| **"Docker 部署" / "容器化部署"** | 按「0.5 Docker 部署」执行 | Docker 容器部署，无需 Python/FFmpeg |
 | **"验证项目" / "跑一下检查"** | 按「0.4 部署验证清单」执行 | 部署后验证 |
 
 ---
@@ -250,6 +298,9 @@ print('All subtitle multi-line tests passed!')
 agnes-video-generator/
 ├── server.py                         # FastAPI 主服务，六种任务路由 + 图片生成 + 工作区管理 + artifacts
 ├── start.sh                          # 一键启动脚本（venv + pip install + run）
+├── Dockerfile                        # 多平台 Docker 镜像（Python 3.11 + imageio-ffmpeg 静态二进制）
+├── docker-compose.yml                # Docker Compose（bind mount 持久化工作区 + 配置）
+├── docker-run.sh                     # 一行 Docker 启动脚本（自动挂载本机数据目录）
 ├── requirements.txt                  # 依赖（含 edge_tts, srt, tenacity）
 │
 ├── models/

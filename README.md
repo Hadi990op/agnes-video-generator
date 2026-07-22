@@ -191,7 +191,41 @@ curl -X POST http://localhost:8765/api/config \
 
 Open `http://localhost:8765`, choose a video mode (Simple / Creative / Manuscript / Anchor), enter your idea, and click "Start Generating".
 
-### Option B: AI Agent Assisted Setup
+### Option B: Docker (No Python/FFmpeg Required)
+
+Pre-built multi-arch images (`linux/amd64`, `linux/arm64`) are published to both **GitHub Container Registry (GHCR)** and **Docker Hub** on every release.
+
+**Pull & Run**
+
+```bash
+# GHCR
+docker run -d -p 8765:8765 \
+  -e AGNES_API_KEY=<your-key> \
+  -v ~/agnes-data/working:/app/.working_dir \
+  -v ~/agnes-data/config:/app/.agnes_config \
+  ghcr.io/lcy362/free-short-video:latest
+
+# Docker Hub
+docker run -d -p 8765:8765 \
+  -e AGNES_API_KEY=<your-key> \
+  -v ~/agnes-data/working:/app/.working_dir \
+  -v ~/agnes-data/config:/app/.agnes_config \
+  lcy362/free-short-video:latest
+```
+
+Then open `http://localhost:8765`.
+
+**Data Persistence:** The app writes videos, uploads, and settings inside the container (`/app/.working_dir`, `/app/.agnes_config`). Mount them to your host so outputs survive container recreation and are accessible from your local filesystem. Your generated videos will be at `~/agnes-data/working/` on your machine.
+
+Or use `docker compose` with the included `docker-compose.yml`:
+
+```bash
+git clone https://github.com/lcy362/agnes-video-generator.git
+cd agnes-video-generator
+AGNES_API_KEY=<your-key> docker compose up -d
+```
+
+### Option C: AI Agent Assisted Setup
 
 This project is designed for AI coding assistants. First, download the code and prepare your API key:
 
@@ -287,6 +321,9 @@ If the server is interrupted, restart it and find the incomplete task in the "Ta
 agnes-video-generator/
 ├── start.sh                          # One-click launch script
 ├── requirements.txt                  # Python dependencies
+├── Dockerfile                        # Multi-arch Docker image (Python 3.11 + ffmpeg via imageio)
+├── docker-compose.yml                # Docker Compose with persisted volumes
+├── docker-run.sh                     # One-command Docker launch (wrapper with bind mounts)
 ├── server.py                         # FastAPI server (REST + WebSocket)
 ├── static/
 │   └── index.html                    # Frontend SPA — 5 task tabs, 13 languages (Tailwind CSS)
@@ -457,6 +494,10 @@ Yes. You can upload reference images for character or scene consistency across s
 ### What languages does the UI support?
 
 The Web UI supports 13 languages: 中文, English, Deutsch, Français, Nederlands, Español, Português, Italiano, Русский, 日本語, 한국어, Bahasa Melayu, and Bahasa Indonesia. Subtitles are generated in the source text language with CJK font support built-in.
+
+### Can I run this with Docker?
+
+Yes. Pre-built images are published to both [GHCR](https://github.com/lcy362/agnes-video-generator/pkgs/container/free-short-video) and [Docker Hub](https://hub.docker.com/r/lcy362/free-short-video). Just pull the `latest` tag and run — no Python or ffmpeg installation needed. See **[Option B: Docker](#option-b-docker-no-pythonffmpeg-required)** in Quick Start for the full command and volume mount instructions.
 
 ### Can I host this on my own server?
 
