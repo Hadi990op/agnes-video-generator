@@ -67,7 +67,7 @@ jobs:
         id: meta
         uses: docker/metadata-action@v5
         with:
-          images: ghcr.io/${{ github.repository_owner }}/${{ env.IMAGE_NAME }}
+          images: ghcr.io/${{ github.repository }}/${{ env.IMAGE_NAME }}
           tags: |
             type=semver,pattern={{version}}      # v4.0.0
             type=semver,pattern={{major}}.{{minor}}  # v4.0
@@ -125,11 +125,11 @@ jobs:
 
             ### GitHub Container Registry (GHCR)
             ```bash
-            docker pull ghcr.io/${{ github.repository_owner }}/${{ env.IMAGE_NAME }}:${{ steps.meta.outputs.version }}
+            docker pull ghcr.io/${{ github.repository }}/${{ env.IMAGE_NAME }}:${{ steps.meta.outputs.version }}
             ```
             Run:
             ```bash
-            docker run -p 8765:8765 -e AGNES_API_KEY=<your-key> ghcr.io/${{ github.repository_owner }}/${{ env.IMAGE_NAME }}:${{ steps.meta.outputs.version }}
+            docker run -p 8765:8765 -e AGNES_API_KEY=<your-key> ghcr.io/${{ github.repository }}/${{ env.IMAGE_NAME }}:${{ steps.meta.outputs.version }}
             ```
 
             ### Docker Hub
