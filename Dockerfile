@@ -10,9 +10,10 @@ WORKDIR /app
 
 # ffmpeg 是视频拼接/音频处理的硬依赖。
 # 采用 imageio-ffmpeg：ffmpeg 静态二进制打包在 PyPI wheel 内，
-# 走 pip 镜像（国内清华源）即可获取，避免 apt 装 ffmpeg 的庞大依赖树。
-# 国内构建默认走清华 pip 镜像加速；CI（GitHub Actions）可传 --build-arg PIP_INDEX_URL= 关闭。
-ARG PIP_INDEX_URL=https://pypi.tuna.tsinghua.edu.cn/simple
+# 避免 apt 装 ffmpeg 的庞大依赖树。
+# 默认走官方 PyPI（GitHub Actions 美国 runner 最快）。
+# 本地国内构建如需加速，传 --build-arg PIP_INDEX_URL=https://pypi.tuna.tsinghua.edu.cn/simple
+ARG PIP_INDEX_URL=
 RUN if [ -n "$PIP_INDEX_URL" ]; then \
         pip config set global.index-url "$PIP_INDEX_URL"; \
     fi \
