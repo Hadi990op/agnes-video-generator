@@ -68,6 +68,25 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
+      # 清理历史由个人 PAT 推成的 user-owned 孤儿包：repo 级路径的包若被记为
+      # user-owned，GITHUB_TOKEN（repo 上下文）无法写入该路径。先尝试删除，再让
+      # GITHUB_TOKEN 以 repo-owned 重建并关联到本仓库。
+      - name: Remove orphan GHCR package (if any)
+        if: ${{ secrets.GHCR_PAT != '' }}
+        continue-on-error: true
+        env:
+          GHCR_PAT: ${{ secrets.GHCR_PAT }}
+        run: |
+          echo "Removing any orphan free-short-video package before rebuild..."
+          curl -sS -o /dev/null -w "user-scoped: %{http_code}\n" -X DELETE \
+            -H "Authorization: Bearer $GHCR_PAT" \
+            -H "Accept: application/vnd.github+json" \
+            "https://api.github.com/user/packages/container/free-short-video" || true
+          curl -sS -o /dev/null -w "repo-scoped: %{http_code}\n" -X DELETE \
+            -H "Authorization: Bearer $GHCR_PAT" \
+            -H "Accept: application/vnd.github+json" \
+            "https://api.github.com/repos/lcy362/agnes-video-generator/packages/container/free-short-video" || true
+
       - name: Extract image metadata
         id: meta
         uses: docker/metadata-action@v5
