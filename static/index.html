@@ -381,9 +381,10 @@
         <div>
           <label class="block text-xs text-gray-400 mb-1" data-i18n="modelTextLabel">文本 / 对话模型</label>
           <div class="flex gap-3">
-            <select id="model-text" class="flex-1 glass-input rounded-lg px-3 py-2.5 text-sm text-gray-100"></select>
+            <select id="model-text" class="flex-1 glass-input rounded-lg px-3 py-2.5 text-sm text-gray-100" onchange="updateBetaHint()"></select>
             <button id="model-sync" class="px-4 py-2.5 bg-gray-700 hover:bg-gray-600 rounded-lg text-sm font-medium transition whitespace-nowrap" data-i18n="modelSync">刷新列表</button>
           </div>
+          <p id="model-text-beta-hint" class="text-xs text-amber-400 mt-1.5 hidden" data-i18n="modelBetaHint">agnes-2.5-flash 内测中：需使用已开通内测权限的 API Key，否则调用会失败。</p>
         </div>
         <!-- 图像模型（置灰） -->
         <div>
@@ -1521,6 +1522,7 @@ const T = {
     modelTitle: '模型选择', modelHint: '选择生成时使用的 Agnes 模型。图像与视频模型暂未开放，保留默认配置。',
     modelTextLabel: '文本 / 对话模型', modelImageLabel: '图像模型（暂未开放）', modelVideoLabel: '视频模型（暂未开放）',
     modelSync: '刷新列表', modelSyncIdle: '未同步', modelSaved: '已保存',
+    modelBetaHint: 'agnes-2.5-flash 内测中：需使用已开通内测权限的 API Key，否则调用会失败。',
     modelTextRequired: '文本模型不能为空', modelSyncFailed: '拉取失败', modelSaveFailed: '保存失败',
     workspaceTitle: '工作目录', workspaceNone: '未设置', workspaceActive: '已激活', workspaceAdd: '添加',
     workspacePathPlaceholder: '点击右侧"浏览"选择目录', workspaceNamePlaceholder: '名称（可选）',
@@ -1661,6 +1663,7 @@ const T = {
     clear: 'Clear', clearConfirm: 'Are you sure you want to clear the configured API Key?', apiKeyFromEnv: 'Configured (env)',
     clearEnvHint: 'The API Key is set via environment variable AGNES_API_KEY and cannot be cleared from the UI.',
     modelTitle: 'Model Selection', modelHint: 'Choose the Agnes models used for generation. Image and video models are not yet open; their defaults are kept.',
+    modelBetaHint: 'agnes-2.5-flash is in beta: requires an API Key with beta access, otherwise calls will fail.',
     modelTextLabel: 'Text / Chat Model', modelImageLabel: 'Image Model (not yet open)', modelVideoLabel: 'Video Model (not yet open)',
     modelSync: 'Refresh List', modelSyncIdle: 'Not synced', modelSaved: 'Saved',
     modelTextRequired: 'Text model is required', modelSyncFailed: 'Fetch failed', modelSaveFailed: 'Save failed',
@@ -1796,6 +1799,7 @@ const T = {
     clear: 'Очистить', clearConfirm: 'Вы уверены, что хотите удалить API Key?', apiKeyFromEnv: 'Настроен (env)',
     clearEnvHint: 'API Key задан через переменную AGNES_API_KEY и не может быть удалён из интерфейса.',
     modelTitle: 'Model Selection', modelHint: 'Choose the Agnes models used for generation. Image and video models are not yet open; their defaults are kept.',
+    modelBetaHint: 'agnes-2.5-flash is in beta: requires an API Key with beta access, otherwise calls will fail.',
     modelTextLabel: 'Text / Chat Model', modelImageLabel: 'Image Model (not yet open)', modelVideoLabel: 'Video Model (not yet open)',
     modelSync: 'Refresh List', modelSyncIdle: 'Not synced', modelSaved: 'Saved',
     workspaceTitle: 'Рабочий каталог', workspaceNone: 'Не задан', workspaceActive: 'Активен', workspaceAdd: 'Добавить',
@@ -1903,6 +1907,7 @@ const T = {
     clear: 'クリア', clearConfirm: '設定済みのAPI Keyを削除しますか？', apiKeyFromEnv: '設定済み (環境変数)',
     clearEnvHint: 'API Keyは環境変数 AGNES_API_KEY で設定されているため、画面から削除できません。',
     modelTitle: 'Model Selection', modelHint: 'Choose the Agnes models used for generation. Image and video models are not yet open; their defaults are kept.',
+    modelBetaHint: 'agnes-2.5-flash is in beta: requires an API Key with beta access, otherwise calls will fail.',
     modelTextLabel: 'Text / Chat Model', modelImageLabel: 'Image Model (not yet open)', modelVideoLabel: 'Video Model (not yet open)',
     modelSync: 'Refresh List', modelSyncIdle: 'Not synced', modelSaved: 'Saved',
     workspaceTitle: '作業ディレクトリ', workspaceNone: '未設定', workspaceActive: '有効', workspaceAdd: '追加',
@@ -2007,6 +2012,7 @@ const T = {
     clear: '초기화', clearConfirm: '설정된 API Key를 삭제하시겠습니까?', apiKeyFromEnv: '설정됨 (환경변수)',
     clearEnvHint: 'API Key가 환경변수 AGNES_API_KEY로 설정되어 있어 화면에서 삭제할 수 없습니다.',
     modelTitle: 'Model Selection', modelHint: 'Choose the Agnes models used for generation. Image and video models are not yet open; their defaults are kept.',
+    modelBetaHint: 'agnes-2.5-flash is in beta: requires an API Key with beta access, otherwise calls will fail.',
     modelTextLabel: 'Text / Chat Model', modelImageLabel: 'Image Model (not yet open)', modelVideoLabel: 'Video Model (not yet open)',
     modelSync: 'Refresh List', modelSyncIdle: 'Not synced', modelSaved: 'Saved',
     workspaceTitle: '작업 디렉토리', workspaceNone: '미설정', workspaceActive: '활성', workspaceAdd: '추가',
@@ -2111,6 +2117,7 @@ const T = {
     clear: 'Padam', clearConfirm: 'Pasti mahu padam API Key?', apiKeyFromEnv: 'Sudah (env)',
     clearEnvHint: 'API Key ditetapkan melalui pembolehubah AGNES_API_KEY dan tidak boleh dipadam dari UI.',
     modelTitle: 'Model Selection', modelHint: 'Choose the Agnes models used for generation. Image and video models are not yet open; their defaults are kept.',
+    modelBetaHint: 'agnes-2.5-flash is in beta: requires an API Key with beta access, otherwise calls will fail.',
     modelTextLabel: 'Text / Chat Model', modelImageLabel: 'Image Model (not yet open)', modelVideoLabel: 'Video Model (not yet open)',
     modelSync: 'Refresh List', modelSyncIdle: 'Not synced', modelSaved: 'Saved',
     workspaceTitle: 'Direktori Kerja', workspaceNone: 'Tidak ditetapkan', workspaceActive: 'Aktif', workspaceAdd: 'Tambah',
@@ -2215,6 +2222,7 @@ const T = {
     clear: 'Hapus', clearConfirm: 'Yakin ingin menghapus API Key?', apiKeyFromEnv: 'Sudah (env)',
     clearEnvHint: 'API Key diatur melalui variabel AGNES_API_KEY dan tidak dapat dihapus dari UI.',
     modelTitle: 'Model Selection', modelHint: 'Choose the Agnes models used for generation. Image and video models are not yet open; their defaults are kept.',
+    modelBetaHint: 'agnes-2.5-flash is in beta: requires an API Key with beta access, otherwise calls will fail.',
     modelTextLabel: 'Text / Chat Model', modelImageLabel: 'Image Model (not yet open)', modelVideoLabel: 'Video Model (not yet open)',
     modelSync: 'Refresh List', modelSyncIdle: 'Not synced', modelSaved: 'Saved',
     workspaceTitle: 'Direktori Kerja', workspaceNone: 'Belum diatur', workspaceActive: 'Aktif', workspaceAdd: 'Tambah',
@@ -2318,6 +2326,7 @@ const T = {
     clear: 'Löschen', clearConfirm: 'API-Key wirklich löschen?', apiKeyFromEnv: 'Konfiguriert (env)',
     clearEnvHint: 'Der API-Key ist über die Umgebungsvariable AGNES_API_KEY gesetzt und kann nicht aus der UI gelöscht werden.',
     modelTitle: 'Model Selection', modelHint: 'Choose the Agnes models used for generation. Image and video models are not yet open; their defaults are kept.',
+    modelBetaHint: 'agnes-2.5-flash is in beta: requires an API Key with beta access, otherwise calls will fail.',
     modelTextLabel: 'Text / Chat Model', modelImageLabel: 'Image Model (not yet open)', modelVideoLabel: 'Video Model (not yet open)',
     modelSync: 'Refresh List', modelSyncIdle: 'Not synced', modelSaved: 'Saved',
     workspaceTitle: 'Arbeitsverzeichnis', workspaceNone: 'Nicht gesetzt', workspaceActive: 'Aktiv', workspaceAdd: 'Hinzufügen',
@@ -2427,6 +2436,7 @@ const T = {
     clear: 'Effacer', clearConfirm: 'Voulez-vous vraiment supprimer la clé API ?', apiKeyFromEnv: 'Configuré (env)',
     clearEnvHint: 'La clé API est définie via la variable AGNES_API_KEY et ne peut pas être supprimée depuis l\'interface.',
     modelTitle: 'Model Selection', modelHint: 'Choose the Agnes models used for generation. Image and video models are not yet open; their defaults are kept.',
+    modelBetaHint: 'agnes-2.5-flash is in beta: requires an API Key with beta access, otherwise calls will fail.',
     modelTextLabel: 'Text / Chat Model', modelImageLabel: 'Image Model (not yet open)', modelVideoLabel: 'Video Model (not yet open)',
     modelSync: 'Refresh List', modelSyncIdle: 'Not synced', modelSaved: 'Saved',
     workspaceTitle: 'Répertoire de travail', workspaceNone: 'Non défini', workspaceActive: 'Actif', workspaceAdd: 'Ajouter',
@@ -2536,6 +2546,7 @@ const T = {
     clear: 'Wissen', clearConfirm: 'Weet u zeker dat u de API-sleutel wilt wissen?', apiKeyFromEnv: 'Geconfigureerd (env)',
     clearEnvHint: 'De API-sleutel is ingesteld via omgevingsvariabele AGNES_API_KEY en kan niet uit de UI worden gewist.',
     modelTitle: 'Model Selection', modelHint: 'Choose the Agnes models used for generation. Image and video models are not yet open; their defaults are kept.',
+    modelBetaHint: 'agnes-2.5-flash is in beta: requires an API Key with beta access, otherwise calls will fail.',
     modelTextLabel: 'Text / Chat Model', modelImageLabel: 'Image Model (not yet open)', modelVideoLabel: 'Video Model (not yet open)',
     modelSync: 'Refresh List', modelSyncIdle: 'Not synced', modelSaved: 'Saved',
     workspaceTitle: 'Werkmap', workspaceNone: 'Niet ingesteld', workspaceActive: 'Actief', workspaceAdd: 'Toevoegen',
@@ -2645,6 +2656,7 @@ const T = {
     clear: 'Eliminar', clearConfirm: '¿Está seguro de eliminar la clave API?', apiKeyFromEnv: 'Configurado (env)',
     clearEnvHint: 'La clave API está configurada mediante la variable de entorno AGNES_API_KEY y no se puede eliminar desde la interfaz.',
     modelTitle: 'Model Selection', modelHint: 'Choose the Agnes models used for generation. Image and video models are not yet open; their defaults are kept.',
+    modelBetaHint: 'agnes-2.5-flash is in beta: requires an API Key with beta access, otherwise calls will fail.',
     modelTextLabel: 'Text / Chat Model', modelImageLabel: 'Image Model (not yet open)', modelVideoLabel: 'Video Model (not yet open)',
     modelSync: 'Refresh List', modelSyncIdle: 'Not synced', modelSaved: 'Saved',
     workspaceTitle: 'Directorio de trabajo', workspaceNone: 'No configurado', workspaceActive: 'Activo', workspaceAdd: 'Agregar',
@@ -2754,6 +2766,7 @@ const T = {
     clear: 'Limpar', clearConfirm: 'Tem certeza de que deseja remover a chave API?', apiKeyFromEnv: 'Configurado (env)',
     clearEnvHint: 'A chave API está definida via variável de ambiente AGNES_API_KEY e não pode ser removida pela interface.',
     modelTitle: 'Model Selection', modelHint: 'Choose the Agnes models used for generation. Image and video models are not yet open; their defaults are kept.',
+    modelBetaHint: 'agnes-2.5-flash is in beta: requires an API Key with beta access, otherwise calls will fail.',
     modelTextLabel: 'Text / Chat Model', modelImageLabel: 'Image Model (not yet open)', modelVideoLabel: 'Video Model (not yet open)',
     modelSync: 'Refresh List', modelSyncIdle: 'Not synced', modelSaved: 'Saved',
     workspaceTitle: 'Diretório de trabalho', workspaceNone: 'Não definido', workspaceActive: 'Ativo', workspaceAdd: 'Adicionar',
@@ -2863,6 +2876,7 @@ const T = {
     clear: 'Cancella', clearConfirm: 'Sei sicuro di voler cancellare la chiave API?', apiKeyFromEnv: 'Configurato (env)',
     clearEnvHint: 'La chiave API è impostata tramite la variabile d\'ambiente AGNES_API_KEY e non può essere rimossa dall\'interfaccia.',
     modelTitle: 'Model Selection', modelHint: 'Choose the Agnes models used for generation. Image and video models are not yet open; their defaults are kept.',
+    modelBetaHint: 'agnes-2.5-flash is in beta: requires an API Key with beta access, otherwise calls will fail.',
     modelTextLabel: 'Text / Chat Model', modelImageLabel: 'Image Model (not yet open)', modelVideoLabel: 'Video Model (not yet open)',
     modelSync: 'Refresh List', modelSyncIdle: 'Not synced', modelSaved: 'Saved',
     workspaceTitle: 'Directory di lavoro', workspaceNone: 'Non impostato', workspaceActive: 'Attivo', workspaceAdd: 'Aggiungi',
@@ -4863,6 +4877,22 @@ document.getElementById('apikey-clear').onclick = async () => {
 
 let modelListCache = { text: [], image: [], video: [] };
 
+function isBetaModel(m) {
+  // 内测模型：目前 agnes-2.5-flash 处于内测，需开通内测权限的 key
+  return typeof m === 'string' && (m === 'agnes-2.5-flash' || /2\.5/.test(m));
+}
+
+function updateBetaHint() {
+  const hint = document.getElementById('model-text-beta-hint');
+  if (!hint) return;
+  const val = (document.getElementById('model-text').value || '').replace('（内测）', '');
+  if (isBetaModel(val)) {
+    hint.classList.remove('hidden');
+  } else {
+    hint.classList.add('hidden');
+  }
+}
+
 function populateModelSelect(selectEl, options, selected) {
   let opts = (options || []).slice();
   // 保证当前选中的模型一定在列表中（例如选中的是内测模型但列表未返回）
@@ -4871,7 +4901,8 @@ function populateModelSelect(selectEl, options, selected) {
   opts.forEach(m => {
     const opt = document.createElement('option');
     opt.value = m;
-    opt.textContent = m;
+    opt.textContent = isBetaModel(m) ? m + '（内测）' : m;
+    if (isBetaModel(m)) opt.title = t('modelBetaHint');
     if (m === selected) opt.selected = true;
     selectEl.appendChild(opt);
   });
@@ -4898,6 +4929,7 @@ async function loadModels() {
     populateModelSelect(document.getElementById('model-image'), modelListCache.image, sel.image);
     populateModelSelect(document.getElementById('model-video'), modelListCache.video, sel.video);
     updateModelCompact(sel);
+    updateBetaHint();
   } catch (e) {
     console.error('load model config failed:', e);
   }
@@ -4942,6 +4974,7 @@ document.getElementById('model-sync').onclick = async () => {
       populateModelSelect(document.getElementById('model-text'), modelListCache.text, text);
       populateModelSelect(document.getElementById('model-image'), modelListCache.image, image);
       populateModelSelect(document.getElementById('model-video'), modelListCache.video, video);
+      updateBetaHint();
       statusEl.textContent = t('modelSyncIdle');
       statusEl.className = 'text-xs px-2 py-1 rounded-full bg-green-900 text-green-300';
       setTimeout(() => { statusEl.className = 'text-xs px-2 py-1 rounded-full bg-gray-800 text-gray-400'; }, 1500);
