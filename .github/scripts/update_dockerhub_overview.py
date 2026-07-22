@@ -27,6 +27,13 @@ def main() -> int:
             "Text to multi-scene video with narration, subtitles, and digital "
             "anchor via Web UI, powered by Agnes AI."
         )
+    # Docker Hub description cap: 100 bytes (not chars — em-dash is 3 bytes).
+    if len(desc.encode()) > 100:
+        # Truncate to ~96 chars then cut at last space to be safe under 100b.
+        safe = desc[:96]
+        cut = safe.rfind(" ")
+        desc = (safe[:cut] if cut > 0 else safe[:95]) + "…"
+
     image = os.environ.get("IMAGE_NAME", "free-short-video")
     repo_path = f"{user}/{image}"
 
