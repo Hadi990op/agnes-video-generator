@@ -405,3 +405,59 @@ DURATION_FRAME_MAP = {
     18: (441, 24),
     20: (441, 22),
 }
+
+
+# ═══════════════════════════════════════════════════
+# 模型选择配置（v5.0 新增：文本 / 图像 / 视频模型）
+# ═══════════════════════════════════════════════════
+
+# 各类型 Agnes 模型默认值（与三个 API 客户端的默认 model 对齐）
+DEFAULT_TEXT_MODEL = "agnes-2.0-flash"
+DEFAULT_IMAGE_MODEL = "agnes-image-2.1-flash"
+DEFAULT_VIDEO_MODEL = "agnes-video-v2.0"
+
+DEFAULT_MODELS = {
+    "text": DEFAULT_TEXT_MODEL,
+    "image": DEFAULT_IMAGE_MODEL,
+    "video": DEFAULT_VIDEO_MODEL,
+}
+
+
+def get_selected_models() -> dict:
+    """返回当前选中的模型配置。
+
+    Returns:
+        {"text": str, "image": str, "video": str}
+        缺省值回退到 Agnes 三个 API 客户端的默认模型。
+    """
+    config = load_config()
+    m = config.get("models", {}) or {}
+    return {
+        "text": m.get("text") or DEFAULT_TEXT_MODEL,
+        "image": m.get("image") or DEFAULT_IMAGE_MODEL,
+        "video": m.get("video") or DEFAULT_VIDEO_MODEL,
+    }
+
+
+def set_selected_models(text: str = None, image: str = None, video: str = None) -> dict:
+    """保存选中的模型配置。
+
+    Args:
+        text:  文本（chat）模型名，None 表示不修改
+        image: 图像模型名，None 表示不修改
+        video: 视频模型名，None 表示不修改
+
+    Returns:
+        保存后的完整模型配置字典
+    """
+    config = load_config()
+    m = config.get("models", {}) or {}
+    if text is not None:
+        m["text"] = text
+    if image is not None:
+        m["image"] = image
+    if video is not None:
+        m["video"] = video
+    config["models"] = m
+    save_config(config)
+    return get_selected_models()

@@ -24,6 +24,7 @@ import shutil
 import signal
 import subprocess
 import tempfile
+import time
 import uuid
 from contextlib import asynccontextmanager
 from datetime import datetime
@@ -33,7 +34,7 @@ from fastapi import FastAPI, UploadFile, File, Form, HTTPException
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse, JSONResponse
 
-from core.config import get_api_key, set_api_key, delete_api_key, get_api_key_source, get_working_dir, DURATION_FRAME_MAP, get_workspaces, add_workspace, remove_workspace, set_active_workspace, get_active_workspace, REGRESSION_WORKING_DIR_ENV, get_watermark_config, set_watermark_config, WATERMARK_PROMO_TEXT_ZH, WATERMARK_PROMO_TEXT_EN
+from core.config import get_api_key, set_api_key, delete_api_key, get_api_key_source, get_working_dir, DURATION_FRAME_MAP, get_workspaces, add_workspace, remove_workspace, set_active_workspace, get_active_workspace, REGRESSION_WORKING_DIR_ENV, get_watermark_config, set_watermark_config, WATERMARK_PROMO_TEXT_ZH, WATERMARK_PROMO_TEXT_EN, get_selected_models, set_selected_models
 from core.audio.voices import (
     get_voice_catalog,
     get_voice_lang,
@@ -56,6 +57,7 @@ from core.pipelines import (
 )
 from core.pipelines.poetry_video import POETRY_SUBTITLE_STYLE
 from core.api.agnes_image import AgnesImageAPI
+from core.api.agnes_models import fetch_available_models
 from core.api.error_collector import set_workspace_root
 from core.artifacts import list_artifacts, resolve_artifact, get_cascade_plan, apply_cascade_plan
 from core.task_manager import TaskManager
@@ -360,6 +362,7 @@ async def get_config():
         "watermark": wm,
         "watermark_promo_zh": WATERMARK_PROMO_TEXT_ZH,
         "watermark_promo_en": WATERMARK_PROMO_TEXT_EN,
+        "models": get_selected_models(),
     }
     return data
 
@@ -381,6 +384,63 @@ async def clear_config():
         )
     delete_api_key()
     return {"ok": True}
+
+
+# ═══════════════════════════════════════════════════
+# 模型选择（v5.0）
+# ═══════════════════════════════════════════════════
+
+
+# 模型列表服务端缓存，避免每次页面加载都打外部接口（apihub.agnes-ai.com）导致变慢。
+# TTL 默认 5 分钟；?refresh=1 或缓存过期时重新拉取。
+_MODEL_CACHE = {"models": None, "ts": 0.0, "ttl": 300}
+
+
+@app.get("/api/models")
+async def list_models(refresh: bool = False):
+    """拉取 Agnes 可用模型列表，按 text/image/video 分组。
+
+    需已配置 API Key。列表来自 GET /v1/models?all=true（含内测模型）。
+    失败时回退到硬编码默认列表。
+
+    结果在服务端缓存 TTL 秒；普通页面加载走缓存瞬时返回，
+    仅“刷新列表”按钮（?refresh=1）或缓存过期时才重新请求外部接口。
+    """
+    key = get_api_key()
+    if not key:
+        raise HTTPException(status_code=400, detail="未配置 API Key")
+    now = time.time()
+    if (
+        not refresh
+        and _MODEL_CACHE["models"] is not None
+        and (now - _MODEL_CACHE["ts"]) < _MODEL_CACHE["ttl"]
+    ):
+        return {"ok": True, "models": _MODEL_CACHE["models"], "cached": True}
+    grouped = fetch_available_models(key)
+    _MODEL_CACHE["models"] = grouped
+    _MODEL_CACHE["ts"] = now
+    return {"ok": True, "models": grouped, "cached": False}
+
+
+@app.post("/api/config/models")
+async def save_models(
+    text: str = Form(None),
+    image: str = Form(None),
+    video: str = Form(None),
+):
+    """保存选中的模型配置。
+
+    text 为必填（目前仅文本模型开放选择）；image/video 接受但不强制，
+    置灰时前端仍会随配置保存其值（缺省回退到当前默认值）。
+    """
+    if text is None or text.strip() == "":
+        raise HTTPException(status_code=400, detail="文本模型不能为空")
+    result = set_selected_models(
+        text=text or None,
+        image=image,
+        video=video,
+    )
+    return {"ok": True, "models": result}
 
 
 # ═══════════════════════════════════════════════════
@@ -698,6 +758,9 @@ async def list_tasks():
             elif isinstance(state, SimpleVideoTask):
                 t["prompt"] = state.prompt[:100] if state.prompt else ""
                 t["mode"] = state.mode
+            # 诗歌视频
+            elif isinstance(state, PoetryVideoTask):
+                t["poem_text"] = state.poem_text[:100] if state.poem_text else ""
             # 简单图片
             elif isinstance(state, SimpleImageTask):
                 t["prompt"] = state.prompt[:100] if state.prompt else ""
@@ -963,12 +1026,24 @@ def _create_pipeline_for_type(
     task_id: str,
     dir_name: str,
 ) -> BasePipeline:
-    """根据任务类型创建对应的 Pipeline 实例。"""
+    """根据任务类型创建对应的 Pipeline 实例。
+
+    从配置读取选中的模型（文本/图像/视频），注入各 Pipeline，
+    使界面选择的模型生效。
+    """
+    models = get_selected_models()
+    text_model = models["text"]
+    image_model = models["image"]
+    video_model = models["video"]
+
     if task_type == TaskType.SIMPLE:
         return SimpleVideoPipeline(
             api_key=api_key,
             task_id=task_id,
             dir_name=dir_name,
+            chat_model=text_model,
+            image_model=image_model,
+            video_model=video_model,
             shutdown_event=shutdown_event,
         )
     elif task_type == TaskType.MANUSCRIPT:
@@ -976,6 +1051,9 @@ def _create_pipeline_for_type(
             api_key=api_key,
             task_id=task_id,
             dir_name=dir_name,
+            chat_model=text_model,
+            image_model=image_model,
+            video_model=video_model,
             shutdown_event=shutdown_event,
         )
     elif task_type == TaskType.ANCHOR:
@@ -983,6 +1061,9 @@ def _create_pipeline_for_type(
             api_key=api_key,
             task_id=task_id,
             dir_name=dir_name,
+            chat_model=text_model,
+            image_model=image_model,
+            video_model=video_model,
             shutdown_event=shutdown_event,
         )
     elif task_type == TaskType.POETRY:
@@ -990,6 +1071,8 @@ def _create_pipeline_for_type(
             api_key=api_key,
             task_id=task_id,
             dir_name=dir_name,
+            chat_model=text_model,
+            video_model=video_model,
             shutdown_event=shutdown_event,
         )
     else:
@@ -998,6 +1081,9 @@ def _create_pipeline_for_type(
             api_key=api_key,
             task_id=task_id,
             dir_name=dir_name,
+            chat_model=text_model,
+            image_model=image_model,
+            video_model=video_model,
             shutdown_event=shutdown_event,
         )
 

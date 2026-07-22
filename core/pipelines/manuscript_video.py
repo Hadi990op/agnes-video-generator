@@ -58,13 +58,16 @@ class ManuscriptVideoPipeline(MultiScenePipeline):
         api_key: str,
         task_id: str,
         dir_name: str = None,
+        chat_model: str = "agnes-2.0-flash",
+        image_model: str = "agnes-image-2.1-flash",
+        video_model: str = "agnes-video-v2.0",
         progress_callback: Optional[Callable] = None,
         shutdown_event: Optional[asyncio.Event] = None,
     ):
         super().__init__(api_key, task_id, dir_name, progress_callback, shutdown_event)
-        self.video_api = AgnesVideoAPI(api_key=api_key)
+        self.video_api = AgnesVideoAPI(api_key=api_key, model=video_model)
         self.video_api.shutdown_event = shutdown_event
-        self.screenwriter = Screenwriter(api_key=api_key)
+        self.screenwriter = Screenwriter(api_key=api_key, model=chat_model)
 
     # ------------------------------------------------------------------
     # 模板钩子：数据来源
