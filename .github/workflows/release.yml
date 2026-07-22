@@ -56,12 +56,17 @@ jobs:
           if [ "$code" != "200" ]; then echo "SMOKE TEST FAILED"; exit 1; fi
 
       # ── 主仓库：GitHub Container Registry（GHCR）──
+      # 必须用仓库自带的 GITHUB_TOKEN 推送，包才会关联到本仓库、
+      # 出现在仓库 Packages 页并可在仓库内设为 public。
+      # 个人 PAT 推仓库级路径不会挂到仓库 UI（表现为 Packages 页为空、链接 404）。
+      # 前置条件：仓库/组织 Settings → Actions → General → Workflow permissions
+      #           必须设为 "Read and write permissions"，否则 GITHUB_TOKEN 为只读，推送 403。
       - name: Log in to GHCR
         uses: docker/login-action@v3
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
-          password: ${{ secrets.GHCR_PAT }}
+          password: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Extract image metadata
         id: meta
