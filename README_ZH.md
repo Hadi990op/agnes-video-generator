@@ -191,7 +191,41 @@ curl -X POST http://localhost:8765/api/config \
 
 打开 `http://localhost:8765`，选择视频模式（简单 / 创意 / 稿件 / 数字人），输入创意描述，点击"开始生成视频"。
 
-### 方式 B：AI Agent 辅助部署
+### 方式 B：Docker 部署（无需安装 Python/FFmpeg）
+
+每次 release 都会推送预构建的多平台镜像（`linux/amd64`、`linux/arm64`）至 **GitHub Container Registry (GHCR)** 和 **Docker Hub**。
+
+**拉取并运行**
+
+```bash
+# GHCR
+docker run -d -p 8765:8765 \
+  -e AGNES_API_KEY=<你的key> \
+  -v ~/agnes-data/working:/app/.working_dir \
+  -v ~/agnes-data/config:/app/.agnes_config \
+  ghcr.io/lcy362/free-short-video:latest
+
+# Docker Hub
+docker run -d -p 8765:8765 \
+  -e AGNES_API_KEY=<你的key> \
+  -v ~/agnes-data/working:/app/.working_dir \
+  -v ~/agnes-data/config:/app/.agnes_config \
+  lcy362/free-short-video:latest
+```
+
+然后打开 `http://localhost:8765`。
+
+**数据持久化**：应用会将视频、上传文件和设置写在容器内的 `/app/.working_dir` 和 `/app/.agnes_config` 目录。务必挂载到本机，否则容器重建后数据丢失且无法导出。挂载后生成的视频就在 `~/agnes-data/working/` 目录，直接可拷。
+
+也可以用项目自带的 `docker-compose.yml` 一键启动：
+
+```bash
+git clone https://github.com/lcy362/agnes-video-generator.git
+cd agnes-video-generator
+AGNES_API_KEY=<你的key> docker compose up -d
+```
+
+### 方式 C：AI Agent 辅助部署
 
 本项目专为 AI 编程助手友好设计。先由你下载代码并准备好 API Key：
 
@@ -287,6 +321,9 @@ AI 驱动的多场景故事视频：
 agnes-video-generator/
 ├── start.sh                          # 一键启动脚本
 ├── requirements.txt                  # Python 依赖
+├── Dockerfile                        # 多平台 Docker 镜像（Python 3.11 + imageio-ffmpeg）
+├── docker-compose.yml                # Docker Compose（bind mount 持久化工作区 + 配置）
+├── docker-run.sh                     # 一行 Docker 启动脚本（封装挂载参数）
 ├── server.py                         # FastAPI 主服务 (REST + WebSocket)
 ├── static/
 │   └── index.html                    # 前端 SPA — 五种任务 Tab，13 种语言 (Tailwind CSS)
@@ -457,6 +494,10 @@ MIT
 ### Web UI 支持哪些语言？
 
 界面支持 13 种语言：中文、English、Deutsch、Français、Nederlands、Español、Português、Italiano、Русский、日本語、한국어、Bahasa Melayu、Bahasa Indonesia。字幕以源文本语言生成，内置 CJK 字体支持。
+
+### 可以用 Docker 部署吗？
+
+可以。预构建镜像已推送至 [GHCR](https://github.com/lcy362/agnes-video-generator/pkgs/container/free-short-video) 和 [Docker Hub](https://hub.docker.com/r/lcy362/free-short-video)。拉取 `latest` 标签后直接运行，无需安装 Python 或 ffmpeg。详见快速开始中的 **[方式 B：Docker 部署](#方式-bdocker-部署无需安装-pythonffmpeg)**。
 
 ### 可以部署在自己的服务器上吗？
 
