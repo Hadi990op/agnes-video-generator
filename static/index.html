@@ -3062,6 +3062,11 @@ function applyLanguage(lang) {
   // 更新折叠状态下的文本（不走 data-i18n，需手动刷新）
   updateApiKeyCompact();
   updateWorkspaceCompact();
+  updateModelCompact({
+    text: (document.getElementById('model-text') || {}).value || '',
+    image: (document.getElementById('model-image') || {}).value || '',
+    video: (document.getElementById('model-video') || {}).value || ''
+  });
 }
 
 function switchLang(lang) { applyLanguage(lang); }
@@ -4747,16 +4752,19 @@ function updateApiKeyCompact() {
   const statusEl = document.getElementById('apikey-status');
   const isConfigured = statusEl.classList.contains('bg-green-900');
 
+  let label, cls;
   if (isConfigured) {
     const source = document.getElementById('apikey-clear').dataset.source;
-    textEl.textContent = source === 'env'
-      ? t('apiKeyFromEnv')
-      : t('apiKeyConfigured');
-    textEl.className = 'text-sm text-green-400';
+    label = source === 'env' ? t('apiKeyFromEnv') : t('apiKeyConfigured');
+    cls = 'text-green-400';
   } else {
-    textEl.textContent = t('apiKeyNotConfigured');
-    textEl.className = 'text-sm text-gray-400';
+    label = t('apiKeyNotConfigured');
+    cls = 'text-gray-400';
   }
+  textEl.innerHTML =
+    '<span class="text-gray-300 font-medium">' + t('apiKeyTitle') + '</span>' +
+    '<span class="text-gray-600 mx-2">·</span>' +
+    '<span class="' + cls + '">' + escapeHtml(label) + '</span>';
 
   // Auto-manage collapse: configured → auto-collapse, not configured → expand
   const prefs = getCollapsePrefs();
@@ -4774,18 +4782,23 @@ function updateWorkspaceCompact() {
   const textEl = document.getElementById('workspace-compact-text');
   const statusEl = document.getElementById('workspace-status');
 
+  let label, cls;
   if (statusEl.classList.contains('bg-green-900')) {
     const nameEl = document.getElementById('workspace-active-name');
     const pathEl = document.getElementById('workspace-active-path');
-    textEl.textContent = (nameEl.textContent || '') + (pathEl.textContent ? ' — ' + pathEl.textContent : '');
-    textEl.className = 'text-sm text-green-400';
+    label = (nameEl.textContent || '') + (pathEl.textContent ? ' — ' + pathEl.textContent : '');
+    cls = 'text-green-400';
   } else if (statusEl.classList.contains('bg-amber-900')) {
-    textEl.textContent = t('workspaceActive');
-    textEl.className = 'text-sm text-amber-300';
+    label = t('workspaceActive');
+    cls = 'text-amber-300';
   } else {
-    textEl.textContent = t('workspaceNone');
-    textEl.className = 'text-sm text-gray-400';
+    label = t('workspaceNone');
+    cls = 'text-gray-400';
   }
+  textEl.innerHTML =
+    '<span class="text-gray-300 font-medium">' + t('workspaceTitle') + '</span>' +
+    '<span class="text-gray-600 mx-2">·</span>' +
+    '<span class="' + cls + '">' + escapeHtml(label) + '</span>';
   document.getElementById('workspace-compact').style.display = 'flex';
 
   const prefs = getCollapsePrefs();
@@ -4965,14 +4978,16 @@ function updateModelCompact(sel) {
   const t_ = cur.text || '';
   const i_ = cur.image || '';
   const v_ = cur.video || '';
+  const titlePrefix = '<span class="text-gray-300 font-medium">' + t('modelTitle') + '</span>' +
+                      '<span class="text-gray-600 mx-2">·</span>';
   if (t_ || i_ || v_) {
     // 折叠态展示全部三个已选模型（文字/图像/视频，随语言切换）
-    textEl.innerHTML =
+    textEl.innerHTML = titlePrefix +
       '<span class="text-gray-500">' + t('modelTagText') + '</span> ' + escapeHtml(t_) +
       ' &nbsp;<span class="text-gray-500">' + t('modelTagImage') + '</span> ' + escapeHtml(i_) +
       ' &nbsp;<span class="text-gray-500">' + t('modelTagVideo') + '</span> ' + escapeHtml(v_);
   } else {
-    textEl.textContent = t('modelTitle');
+    textEl.innerHTML = titlePrefix + '<span class="text-gray-400">—</span>';
   }
   const prefs = getCollapsePrefs();
   if (prefs.model_manual !== undefined) {
