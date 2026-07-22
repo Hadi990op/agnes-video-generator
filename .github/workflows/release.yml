@@ -123,20 +123,53 @@ jobs:
           body: |
             ## Docker Image
 
-            ### GitHub Container Registry (GHCR)
+            Multi-arch (`linux/amd64`, `linux/arm64`) images for this release are published to **GHCR** and **Docker Hub**.
+
+            ### Pull
+
+            GitHub Container Registry (GHCR):
             ```bash
             docker pull ghcr.io/${{ github.repository }}/${{ env.IMAGE_NAME }}:${{ steps.meta.outputs.version }}
             ```
-            Run:
-            ```bash
-            docker run -p 8765:8765 -e AGNES_API_KEY=<your-key> ghcr.io/${{ github.repository }}/${{ env.IMAGE_NAME }}:${{ steps.meta.outputs.version }}
-            ```
 
-            ### Docker Hub
+            Docker Hub:
             ```bash
             docker pull ${{ secrets.DOCKERHUB_USERNAME }}/${{ env.IMAGE_NAME }}:${{ github.ref_name }}
             ```
-            Run:
+
+            ### Run
+
+            > **Data persistence:** the app writes all generated videos, uploads and settings into `/app/.working_dir` and `/app/.agnes_config` *inside the container*. A plain `docker run` without a volume loses everything when the container is recreated. Mount these paths to your host so outputs survive restarts and can be exported.
+
+            **Option A — bind mount to a host folder (recommended; files land directly in the folder):**
             ```bash
-            docker run -p 8765:8765 -e AGNES_API_KEY=<your-key> ${{ secrets.DOCKERHUB_USERNAME }}/${{ env.IMAGE_NAME }}:${{ github.ref_name }}
+            mkdir -p ~/agnes-data/working ~/agnes-data/config
+            docker run -d -p 8765:8765 \
+              -e AGNES_API_KEY=<your-key> \
+              -v ~/agnes-data/working:/app/.working_dir \
+              -v ~/agnes-data/config:/app/.agnes_config \
+              ghcr.io/${{ github.repository }}/${{ env.IMAGE_NAME }}:${{ steps.meta.outputs.version }}
             ```
+            Your videos will be in `~/agnes-data/working/` on your machine.
+
+            **Option B — named Docker volume (no host path needed; survives container recreation):**
+            ```bash
+            docker volume create agnes-working
+            docker volume create agnes-config
+            docker run -d -p 8765:8765 \
+              -e AGNES_API_KEY=<your-key> \
+              -v agnes-working:/app/.working_dir \
+              -v agnes-config:/app/.agnes_config \
+              ghcr.io/${{ github.repository }}/${{ env.IMAGE_NAME }}:${{ steps.meta.outputs.version }}
+            ```
+            Export files from a named volume:
+            ```bash
+            docker run --rm -v agnes-working:/data -v "$PWD":/out busybox cp -r /data/. /out/agnes-export
+            ```
+
+            Then open **http://localhost:8765**.
+
+            **Notes**
+            - Prefer Docker Hub? Replace the image with `${{ secrets.DOCKERHUB_USERNAME }}/${{ env.IMAGE_NAME }}:${{ github.ref_name }}`.
+            - The image already declares `VOLUME` for both paths, so `docker run -p 8765:8765 <image>` (no `-v`) keeps data only while you reuse the same container (`stop`/`start`); recreating the container starts fresh.
+            - `AGNES_API_KEY` can also be set later in the Web UI; it is then stored in the mounted config volume.

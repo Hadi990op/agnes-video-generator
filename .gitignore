@@ -29,6 +29,9 @@ error_logs/
 tests/mock_regression/reports/
 tests/mock_regression/**/.working_dir/
 
+# 本地 Docker 持久化数据（宿主机挂载目录）
+agnes_data/
+
 # moviepy 临时产物（运行期泄漏到仓库根目录）
 final_video*TEMP*.mp4
 *TEMP*_wvf_snd.mp4

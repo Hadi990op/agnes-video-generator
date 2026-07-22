@@ -1,0 +1,33 @@
+# Agnes Video Generator — 带本地持久化的启动配置
+#
+# 关键点：容器内的工作空间 /app/.working_dir 和配置目录 /app/.agnes_config
+# 默认都在容器的「可写层」里，容器一删重建就会丢失。
+# 下面用 bind mount 把这两个目录挂到宿主机 ./agnes_data/，
+# 生成的视频、上传文件、设置都会直接落在本地磁盘，可随时拷出。
+#
+# 用法：
+#   docker compose up -d
+#   # 面板： http://localhost:8765
+#   # 生成的文件在宿主机： ./agnes_data/working/
+#
+# API Key（可选）：用环境变量注入，避免写进镜像/配置
+#   AGNES_API_KEY=你的key docker compose up -d
+# 或在同级建 .env 文件写一行： AGNES_API_KEY=你的key
+
+services:
+  agnes:
+    # 用你已发布的最新 tag 替换（当前为 4.7.2）。等 v4.7.3 发布后可改成 4.7.3
+    # GHCR 与 Docker Hub 二选一：
+    #   image: ghcr.io/lcy362/agnes-video-generator/free-short-video:4.7.2
+    image: ghcr.io/lcy362/agnes-video-generator/free-short-video:4.7.2
+    container_name: agnes-video
+    ports:
+      - "8765:8765"
+    environment:
+      - AGNES_API_KEY=${AGNES_API_KEY:-}
+    volumes:
+      # 工作空间（任务目录、final_video.mp4、uploads/）
+      - ./agnes_data/working:/app/.working_dir
+      # 配置（API Key、工作空间列表等设置）
+      - ./agnes_data/config:/app/.agnes_config
+    restart: unless-stopped
