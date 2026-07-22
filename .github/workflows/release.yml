@@ -72,11 +72,11 @@ jobs:
       # user-owned，GITHUB_TOKEN（repo 上下文）无法写入该路径。先尝试删除，再让
       # GITHUB_TOKEN 以 repo-owned 重建并关联到本仓库。
       - name: Remove orphan GHCR package (if any)
-        if: ${{ secrets.GHCR_PAT != '' }}
         continue-on-error: true
         env:
           GHCR_PAT: ${{ secrets.GHCR_PAT }}
         run: |
+          if [ -z "$GHCR_PAT" ]; then echo "GHCR_PAT not set, skip cleanup"; exit 0; fi
           echo "Removing any orphan free-short-video package before rebuild..."
           curl -sS -o /dev/null -w "user-scoped: %{http_code}\n" -X DELETE \
             -H "Authorization: Bearer $GHCR_PAT" \
