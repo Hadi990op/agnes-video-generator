@@ -67,6 +67,42 @@ jobs:
             --cov-report=html:htmlcov \
             --cov-fail-under=50
 
+      - name: Publish coverage to job summary
+        # 即使 --cov-fail-under 判红（上一步非零退出），本步仍运行，
+        # 保证 summary 页面始终展示覆盖率，便于一眼看到退化幅度。
+        if: always()
+        run: |
+          python -m coverage json -o coverage.json
+          python - <<'PY'
+          import json, os
+          data = json.load(open('coverage.json'))
+          t = data['totals']
+          pct = t['percent_covered']
+          covered = t['covered_lines']
+          total = t['num_statements']
+          missing = t['missing_lines']
+          color = 'green' if pct >= 80 else ('yellow' if pct >= 50 else 'red')
+          badge = f"https://img.shields.io/badge/coverage-{pct:.1f}%25-{color}"
+          lines = []
+          lines.append("## 🧪 单元测试覆盖率")
+          lines.append("")
+          lines.append(f"![coverage]({badge})")
+          lines.append("")
+          lines.append(f"**总计 {pct:.1f}%** —— 覆盖 {covered}/{total} 条语句，未覆盖 {missing} 条。")
+          lines.append("")
+          lines.append("| 模块 | 覆盖率 | 语句 | 未覆盖 |")
+          lines.append("| --- | --- | --- | --- |")
+          for f, info in sorted(data['files'].items(),
+                                key=lambda kv: kv[1]['summary']['percent_covered']):
+              s = info['summary']
+              lines.append(f"| `{f}` | {s['percent_covered']:.1f}% | {s['num_statements']} | {s['missing_lines']} |")
+          lines.append("")
+          lines.append("> 详细逐行覆盖见上方 `coverage-html` / `coverage-xml` artifact。")
+          lines.append("")
+          with open(os.environ['GITHUB_STEP_SUMMARY'], 'a') as fh:
+              fh.write("\n".join(lines) + "\n")
+          PY
+
       - name: Upload HTML coverage report
         if: always()
         uses: actions/upload-artifact@v4
