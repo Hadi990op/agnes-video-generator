@@ -13,12 +13,12 @@ name: Unit Tests & Coverage
 #      moviepy 也自带 imageio-ffmpeg 静态二进制作为兜底。
 #   4. tests/test_core.py 为纯单元（模型/字幕/配置/拼接器），无任何外部依赖。
 #
-# 触发：push 到 main/master、所有 PR、以及手动触发。
+# 触发：push 到任意分支、所有 PR、以及手动触发。
 # ════════════════════════════════════════════════════════════
 
 on:
   push:
-    branches: [ main, master ]
+    branches: [ "**" ]
   pull_request:
   workflow_dispatch:
 
