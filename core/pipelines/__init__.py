@@ -270,6 +270,24 @@ class BasePipeline(ABC):
             with open(srt_path, "w", encoding="utf-8") as f:
                 f.write("")
 
+        # ── 2.5 统一后处理：确保每条字幕不超过 2 行（参考中文短字幕规范，适配所有语言）──
+        try:
+            raw_srt = open(srt_path, "r", encoding="utf-8").read()
+            fixed_srt = SubtitleGenerator.enforce_max_lines(
+                raw_srt, max_lines=2,
+                video_width=video_width, fontsize=subtitle_config.style.fontsize,
+            )
+            if fixed_srt and fixed_srt != raw_srt:
+                with open(srt_path, "w", encoding="utf-8") as f:
+                    f.write(fixed_srt)
+                entry_count = fixed_srt.count("\n\n") + 1 if "\n\n" in fixed_srt else 1
+                logger.info(
+                    "[Subtitle] enforce_max_lines applied: ≤2 lines/entry (%d entries)",
+                    entry_count,
+                )
+        except Exception as e:
+            logger.warning("[Subtitle] enforce_max_lines failed: %s", e)
+
         # ── 3. LLM 智能样式 ──
         if (subtitle_config.enabled
                 and subtitle_config.style.style_mode == "llm"

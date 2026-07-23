@@ -39,15 +39,19 @@ class SubtitleGenerator:
     """字幕生成器：cues → SRT + moviepy 叠加。"""
 
     @staticmethod
-    def _split_long_text(txt: str, max_chars_per_line: int = 14) -> str:
+    def _split_long_text(txt: str, max_chars_per_line: int = 14,
+                         video_width: int = None, fontsize: int = None) -> str:
         """将过长的字幕文本拆分为多行，避免单行溢出屏幕。
 
-        对 CJK 文本按字符数拆分，对非 CJK 文本按单词边界拆分。
-        最多拆为 2 行，尽量等长分配。
+        对 CJK 文本按字符数拆分，对非 CJK 文本按单词边界拆分。最多拆为 2 行，
+        并尽量让每行在目标视频宽度 / 字号下不超过一行（宽度感知）。
 
         Args:
             txt: 原始字幕文本
-            max_chars_per_line: 每行最大字符数（CJK）或单词数（非 CJK）
+            max_chars_per_line: 每行最大字符数（CJK）或单词数（非 CJK）的旧式预算；
+                当提供 video_width + fontsize 时，将以宽度感知预算覆盖此值。
+            video_width: 视频宽度（用于估算每行可容纳字符数）
+            fontsize: 字幕字号（用于估算每行可容纳字符数）
 
         Returns:
             可能含 \\n 的文本
@@ -57,12 +61,22 @@ class SubtitleGenerator:
 
         has_cjk = any('\u4e00' <= ch <= '\u9fff' or '\u3400' <= ch <= '\u4dbf' for ch in txt)
 
+        # 宽度感知：根据视频宽度与字号计算每行可容纳字符数（参考中文短字幕规范）
+        if video_width and fontsize:
+            available_w = max(80, int(video_width) - 40)
+            if has_cjk:
+                per_line = max(8, available_w // fontsize)
+            else:
+                # 拉丁字符宽约为字号的 0.5 倍，留出安全系数 0.52
+                per_line = max(12, int(available_w / (fontsize * 0.52)))
+        else:
+            per_line = max_chars_per_line
+
         if has_cjk:
-            if len(txt) <= max_chars_per_line:
+            if len(txt) <= per_line:
                 return txt
-            # 拆为 2 行，尽量等长
+            # 拆为 2 行，尽量等长，在中间附近找标点或自然断点
             mid = len(txt) // 2
-            # 在中间附近找标点或自然断点
             for offset in range(min(4, mid)):
                 for candidate in (mid + offset, mid - offset):
                     if 0 < candidate < len(txt) and txt[candidate - 1] in '，。、；！？,. ;!?':
@@ -70,10 +84,133 @@ class SubtitleGenerator:
             return txt[:mid] + "\n" + txt[mid:]
         else:
             words = txt.split()
-            if len(words) <= max_chars_per_line:
+            if len(txt) <= per_line:
                 return txt
-            mid = len(words) // 2
-            return " ".join(words[:mid]) + "\n" + " ".join(words[mid:])
+            # 按字符预算分两行（每行不超过 per_line 字符），优先在词边界断开
+            taken = []
+            cur = 0
+            for w in words:
+                add = len(w) + (1 if cur else 0)
+                if cur == 0 or cur + add <= per_line:
+                    taken.append(w)
+                    cur += add
+                else:
+                    break
+            if not taken:
+                taken = [words[0]]
+            line1 = " ".join(taken)
+            line2 = " ".join(words[len(taken):])
+            if not line2:
+                return line1
+            return line1 + "\n" + line2
+
+    @staticmethod
+    def _chunk_text(text: str, max_entry: int, has_cjk: bool) -> List[str]:
+        """将一段字幕文本切分为若干 ≤ max_entry 字符的块（用于强制 ≤2 行）。
+
+        CJK 按字符贪心切分（尽量在标点处断开）；非 CJK 按单词贪心切分。
+        """
+        text = text.strip()
+        if not text:
+            return []
+        if len(text) <= max_entry:
+            return [text]
+        if has_cjk:
+            chunks = []
+            cur = ""
+            for ch in text:
+                if len(cur) + 1 <= max_entry:
+                    cur += ch
+                else:
+                    chunks.append(cur)
+                    cur = ch
+            if cur:
+                chunks.append(cur)
+            return chunks
+        words = text.split()
+        chunks = []
+        cur = ""
+        for w in words:
+            if not cur:
+                cur = w
+            elif len(cur) + 1 + len(w) <= max_entry:
+                cur += " " + w
+            else:
+                chunks.append(cur)
+                cur = w
+        if cur:
+            chunks.append(cur)
+        return chunks
+
+    @staticmethod
+    def enforce_max_lines(srt_content: str, max_lines: int = 2,
+                          video_width: int = 768, fontsize: int = 42) -> str:
+        """确保每条字幕（SRT entry）渲染后不超过 max_lines 行，适配所有语言。
+
+        参考中文短字幕规范：将过长的字幕块按目标视频宽度 / 字号估算的「每行字符数」
+        上限切分为多个更短的块，并在原时间区间内按块长度比例重新分配时间。
+        这样无论 CJK 还是拉丁 / 西里尔等文字体系，单条字幕都不会溢出成多行。
+
+        Args:
+            srt_content: 原始 SRT 文本
+            max_lines: 每条字幕允许的最大行数（默认 2）
+            video_width: 视频宽度（像素）
+            fontsize: 字幕字号（像素）
+
+        Returns:
+            处理后的 SRT 文本（条目数可能增加，但每条均 ≤ max_lines 行）
+        """
+        import srt as _srt
+
+        if not srt_content or not srt_content.strip():
+            return srt_content
+        try:
+            subs = list(_srt.parse(srt_content))
+        except Exception:
+            return srt_content
+        if not subs:
+            return srt_content
+
+        available_w = max(80, int(video_width or 768) - 40)
+        fs = int(fontsize or 42)
+        new_subs = []
+
+        for sub in subs:
+            text = (sub.content or "").strip()
+            if not text:
+                new_subs.append(sub)
+                continue
+            has_cjk = any('\u4e00' <= ch <= '\u9fff' or '\u3400' <= ch <= '\u4dbf' for ch in text)
+            if has_cjk:
+                per_line = max(8, available_w // fs)
+            else:
+                per_line = max(12, int(available_w / (fs * 0.52)))
+            max_entry = per_line * max_lines
+
+            if len(text) <= max_entry:
+                new_subs.append(sub)
+                continue
+
+            chunks = SubtitleGenerator._chunk_text(text, max_entry, has_cjk)
+            if len(chunks) <= 1:
+                new_subs.append(sub)
+                continue
+
+            total = sum(len(c) for c in chunks) or 1
+            start = sub.start
+            end = sub.end
+            dur = (end - start).total_seconds()
+            cursor = start
+            for c in chunks:
+                frac = len(c) / total
+                c_dur = dur * frac
+                c_end = cursor + datetime.timedelta(seconds=c_dur)
+                new_subs.append(_srt.Subtitle(index=0, start=cursor, end=c_end, content=c))
+                cursor = c_end
+
+        for i, s in enumerate(new_subs, 1):
+            s.index = i
+        return _srt.compose(new_subs)
 
     @staticmethod
     def cue_to_srt_time(seconds: float) -> str:
@@ -727,8 +864,11 @@ class SubtitleGenerator:
             # moviepy 的 SubtitlesClip 读取 SRT 文件
             def make_text_clip(txt):
                 from moviepy import TextClip
-                # 长文本自动拆为多行
-                wrapped = SubtitleGenerator._split_long_text(txt, cjk_max_chars)
+                # 长文本自动拆为多行（宽度感知：参考中文短字幕规范，适配所有语言）
+                wrapped = SubtitleGenerator._split_long_text(
+                    txt, cjk_max_chars,
+                    video_width=video_clip.w, fontsize=style.fontsize,
+                )
                 return TextClip(
                     text=wrapped,
                     font=font_path,
