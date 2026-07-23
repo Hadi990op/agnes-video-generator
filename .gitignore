@@ -25,6 +25,12 @@ static/generated/
 # 模型接口报错收集
 error_logs/
 
+# 单元测试覆盖度产物（不提交，CI 另生成）
+.coverage
+.coverage.*
+htmlcov/
+coverage.xml
+
 # Mock 回归测试生成的报告与临时数据（预制素材 assets/ fixture_data/ 需保留）
 tests/mock_regression/reports/
 tests/mock_regression/**/.working_dir/

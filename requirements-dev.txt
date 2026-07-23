@@ -1,0 +1,11 @@
+# Agnes Video Generator — 开发 / 测试依赖
+# 运行单元测试与覆盖度分析所需，不进入生产镜像。
+# 安装：pip install -r requirements.txt -r requirements-dev.txt
+
+# 测试运行器与异步支持
+pytest>=8.0,<9.0
+pytest-asyncio>=0.23.0,<1.0.0
+
+# 覆盖度分析
+coverage>=7.0,<9.0
+pytest-cov>=4.1.0,<7.0.0

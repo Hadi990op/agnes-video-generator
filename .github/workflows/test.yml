@@ -1,0 +1,84 @@
+name: Unit Tests & Coverage
+
+# ════════════════════════════════════════════════════════════
+# 单元测试 + 覆盖度分析
+#
+# 为什么适合 CI：
+#   1. tests/mock_regression 在「API 协议边界」处把 AgnesVideo/Image/Chat API、
+#      EdgeTTS、限流器全部替换成 Mock，测试不发起任何网络请求、不需要 AGNES_API_KEY。
+#   2. 测试依赖的素材（tests/mock_regression/assets/*.mp4|*.png）与
+#      fixture 文本（tests/mock_regression/fixture_data/*）已提交进仓库，
+#      checkout 后即可用，无需额外生成步骤。
+#   3. 唯一外部二进制依赖是 ffmpeg（视频拼接），由 apt 安装；
+#      moviepy 也自带 imageio-ffmpeg 静态二进制作为兜底。
+#   4. tests/test_core.py 为纯单元（模型/字幕/配置/拼接器），无任何外部依赖。
+#
+# 触发：push 到 main/master、所有 PR、以及手动触发。
+# ════════════════════════════════════════════════════════════
+
+on:
+  push:
+    branches: [ main, master ]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    # 如需验证多版本兼容性，把 python-version 改为矩阵即可，例如：
+    # strategy:
+    #   fail-fast: false
+    #   matrix:
+    #     python-version: ["3.11", "3.12"]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: |
+            requirements.txt
+            requirements-dev.txt
+
+      - name: Install ffmpeg + CJK font (moviepy 视频拼接 / 字幕中文渲染依赖)
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ffmpeg fonts-noto-cjk
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt -r requirements-dev.txt
+
+      - name: Run tests with coverage
+        # --cov-fail-under=50：覆盖率跌破当前基线（55%）即判红，防静默退化。
+        # 补完 artifacts.py / server.py 等单测后可逐步上调。
+        run: |
+          python -m pytest tests/ \
+            --cov=core --cov=models --cov=utils \
+            --cov-report=term-missing \
+            --cov-report=xml:coverage.xml \
+            --cov-report=html:htmlcov \
+            --cov-fail-under=50
+
+      - name: Upload HTML coverage report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-html
+          path: htmlcov/
+          retention-days: 14
+
+      - name: Upload coverage.xml
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-xml
+          path: coverage.xml
+          retention-days: 14

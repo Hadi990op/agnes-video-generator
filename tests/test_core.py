@@ -7,7 +7,7 @@ Agnes Video Generator v2.0 — 单元测试套件
 - core/config.py: 默认配置结构、resolve_font_path CJK 回退
 - core/task_manager.py: 旧数据兼容（无 task_type → CREATIVE）
 - core/compositor/concatenator.py: 字幕位置解析（bottom-80/top+N）
-- core/pipelines/manuscript_video.py: _step_split_text 拆段算法
+- core/pipelines/manuscript_video.py: _split_text 拆段算法
 
 用法:
     .venv/bin/python -m pytest tests/ -v
@@ -251,12 +251,14 @@ class TestResolveSubtitlePosition:
         )
         assert pos == ("center", 1072)
 
-    def test_top_plus_50(self):
+    def test_top_plus_offset(self):
+        # top+N 解析为像素偏移；该偏移会被 safe_margin_y(默认 80) 下限钳制，
+        # 故用 200 验证「+N」解析本身（> 下限时不触发钳制）。
         from core.compositor.concatenator import VideoConcatenator
         pos = VideoConcatenator._resolve_subtitle_position(
-            ("center", "top+50"), video_height=1152
+            ("center", "top+200"), video_height=1152
         )
-        assert pos == ("center", 50)
+        assert pos == ("center", 200)
 
     def test_plain_bottom(self):
         from core.compositor.concatenator import VideoConcatenator
@@ -287,13 +289,14 @@ class TestResolveSubtitlePosition:
         pos = VideoConcatenator._resolve_subtitle_position("top+100", video_height=768)
         assert pos == ("center", 100)
 
-    def test_no_height_fallback(self):
+    def test_bottom_offset_zero_height_defaults(self):
+        # video_height=0 被视为「未提供」，_resolve_subtitle_position 回退到默认高度 1080，
+        # 因此 bottom-80 实际解析为 1080-80=1000（而非回退为字符串 "bottom"）。
         from core.compositor.concatenator import VideoConcatenator
         pos = VideoConcatenator._resolve_subtitle_position(
             ("center", "bottom-80"), video_height=0
         )
-        # 无 video_height 时，bottom-80 无法计算像素，回退到普通 bottom
-        assert pos == ("center", "bottom")
+        assert pos == ("center", 1000)
 
     def test_numeric_position_passthrough(self):
         from core.compositor.concatenator import VideoConcatenator
@@ -376,10 +379,11 @@ class TestParseDuration:
 # ═══════════════════════════════════════════════════
 
 class TestStepSplitText:
-    """稿件文本拆分测试（_step_split_text）。"""
+    """稿件文本拆分测试（_split_text）。"""
 
     def _make_pipeline(self):
         """构建带 mock _state 的最小化 ManuscriptVideoPipeline 实例。"""
+        from unittest.mock import MagicMock
         from core.pipelines.manuscript_video import ManuscriptVideoPipeline
         from models.task import ManuscriptVideoTask
         pipeline = ManuscriptVideoPipeline.__new__(ManuscriptVideoPipeline)
@@ -388,18 +392,20 @@ class TestStepSplitText:
             creative_name="test",
             manuscript_text="",
         )
+        # _split_text 在文本与 _state 不一致时会回写 task_manager，这里用 mock 提供
+        pipeline.task_manager = MagicMock()
         return pipeline
 
     def test_short_text_single_paragraph(self):
         pipeline = self._make_pipeline()
-        paragraphs = pipeline._step_split_text("这是短句。")
+        paragraphs = pipeline._split_text("这是短句。")
         assert len(paragraphs) >= 1
         assert all(p.text.strip() for p in paragraphs)
 
     def test_multi_sentence_split(self):
         text = "春天来了。花开了。小鸟在唱歌。孩子们在玩耍。"
         pipeline = self._make_pipeline()
-        paragraphs = pipeline._step_split_text(text)
+        paragraphs = pipeline._split_text(text)
         assert len(paragraphs) >= 1
         combined = "".join(p.text for p in paragraphs)
         assert "春天来了" in combined
@@ -415,12 +421,12 @@ class TestStepSplitText:
             "红艳艳的苹果挂满枝头，农民们开心地收获着一年的成果。"
         )
         pipeline = self._make_pipeline()
-        paragraphs = pipeline._step_split_text(text)
+        paragraphs = pipeline._split_text(text)
         assert len(paragraphs) >= 2
 
     def test_empty_text(self):
         pipeline = self._make_pipeline()
-        paragraphs = pipeline._step_split_text("")
+        paragraphs = pipeline._split_text("")
         assert len(paragraphs) == 0
 
 
