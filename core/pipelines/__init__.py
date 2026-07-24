@@ -235,8 +235,10 @@ class BasePipeline(ABC):
 
         # ── 2. 生成 SRT ──
         num_segments = len(segment_texts)
+        use_cue_timeline = getattr(subtitle_config, "use_cue_timeline", True)
+
         if subtitle_config.enabled and num_segments > 1:
-            # 按音频时长等比缩放段落时长
+            # 按音频时长等比缩放段落时长（场景时间轴/策略B 用；cues 路径计时本身不依赖缩放）
             total_est = sum(segment_durations)
             scaled_durations = list(segment_durations)
             if actual_audio_dur > 0 and total_est > 0:
@@ -247,10 +249,34 @@ class BasePipeline(ABC):
                     scale, actual_audio_dur, total_est,
                 )
 
-            srt_content = SubtitleGenerator._generate_scene_aware_srt(
-                segment_texts, scaled_durations,
-                word_cues=sub_maker if sub_maker is not None else None,
-            )
+            # cues 精确对齐（有 sub_maker 且开关开启）；否则回退 legacy 启发式
+            if sub_maker is not None and use_cue_timeline:
+                scene_start_times = []
+                acc = 0.0
+                for d in scaled_durations:
+                    scene_start_times.append(acc)
+                    acc += d
+                srt_content = SubtitleGenerator.generate_cue_aware_srt(
+                    sub_maker,
+                    segment_texts=segment_texts,
+                    scene_start_times=scene_start_times,
+                    scene_durations=scaled_durations,
+                    audio_duration=actual_audio_dur if actual_audio_dur > 0 else None,
+                )
+                if not srt_content.strip():
+                    # cues 不足（如 raw_cues 粒度过低）→ 回退 legacy
+                    logger.warning(
+                        "[Subtitle] cue-aware produced empty SRT, "
+                        "falling back to scene-aware"
+                    )
+                    srt_content = SubtitleGenerator._generate_scene_aware_srt(
+                        segment_texts, scaled_durations, word_cues=None,
+                    )
+            else:
+                srt_content = SubtitleGenerator._generate_scene_aware_srt(
+                    segment_texts, scaled_durations, word_cues=None,
+                )
+
             if srt_content.strip():
                 with open(srt_path, "w", encoding="utf-8") as f:
                     f.write(srt_content)

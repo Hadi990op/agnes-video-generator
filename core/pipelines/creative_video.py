@@ -1628,6 +1628,8 @@ class CreativeVideoPipeline(MultiScenePipeline):
         )
 
         sub_maker = None
+        subtitle_config = self._state.subtitle_config
+        harvest = bool(subtitle_config.enabled) and bool(subtitle_config.harvest_cues_when_audio_off)
         if audio_enabled and narration_text:
             edge_tts = EdgeTTSEngine()
             try:
@@ -1645,6 +1647,23 @@ class CreativeVideoPipeline(MultiScenePipeline):
                     output_path=combined_audio,
                     duration_sec=total_duration,
                 )
+        elif (not audio_enabled) and narration_text and harvest:
+            # 路径 B（v2.0）：音频关、字幕开 → 仅采集 cues，不落音频；silent 占位供合成
+            try:
+                edge_tts = EdgeTTSEngine()
+                sub_maker = await edge_tts.harvest_cues(
+                    text=narration_text,
+                    voice=self._state.audio_config.voice,
+                    rate=self._state.audio_config.rate,
+                )
+            except RuntimeError as e:
+                logger.warning(f"[Pipeline] harvest_cues failed, silent fallback: {e}")
+            silent_tts = SilentTTSEngine()
+            await silent_tts.generate(
+                text=narration_text or "placeholder",
+                output_path=combined_audio,
+                duration_sec=total_duration,
+            )
         else:
             silent_tts = SilentTTSEngine()
             await silent_tts.generate(

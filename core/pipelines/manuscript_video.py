@@ -389,6 +389,8 @@ class ManuscriptVideoPipeline(MultiScenePipeline):
         )
 
         sub_maker = None
+        subtitle_config = self._state.subtitle_config
+        harvest = bool(subtitle_config.enabled) and bool(subtitle_config.harvest_cues_when_audio_off)
         if audio_config.enabled:
             try:
                 audio_result, sub_maker = await edge_tts.generate(
@@ -403,6 +405,20 @@ class ManuscriptVideoPipeline(MultiScenePipeline):
                     text=full_text,
                     output_path=audio_path,
                 )
+        elif harvest:
+            # 路径 B（v2.0）：音频关、字幕开 → 仅采集 cues，不落音频；silent 占位供合成
+            try:
+                sub_maker = await edge_tts.harvest_cues(
+                    text=full_text,
+                    voice=audio_config.voice,
+                    rate=audio_config.rate,
+                )
+            except RuntimeError as e:
+                logger.warning(f"[Manuscript] harvest_cues failed, silent fallback: {e}")
+            audio_result, _ = await silent_tts.generate(
+                text=full_text,
+                output_path=audio_path,
+            )
         else:
             audio_result, sub_maker = await silent_tts.generate(
                 text=full_text,

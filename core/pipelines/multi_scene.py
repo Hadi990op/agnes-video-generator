@@ -271,6 +271,11 @@ class MultiScenePipeline(BasePipeline):
         await self._emit("audio", "running", f"生成配音 ({len(text)} 字)...", 0.75)
 
         sub_maker = None
+        # 路径 B（v2.0）：音频关但字幕开 → 仅采集 cues，不落音频（silent 占位供合成）
+        subtitle_config = self._state.subtitle_config if hasattr(self._state, "subtitle_config") else None
+        subtitle_enabled = bool(getattr(subtitle_config, "enabled", False))
+        harvest_cues = bool(getattr(subtitle_config, "harvest_cues_when_audio_off", True))
+
         if audio_config.enabled:
             try:
                 _, sub_maker = await edge_tts.generate(
@@ -283,6 +288,17 @@ class MultiScenePipeline(BasePipeline):
                     text=text, output_path=audio_path,
                     duration_sec=total_duration,
                 )
+        elif subtitle_enabled and harvest_cues:
+            try:
+                sub_maker = await edge_tts.harvest_cues(
+                    text=text, voice=audio_config.voice, rate=audio_config.rate,
+                )
+            except RuntimeError as e:
+                logger.warning(f"[MultiScene] harvest_cues failed, silent fallback: {e}")
+            await silent_tts.generate(
+                text=text, output_path=audio_path,
+                duration_sec=total_duration,
+            )
         else:
             await silent_tts.generate(
                 text=text, output_path=audio_path,

@@ -255,6 +255,30 @@ class TestManuscriptVideoPipeline(BasePipelineTest):
         await self._run_and_verify(ManuscriptVideoPipeline, state, temp_workdir)
 
     @pytest.mark.asyncio
+    async def test_manuscript_audio_off_subtitle_on(self, temp_workdir):
+        """稿件视频 — 路径 B：音频关、字幕开（仅采集 cues，不落音频字节）。
+
+        验证 v2.0 P1.5：harvest_cues 与音频输出解耦，sub_maker 驱动
+        generate_cue_aware_srt 产出带精确时间线的 SRT。
+        """
+        from core.pipelines.manuscript_video import ManuscriptVideoPipeline
+        state = await self._make_state(
+            audio_config=AudioConfig(enabled=False),
+            subtitle_config=SubtitleConfig(
+                enabled=True,
+                harvest_cues_when_audio_off=True,
+                use_cue_timeline=True,
+            ),
+        )
+        await self._run_and_verify(ManuscriptVideoPipeline, state, temp_workdir)
+        # 路径 B 应产出自带 cues 时间线的 SRT（mock harvest_cues 提供）
+        srt_path = os.path.join(temp_workdir, "full_subtitle.srt")
+        assert os.path.exists(srt_path), "path B should produce SRT"
+        content = open(srt_path, "r", encoding="utf-8").read().strip()
+        assert content, "path B SRT must not be empty"
+        assert "-->" in content, "path B SRT must contain timed entries"
+
+    @pytest.mark.asyncio
     async def test_manuscript_short_text(self, temp_workdir):
         """稿件视频 — 短文本（单段）。"""
         from core.pipelines.manuscript_video import ManuscriptVideoPipeline

@@ -256,6 +256,9 @@ class PoetryVideoPipeline(MultiScenePipeline):
         scenes = self._state.scenes
         audio_config = self._state.audio_config
         has_audio = audio_config.enabled
+        sub_config = self._state.subtitle_config
+        # v2.0：逐场景缓存 sub_maker（cues），供 _generate_subtitles 使用（不持久化）
+        self._scene_sub_makers: dict = {}
 
         for idx, scene in enumerate(scenes):
             scene_dir = os.path.join(self.working_dir, f"scene_{idx}")
@@ -274,6 +277,7 @@ class PoetryVideoPipeline(MultiScenePipeline):
                     duration_sec=max(int(scene.duration), 2),
                 )
                 scene.narration_audio = audio_path
+                self._scene_sub_makers[idx] = None
                 continue
 
             await self._emit(
@@ -288,10 +292,11 @@ class PoetryVideoPipeline(MultiScenePipeline):
             silent = SilentTTSEngine()
             min_dur = max(len(text) / self._AUDIO_MIN_CHARS_PER_SEC, 2.0)
 
+            sub_maker = None
             if has_audio:
                 try:
                     edge_tts = EdgeTTSEngine()
-                    await edge_tts.generate(
+                    _, sub_maker = await edge_tts.generate(
                         text=text, output_path=audio_path,
                         voice=audio_config.voice, rate=audio_config.rate,
                     )
@@ -308,17 +313,33 @@ class PoetryVideoPipeline(MultiScenePipeline):
                             text=text, output_path=audio_path,
                             duration_sec=max(int(scene.duration), int(min_dur)),
                         )
+                        sub_maker = None
                 except RuntimeError as e:
                     logger.warning(f"[Poetry] scene {idx} TTS failed: {e}, silent")
                     await silent.generate(
                         text=text, output_path=audio_path,
                         duration_sec=max(int(scene.duration), int(min_dur)),
                     )
+                    sub_maker = None
+            elif sub_config.enabled and sub_config.harvest_cues_when_audio_off:
+                # 路径 B（v2.0）：采集 cues，不落音频；silent 占位供合成
+                try:
+                    edge_tts = EdgeTTSEngine()
+                    sub_maker = await edge_tts.harvest_cues(
+                        text=text, voice=audio_config.voice, rate=audio_config.rate,
+                    )
+                except RuntimeError as e:
+                    logger.warning(f"[Poetry] scene {idx} harvest_cues failed: {e}")
+                await silent.generate(
+                    text=text, output_path=audio_path,
+                    duration_sec=max(int(scene.duration), int(min_dur)),
+                )
             else:
                 await silent.generate(
                     text=text, output_path=audio_path,
                     duration_sec=max(int(scene.duration), int(min_dur)),
                 )
+            self._scene_sub_makers[idx] = sub_maker
             scene.narration_audio = audio_path
 
         self.task_manager.update_state(
@@ -394,9 +415,14 @@ class PoetryVideoPipeline(MultiScenePipeline):
                 "subtitle", "running",
                 f"生成字幕 {idx+1}/{len(scenes)}...", 0.87,
             )
-            SubtitleGenerator.text_to_srt(
-                text, srt_path, duration_sec=dur, chars_per_sec=_CHARS_PER_SEC,
-            )
+            # v2.0：优先用该场景 cues 生成精确字幕；cues 缺失则回退纯文本估算
+            sub_maker = getattr(self, "_scene_sub_makers", {}).get(idx)
+            if sub_maker is not None and getattr(sub_maker, "cues", None):
+                SubtitleGenerator.cues_to_srt(sub_maker, srt_path)
+            if not (os.path.exists(srt_path) and os.path.getsize(srt_path) > 0):
+                SubtitleGenerator.text_to_srt(
+                    text, srt_path, duration_sec=dur, chars_per_sec=_CHARS_PER_SEC,
+                )
             scene.subtitle_srt = srt_path
 
         self.task_manager.update_state(

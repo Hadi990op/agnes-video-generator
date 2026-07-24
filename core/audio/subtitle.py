@@ -7,12 +7,13 @@ v3.0: 支持任意位置（四角/百分比/坐标）、逐场景精拆分、突
 """
 
 import datetime
+import itertools
 import logging
 import math
 import os
+import re as _re
 from typing import List, Optional, Tuple
 
-import re as _re
 import srt
 from moviepy import VideoFileClip, CompositeVideoClip
 from moviepy.video.tools.subtitles import SubtitlesClip
@@ -33,6 +34,8 @@ _MIN_WORD_CUES_FOR_FINE = 6
 _PROMINENT_DURATION_MULTIPLIER = 1.4
 # 突出检测：文本长度 ≤ 此值时视为"短句突出"
 _PROMINENT_MAX_CHARS = 12
+# 单段词级字幕的重叠缓冲（仅视觉缓冲，不再掩盖不同步）
+_FINE_OVERLAP_SEC = 0.12
 
 
 class SubtitleGenerator:
@@ -262,6 +265,28 @@ class SubtitleGenerator:
         if not items:
             return ""
 
+        # 复用统一分组逻辑（多段路径 generate_cue_aware_srt 也调用同一方法，保证一致性）
+        return SubtitleGenerator._group_items_to_srt(
+            items, max_duration=max_duration, max_chars=max_chars,
+            overlap_sec=_FINE_OVERLAP_SEC,
+        )
+
+    @staticmethod
+    def _group_items_to_srt(
+        items: List[Tuple[float, float, str]],
+        max_duration: float = _MAX_SUB_DURATION,
+        max_chars: int = _MAX_SUB_CHARS,
+        overlap_sec: float = 0.12,
+    ) -> str:
+        """将 [(start_s, end_s, text), ...] 贪心分组为可读字幕段（SRT 字符串）。
+
+        从 _generate_fine_srt_from_word_cues 抽出，单段/多段共用。
+        分组约束：≤ max_duration 秒、≤ max_chars 字符、词间停顿 >0.4s 断句。
+        保留尾部合并与突出时长加成逻辑。
+        """
+        if not items:
+            return ""
+
         # 计算词间停顿（gap），用于决定在哪里断开字幕组
         gaps = []
         for i in range(1, len(items)):
@@ -308,7 +333,6 @@ class SubtitleGenerator:
             groups.append((group_start_s, group_end_s, "".join(group_text_parts)))
 
         # 后处理：合并过短的尾部组
-        # 只在合并后不会导致前一组过长时才合并
         while len(groups) >= 2:
             last_dur = groups[-1][1] - groups[-1][0]
             last_chars = len(groups[-1][2])
@@ -316,7 +340,6 @@ class SubtitleGenerator:
             prev_chars = len(groups[-2][2])
             merged_dur = groups[-1][1] - groups[-2][0]
             merged_chars = prev_chars + last_chars
-            # 条件：尾部太短 且 合并后不超限
             if (last_dur < 0.8
                     and merged_dur <= max_duration * 1.2
                     and merged_chars <= max_chars * 1.5):
@@ -328,28 +351,25 @@ class SubtitleGenerator:
             else:
                 break
 
-        # ── 应用突出时长加成 ──
+        # 突出时长加成
         if groups:
             for gi, (s_s, e_s, txt) in enumerate(groups):
                 multiplier = SubtitleGenerator._detect_prominence(txt)
                 if multiplier > 1.0:
                     new_dur = (e_s - s_s) * multiplier
                     e_s = s_s + new_dur
-                    # 不超过下一个字幕的 end（容许突出字幕和后段重叠）
                     if gi + 1 < len(groups):
                         e_s = min(e_s, groups[gi + 1][1])
                     groups[gi] = (s_s, e_s, txt)
 
-        # ── 前后段重叠：每条字幕结束时间向后延伸 overlap_sec ──
-        _OVERLAP_SEC = 0.8
+        # 前后段重叠：每条字幕结束时间向后延伸 overlap_sec（仅视觉缓冲）
         for gi in range(len(groups) - 1):
             s_s, e_s, txt = groups[gi]
             next_e = groups[gi + 1][1]
-            new_e = min(e_s + _OVERLAP_SEC, next_e)
+            new_e = min(e_s + overlap_sec, next_e)
             if new_e > e_s:
                 groups[gi] = (s_s, new_e, txt)
 
-        # 生成 SRT
         entries = []
         for idx, (s_s, e_s, txt) in enumerate(groups, 1):
             if e_s - s_s < 0.3:
@@ -392,7 +412,7 @@ class SubtitleGenerator:
         word_cues: object = None,
         max_chars_per_group: int = _MAX_SUB_CHARS,
         scene_start_times: Optional[List[float]] = None,
-        overlap_sec: float = 0.8,
+        overlap_sec: float = 0.12,
     ) -> str:
         """为每个场景/段落生成细粒度 SRT，支持场景内再拆分为子段。
 
@@ -507,6 +527,177 @@ class SubtitleGenerator:
                 global_idx += 1
 
         return "\n".join(entries)
+
+    @staticmethod
+    def _scene_char_ranges(segment_texts: List[str]) -> "Optional[list]":
+        """计算各场景在「归一化整段文本」中的字符区间 [c_start, c_end)。
+
+        归一化：去除空白与所有非「单词字符/中日韩汉字」的符号，仅保留读音文本，
+        使 cues 的累计归一化字符位置能与场景文本对齐（免疫 TTS 插入的停顿/标点漂移）。
+
+        Returns:
+            每场景的 (c_start, c_end) 列表；segment_texts 为空时返回 None。
+        """
+        if not segment_texts:
+            return None
+        norm_len = lambda x: len(_re.sub(r"\s+|[^\w\u4e00-\u9fff]", "", x))
+        ranges = []
+        cum = 0
+        for t in segment_texts:
+            n = norm_len(t)
+            if n == 0:
+                ranges.append((cum, cum))
+            else:
+                ranges.append((cum, cum + n))
+                cum += n
+        return ranges
+
+    @staticmethod
+    def generate_cue_aware_srt(
+        word_cues: object,
+        segment_texts: List[str],
+        scene_start_times: "Optional[list]" = None,
+        scene_durations: "Optional[list]" = None,
+        max_duration: float = _MAX_SUB_DURATION,
+        max_chars: int = _MAX_SUB_CHARS,
+        overlap_sec: float = 0.12,
+        audio_duration: "Optional[float]" = None,
+    ) -> str:
+        """基于 edge_tts 词级 cues 的精确时间线对齐字幕生成（替代 _generate_scene_aware_srt）。
+
+        原理：cues 是合成音频的源头时间线（音频从 t=0 连续播放，最终成片时间轴 =
+        音频时间轴），因此每个 cue 的时间即其在成片中的显示时间，无需额外偏移。
+        本方法仅负责「按场景归属 + 段内分组」，使字幕断句与场景切换对齐，且每句
+        时间戳贴合真实朗读位置。
+
+        场景归属两种策略：
+          - 策略 A（默认，文本锚定）：按各场景归一化字符区间归属 cues，免疫 TTS 在
+            场景间插入的停顿漂移。
+          - 策略 B（兜底，时间区间）：当 segment_texts 无法还原整段文本时，用
+            scene_start_times / scene_durations 累加得到的时间区间归属。
+
+        Args:
+            word_cues: edge_tts SubMaker（含 .cues）。
+            segment_texts: 各场景旁白文本（有序）。
+            scene_start_times: 各场景在成片时间轴的起始秒（策略 B 用）。
+            scene_durations: 各场景时长（策略 B 用，未给 scene_start_times 时累加）。
+            max_duration / max_chars: 段内分组约束。
+            overlap_sec: 段间重叠缓冲（仅视觉）。
+            audio_duration: 实际音频时长，用于把最后一条 cue 钳制到音频尾部（残余归一化）。
+
+        Returns:
+            SRT 字符串；cues 不足时返回空串，由调用方回退 legacy。
+        """
+        raw_cues = getattr(word_cues, "cues", None) or []
+        if not raw_cues:
+            return ""
+
+        # 1) cues → (start, end, text) 三元组（音频时间轴）
+        items = []
+        for cue in raw_cues:
+            s = SubtitleGenerator._cue_total_seconds(cue.start)
+            e = SubtitleGenerator._cue_total_seconds(cue.end)
+            t = (cue.content or "").strip()
+            if t:
+                items.append((s, e, t))
+        if not items:
+            return ""
+
+        # 残余归一化：把最后一条 cue 的 end 钳到实际音频时长（避免尾差留白未覆盖）
+        if audio_duration and audio_duration > 0 and items[-1][1] > audio_duration:
+            items[-1] = (items[-1][0], audio_duration, items[-1][2])
+
+        n = len(segment_texts)
+        if n == 0:
+            return ""
+
+        # 2) 场景归属
+        scene_char_ranges = SubtitleGenerator._scene_char_ranges(segment_texts)
+        if scene_char_ranges is not None:
+            # 策略 A：文本锚定。累计归一化字符位置，定位每个 cue 所属场景。
+            norm_len = lambda x: len(_re.sub(r"\s+|[^\w\u4e00-\u9fff]", "", x))
+            cue_char_pos = []
+            run = 0
+            for _, _, t in items:
+                run += norm_len(t)
+                cue_char_pos.append(run)
+            scene_cue_idx = [[] for _ in range(n)]
+            for ci, cp in enumerate(cue_char_pos):
+                for si in range(n):
+                    c0, c1 = scene_char_ranges[si]
+                    if c0 <= cp <= c1:
+                        scene_cue_idx[si].append(ci)
+                        break
+                else:
+                    # 落在场景间隙（理论极少）：归属到累计位置最近的场景
+                    best = 0
+                    best_diff = abs(scene_char_ranges[0][1] - cp)
+                    for si in range(n):
+                        diff = abs((scene_char_ranges[si][0] + scene_char_ranges[si][1]) / 2 - cp)
+                        if diff < best_diff:
+                            best_diff = diff
+                            best = si
+                    scene_cue_idx[best].append(ci)
+        else:
+            # 策略 B：时间区间兜底
+            if scene_start_times is not None:
+                starts = list(scene_start_times)
+            elif scene_durations is not None:
+                starts = list(itertools.accumulate(scene_durations, initial=0.0))[:-1]
+            else:
+                starts = [0.0] * n
+            scene_cue_idx = [[] for _ in range(n)]
+            for ci, (s, _, _) in enumerate(items):
+                placed = False
+                for si in range(n):
+                    s0 = starts[si]
+                    s1 = starts[si + 1] if si + 1 < len(starts) else items[-1][1] + 1.0
+                    if s0 <= s < s1:
+                        scene_cue_idx[si].append(ci)
+                        placed = True
+                        break
+                if not placed:
+                    scene_cue_idx[-1].append(ci)
+
+        # 3) 逐场景：取 cues 子集（保持时间序）→ 段内分组 → 直接沿用 cues 时间（offset=0）
+        entries = []
+        global_idx = 1
+        for si in range(n):
+            idxs = scene_cue_idx[si]
+            if not idxs:
+                continue
+            scene_items = [items[ci] for ci in idxs]
+            local_srt = SubtitleGenerator._group_items_to_srt(
+                scene_items, max_duration=max_duration, max_chars=max_chars,
+                overlap_sec=overlap_sec,
+            )
+            try:
+                subs = list(srt.parse(local_srt))
+            except Exception:
+                subs = []
+            for sub in subs:
+                entries.append((global_idx, sub.start, sub.end, sub.content))
+                global_idx += 1
+
+        # 残余归一化：把所有字幕时间钳到实际音频时长内，
+        # 覆盖「突出时长加成」可能把末句 end 拉出音频尾部的情况
+        if audio_duration and audio_duration > 0:
+            ad = datetime.timedelta(seconds=audio_duration)
+            clamped = []
+            for idx, s, e, t in entries:
+                s = min(s, ad)
+                e = min(e, ad)
+                if e <= s:
+                    e = s + datetime.timedelta(seconds=0.3)
+                clamped.append((idx, s, e, t))
+            entries = clamped
+
+        entries.sort(key=lambda x: x[1])
+        return "\n".join(
+            f"{idx}\n{SubtitleGenerator.cue_to_srt_time(s.total_seconds())} --> "
+            f"{SubtitleGenerator.cue_to_srt_time(e.total_seconds())}\n{t}\n"
+            for idx, s, e, t in entries
+        )
 
     @staticmethod
     def cues_to_srt(cues, output_path: str) -> str:
