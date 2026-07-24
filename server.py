@@ -35,6 +35,7 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse, JSONResponse
 
 from core.config import get_api_key, set_api_key, delete_api_key, get_api_key_source, get_working_dir, DURATION_FRAME_MAP, get_workspaces, add_workspace, remove_workspace, set_active_workspace, get_active_workspace, REGRESSION_WORKING_DIR_ENV, get_watermark_config, set_watermark_config, WATERMARK_PROMO_TEXT_ZH, WATERMARK_PROMO_TEXT_EN, get_selected_models, set_selected_models
+from core.path_security import safe_join, safe_workspace_path, UnsafePathError
 from core.audio.voices import (
     get_voice_catalog,
     get_voice_lang,
@@ -257,9 +258,14 @@ os.makedirs(VOICE_PREVIEW_CACHE_DIR, exist_ok=True)
 
 
 def _preview_cache_key(voice_id: str, text: str) -> str:
-    """生成试听缓存文件名：{voice_id}__{md5(text)}.mp3"""
+    """生成试听缓存文件名：{md5(voice_id)}__{md5(text)}.mp3
+
+    对 voice_id 一并做哈希，避免用户可控的 voice_id（可能含路径分隔符 / ``..``）
+    流入缓存文件路径造成路径穿越。
+    """
+    voice_hash = hashlib.md5(voice_id.encode("utf-8")).hexdigest()
     text_hash = hashlib.md5(text.encode("utf-8")).hexdigest()
-    return f"{voice_id}__{text_hash}"
+    return f"{voice_hash}__{text_hash}"
 
 
 async def _get_or_generate_preview(voice_id: str, text: str) -> str:
@@ -474,7 +480,14 @@ async def create_workspace(path: str = Form(...), name: str = Form("")):
     """添加一个工作目录。"""
     if not path.strip():
         raise HTTPException(status_code=422, detail="path 不能为空")
-    entry = add_workspace(path.strip(), name.strip())
+    try:
+        safe_path = safe_workspace_path(path.strip())
+    except UnsafePathError:
+        raise HTTPException(
+            status_code=422,
+            detail="工作目录路径不合法或超出允许范围（可由 AGNES_WORKSPACE_ROOT 环境变量放宽）",
+        )
+    entry = add_workspace(safe_path, name.strip())
     os.makedirs(entry["path"], exist_ok=True)
     os.makedirs(os.path.join(entry["path"], "uploads"), exist_ok=True)
     return {"ok": True, "workspace": entry, "active_workspace": get_active_workspace()}
@@ -497,7 +510,13 @@ async def activate_workspace(path: str = Form(...)):
     if not path.strip():
         raise HTTPException(status_code=422, detail="path 不能为空")
     try:
-        active = set_active_workspace(path.strip())
+        safe_path = safe_workspace_path(path.strip())
+        active = set_active_workspace(safe_path)
+    except UnsafePathError:
+        raise HTTPException(
+            status_code=422,
+            detail="工作目录路径不合法或超出允许范围（可由 AGNES_WORKSPACE_ROOT 环境变量放宽）",
+        )
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e))
     os.makedirs(active, exist_ok=True)
@@ -783,7 +802,10 @@ async def get_task(task_id: str):
 @app.get("/api/video/{task_id}")
 async def serve_video(task_id: str):
     dir_name = _find_dir_name(task_id)
-    task_dir = os.path.join(get_working_dir(), dir_name)
+    try:
+        task_dir = safe_join(get_working_dir(), dir_name)
+    except UnsafePathError:
+        raise HTTPException(status_code=404, detail="Video not found")
     video_path = os.path.join(task_dir, "final_video.mp4")
     if not os.path.exists(video_path):
         raise HTTPException(status_code=404, detail="Video not found")
@@ -860,7 +882,7 @@ async def serve_artifact_file(task_id: str, artifact_id: str):
         raise HTTPException(status_code=403, detail="Access denied")
 
     media_type = _ARTIFACT_MEDIA_TYPES.get(artifact.category, "application/octet-stream")
-    return FileResponse(abs_path, media_type=media_type)
+    return FileResponse(real_abs_path, media_type=media_type)
 
 
 @app.get("/api/tasks/{task_id}/artifacts/{artifact_id}/cascade-preview")
@@ -1911,7 +1933,8 @@ async def cleanup_regression():
                 shutil.rmtree(dir_path)
                 removed_dirs += 1
             except OSError as e:
-                errors.append(f"删除目录失败 {dir_name}: {e}")
+                logger.warning(f"[Cleanup] 删除目录失败 {dir_name}: {e}")
+                errors.append(f"删除目录失败: {dir_name}")
 
     # 2. 清理上传文件
     for fname in manifest.get("uploads", []):
@@ -1921,7 +1944,8 @@ async def cleanup_regression():
                 os.remove(fpath)
                 removed_files += 1
             except OSError as e:
-                errors.append(f"删除上传文件失败 {fname}: {e}")
+                logger.warning(f"[Cleanup] 删除上传文件失败 {fname}: {e}")
+                errors.append(f"删除上传文件失败: {fname}")
 
     # 3. 清理报告文件
     for rel_path in manifest.get("reports", []):
@@ -1931,7 +1955,8 @@ async def cleanup_regression():
                 os.remove(abs_path)
                 removed_files += 1
             except OSError as e:
-                errors.append(f"删除报告失败 {rel_path}: {e}")
+                logger.warning(f"[Cleanup] 删除报告失败 {rel_path}: {e}")
+                errors.append(f"删除报告失败: {rel_path}")
 
     # 4. 清理服务器日志
     log_rel = manifest.get("server_log", "")
@@ -1942,14 +1967,16 @@ async def cleanup_regression():
                 os.remove(log_path)
                 removed_files += 1
             except OSError as e:
-                errors.append(f"删除日志失败: {e}")
+                logger.warning(f"[Cleanup] 删除日志失败: {e}")
+                errors.append("删除日志失败")
 
     # 5. 清理清单本身
     try:
         os.remove(manifest_path)
         removed_files += 1
     except OSError as e:
-        errors.append(f"删除清单失败: {e}")
+        logger.warning(f"[Cleanup] 删除清单失败: {e}")
+        errors.append("删除清单失败")
 
     scenarios_cleaned = len(manifest.get("scenarios", {}))
     logger.info(
