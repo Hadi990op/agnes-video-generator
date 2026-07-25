@@ -1,4 +1,4 @@
-name: Release Docker Image
+name: Release
 
 # 触发：推送 v* 标签（如 v4.0.0）自动构建多平台镜像并发布
 on:
