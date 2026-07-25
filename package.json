@@ -1,0 +1,36 @@
+{
+  "name": "free-short-video",
+  "version": "0.0.0",
+  "description": "Free AI short-video generator — run the full Agnes Video Generator service locally with one command. Text-to-video, image generation, Edge-TTS narration, subtitles, and compositing, all free.",
+  "bin": {
+    "free-short-video": "bin/cli.js",
+    "fsv": "bin/cli.js"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "scripts": {
+    "start": "node bin/cli.js"
+  },
+  "keywords": [
+    "video",
+    "short-video",
+    "ai",
+    "text-to-video",
+    "image-generation",
+    "tts",
+    "subtitle",
+    "generator",
+    "free"
+  ],
+  "author": "",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/lcy362/agnes-video-generator.git"
+  },
+  "homepage": "https://github.com/lcy362/agnes-video-generator#readme",
+  "bugs": {
+    "url": "https://github.com/lcy362/agnes-video-generator/issues"
+  }
+}

@@ -151,7 +151,7 @@ One-click launch, operate entirely in the browser. Interface available in **13 l
 ### Prerequisites
 
 - Python 3.10+
-- ffmpeg (for video concatenation and audio processing)
+- ffmpeg — required only for **manual setup** (Option A); the Docker (Option B) and npm (Option C) options bundle ffmpeg automatically, so no system ffmpeg install is needed there.
 
 That's it. No GPU, no large RAM, a regular laptop is all you need.
 
@@ -225,7 +225,28 @@ cd agnes-video-generator
 AGNES_API_KEY=<your-key> docker compose up -d
 ```
 
-### Option C: AI Agent Assisted Setup
+### Option C: npm (One Command)
+
+If you have **Node.js 18+** and **Python 3.10+** installed, the whole service ships as an npm package — no cloning, no manual venv:
+
+```bash
+# Run directly without installing
+npx free-short-video
+
+# Or install globally, then run
+npm install -g free-short-video
+free-short-video          # short alias: fsv
+```
+
+On first run the launcher automatically creates a local virtual environment, installs Python dependencies, wires up a bundled `ffmpeg` (via `imageio-ffmpeg`, so no system ffmpeg needed), starts the server on `http://localhost:8765`, and opens your browser. Pass your key through the environment or set it later in the Web UI:
+
+```bash
+AGNES_API_KEY=<your-key> npx free-short-video
+```
+
+Options: `--port <n>`, `--host <h>` (use `0.0.0.0` for LAN access), `--no-open`.
+
+### Option D: AI Agent Assisted Setup
 
 This project is designed for AI coding assistants. First, download the code and prepare your API key:
 

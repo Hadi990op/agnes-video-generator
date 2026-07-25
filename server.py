@@ -2003,7 +2003,11 @@ async def cleanup_regression():
 if __name__ == "__main__":
     import uvicorn
 
-    config = uvicorn.Config(app, host="0.0.0.0", port=8765, log_level="info")
+    # 允许通过环境变量覆盖监听地址/端口（npm 启动器 free-short-video 会注入）
+    # 默认值保持向后兼容：0.0.0.0:8765
+    _HOST = os.environ.get("HOST", "0.0.0.0")
+    _PORT = int(os.environ.get("PORT", "8765"))
+    config = uvicorn.Config(app, host=_HOST, port=_PORT, log_level="info")
     server = uvicorn.Server(config)
 
     original_handle_exit = server.handle_exit
