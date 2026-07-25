@@ -177,6 +177,22 @@ jobs:
             - The image already declares `VOLUME` for both paths, so `docker run -p 8765:8765 <image>` (no `-v`) keeps data only while you reuse the same container (`stop`/`start`); recreating the container starts fresh.
             - `AGNES_API_KEY` can also be set later in the Web UI; it is then stored in the mounted config volume.
 
+            ## npm
+
+            Use `npx` for a one-shot run or install globally:
+
+            ```bash
+            # Quick run (no install):
+            npx free-short-video
+
+            # Global install:
+            npm install -g free-short-video
+            free-short-video
+            ```
+
+            > Requires Python 3.10+ and ffmpeg on your system.
+            > On first run, a Python virtual environment is auto-created and dependencies are installed.
+
   # ── npm 包发布（整个项目 = free-short-video）──
   # 与 Docker 镜像同由 v* 标签触发；未配置 NPM_TOKEN 时自动跳过，不影响 Docker 发布。
   # 发布的是仓库根目录的 package.json（files 白名单包含全部 Python 源码 + 字体），
@@ -199,6 +215,12 @@ jobs:
         run: |
           TAG="${GITHUB_REF_NAME#v}"
           npm pkg set version="$TAG"
+
+      - name: Prepare npm README (add Quick Start at top)
+        run: |
+          cp README.md /tmp/README.orig.md
+          printf '## Quick Start (npm)\n\n```bash\nnpx free-short-video\n```\n\nOr install globally:\n\n```bash\nnpm install -g free-short-video\nfree-short-video\n```\n\n> Requires Python 3.10+ and ffmpeg.\n\n' > /tmp/npm-header.md
+          cat /tmp/npm-header.md /tmp/README.orig.md > README.md
 
       - name: Publish to npm
         env:

@@ -24,7 +24,7 @@ def main() -> int:
     # Docker Hub caps the short `description` at 100 bytes. Exceeding it
     # rejects the ENTIRE PATCH (including full_description), so we keep this
     # concise and defensively truncate on a character boundary just in case.
-    desc = "Free Short Video — Self-hosted AI video generator with subtitles"
+    desc = "free-short-video — Self-hosted AI video generator with subtitles"
     while len(desc.encode("utf-8")) > 100:
         desc = desc[:-1]
 
@@ -47,8 +47,22 @@ def main() -> int:
     readme_lines = readme.split("\n")
     for i, line in enumerate(readme_lines):
         if line.startswith("# ") and "Agnes Video Generator" in line:
-            readme_lines[i] = line.replace("Agnes Video Generator", "Free Short Video", 1)
+            readme_lines[i] = line.replace("Agnes Video Generator", "free-short-video", 1)
             break
+    # Prepend Docker Quick Start at the very beginning of the page, after the H1.
+    docker_usage = (
+        "---\n\n"
+        "## Quick Start (Docker)\n\n"
+        "```bash\n"
+        "docker run -d -p 8765:8765 \\\n"
+        "  -e AGNES_API_KEY=<your-key> \\\n"
+        "  -v ~/agnes-data/working:/app/.working_dir \\\n"
+        "  lcy362/free-short-video:latest\n"
+        "```\n\n"
+        "Then open **http://localhost:8765**.\n\n"
+        "---\n"
+    )
+    readme_lines.insert(1, docker_usage)
     readme = "\n".join(readme_lines)
 
     # Docker Hub caps full_description; truncate at a newline before the limit.
