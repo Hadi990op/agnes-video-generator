@@ -86,6 +86,54 @@ class EdgeTTSEngine(TTSEngine):
                 logger.error(f"[TTS] edge_tts failed after {max_attempts} attempts: {e}")
                 raise RuntimeError(f"EdgeTTS generation failed: {e}") from e
 
+    async def harvest_cues(
+        self, text: str, voice: str = "zh-CN-XiaoxiaoNeural", rate: str = "+0%"
+    ) -> "edge_tts.SubMaker":
+        """仅采集逐词时间戳，不生成/不落盘音频字节（路径 B：音频关、字幕开）。
+
+        edge_tts 的 WordBoundary 与音频数据交织于同一 stream，需消费完整 stream
+        才能收齐全部 cues；本方法只把 WordBoundary/SentenceBoundary 喂给 SubMaker，
+        音频数据直接丢弃。返回含 .cues 的 sub_maker，供 generate_cue_aware_srt 使用。
+
+        字幕只需时间线真值，不需音频字节——这正是「cues 采集」与「音频输出」解耦的核心。
+
+        Args:
+            text: 要朗读的文本
+            voice: edge_tts 语音角色
+            rate: 语速调节
+
+        Returns:
+            含逐词 cues 的 edge_tts.SubMaker 实例
+
+        Raises:
+            RuntimeError: 采集失败时抛出，调用方应降级到 SilentTTSEngine（字幕回退 legacy）。
+        """
+        logger.info(
+            f"[TTS] Harvesting cues only: voice={voice}, rate={rate}, text={len(text)} chars..."
+        )
+
+        max_attempts = 2
+        for attempt in range(max_attempts):
+            try:
+                communicate = edge_tts.Communicate(text, voice=voice, rate=rate)
+                sub_maker = edge_tts.SubMaker()
+                async for chunk in communicate.stream():
+                    if chunk["type"] in ("WordBoundary", "SentenceBoundary"):
+                        sub_maker.feed(chunk)
+                cue_count = len(getattr(sub_maker, "cues", []) or [])
+                logger.info(f"[TTS] Cues harvested: {cue_count} cues")
+                return sub_maker
+            except Exception as e:
+                if attempt < max_attempts - 1:
+                    logger.warning(
+                        f"[TTS] harvest_cues attempt {attempt + 1}/{max_attempts} "
+                        f"failed: {e}, retrying..."
+                    )
+                    await asyncio.sleep(3)
+                    continue
+                logger.error(f"[TTS] harvest_cues failed after {max_attempts} attempts: {e}")
+                raise RuntimeError(f"EdgeTTS cue harvest failed: {e}") from e
+
 
 class SilentTTSEngine(TTSEngine):
     """静音占位 TTS 引擎。

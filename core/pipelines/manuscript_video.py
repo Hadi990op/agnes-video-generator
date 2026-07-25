@@ -377,7 +377,10 @@ class ManuscriptVideoPipeline(MultiScenePipeline):
         if os.path.exists(audio_path) and os.path.getsize(audio_path) > 0:
             self._state.combined_audio = audio_path
             logger.info("[Manuscript] audio: file already exists, skipping")
-            return None
+            # 续传：音频已存在则仅重采 cues，避免字幕退回 legacy 启发式
+            return await self._recover_sub_maker(
+                full_text, self._state.audio_config, self._state.subtitle_config,
+            )
 
         edge_tts = EdgeTTSEngine()
         silent_tts = SilentTTSEngine()
@@ -389,6 +392,8 @@ class ManuscriptVideoPipeline(MultiScenePipeline):
         )
 
         sub_maker = None
+        subtitle_config = self._state.subtitle_config
+        harvest = bool(subtitle_config.enabled) and bool(subtitle_config.harvest_cues_when_audio_off)
         if audio_config.enabled:
             try:
                 audio_result, sub_maker = await edge_tts.generate(
@@ -403,6 +408,20 @@ class ManuscriptVideoPipeline(MultiScenePipeline):
                     text=full_text,
                     output_path=audio_path,
                 )
+        elif harvest:
+            # 路径 B（v2.0）：音频关、字幕开 → 仅采集 cues，不落音频；silent 占位供合成
+            try:
+                sub_maker = await edge_tts.harvest_cues(
+                    text=full_text,
+                    voice=audio_config.voice,
+                    rate=audio_config.rate,
+                )
+            except RuntimeError as e:
+                logger.warning(f"[Manuscript] harvest_cues failed, silent fallback: {e}")
+            audio_result, _ = await silent_tts.generate(
+                text=full_text,
+                output_path=audio_path,
+            )
         else:
             audio_result, sub_maker = await silent_tts.generate(
                 text=full_text,

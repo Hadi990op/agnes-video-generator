@@ -87,6 +87,10 @@ class SubtitleConfig(BaseModel):
 
     enabled: bool = True
     style: SubtitleStyle = Field(default_factory=SubtitleStyle)
+    # v2.0 字幕对齐：启用 edge_tts cues 精确时间线（False=回退 legacy 启发式）
+    use_cue_timeline: bool = True
+    # v2.0 路径 B：音频关但字幕开时，仍采集 cues（丢弃音频字节）；False=退回纯估算
+    harvest_cues_when_audio_off: bool = True
 
 
 class AudioConfig(BaseModel):

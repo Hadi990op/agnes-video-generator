@@ -21,7 +21,7 @@ from core.api.agnes_video import AgnesVideoAPI
 from core.audio.tts import EdgeTTSEngine, SilentTTSEngine
 from core.compositor.concatenator import VideoConcatenator
 from core.pipelines import MultiScenePipeline, PipelineShutdown
-from core.screenwriter import Screenwriter
+from core.screenwriter import Screenwriter, clean_narration_text
 from models.task import CreativeVideoTask, SceneTask, StepStatus, SubtitleConfig
 
 _CHARS_PER_SEC = 4.0
@@ -1541,6 +1541,12 @@ class CreativeVideoPipeline(MultiScenePipeline):
         single_narration = self._state.narrations[0] if self._state.narrations else ""
 
         if single_narration and len(single_narration) > 5:
+            # 续传复用已有旁白：再清洗一次，修复历史脏数据（元数据/Markdown 结构）
+            cleaned = clean_narration_text(single_narration)
+            if cleaned and cleaned != single_narration:
+                logger.info("[Pipeline] Step generate_narrations: re-cleaned existing narration")
+                self._state.narrations = [cleaned]
+                self.task_manager.update_state(narrations=[cleaned])
             logger.info("[Pipeline] Step generate_narrations: SKIP (narration already populated)")
             return
 
@@ -1559,9 +1565,9 @@ class CreativeVideoPipeline(MultiScenePipeline):
         )
 
         if not narration or len(narration) < 5:
-            logger.warning("[Pipeline] LLM returned empty narration, using fallback")
+            logger.warning("[Pipeline] LLM returned empty/short narration, using cleaned story fallback")
             max_chars = max(int(total_duration * _CHARS_PER_SEC), 40)
-            narration = _trim_to_sentence(story, max_chars) if story else ""
+            narration = clean_narration_text(_trim_to_sentence(story, max_chars)) if story else ""
 
         self._state.narrations = [narration]
         self.task_manager.update_state(narrations=[narration])
@@ -1611,7 +1617,11 @@ class CreativeVideoPipeline(MultiScenePipeline):
             logger.info("[Pipeline] Step audio: SKIP (file exists)")
             self._state.step_audio = StepStatus.COMPLETED
             self.task_manager.update_step("step_audio", StepStatus.COMPLETED)
-            return None
+            # 续传：音频已存在则仅重采 cues，避免字幕退回 legacy 启发式
+            return await self._recover_sub_maker(
+                self._state.narrations[0] if self._state.narrations else "",
+                self._state.audio_config, self._state.subtitle_config,
+            )
 
         audio_enabled = self._state.audio_config.enabled
         narration_text = self._state.narrations[0] if self._state.narrations else ""
@@ -1628,6 +1638,8 @@ class CreativeVideoPipeline(MultiScenePipeline):
         )
 
         sub_maker = None
+        subtitle_config = self._state.subtitle_config
+        harvest = bool(subtitle_config.enabled) and bool(subtitle_config.harvest_cues_when_audio_off)
         if audio_enabled and narration_text:
             edge_tts = EdgeTTSEngine()
             try:
@@ -1645,6 +1657,23 @@ class CreativeVideoPipeline(MultiScenePipeline):
                     output_path=combined_audio,
                     duration_sec=total_duration,
                 )
+        elif (not audio_enabled) and narration_text and harvest:
+            # 路径 B（v2.0）：音频关、字幕开 → 仅采集 cues，不落音频；silent 占位供合成
+            try:
+                edge_tts = EdgeTTSEngine()
+                sub_maker = await edge_tts.harvest_cues(
+                    text=narration_text,
+                    voice=self._state.audio_config.voice,
+                    rate=self._state.audio_config.rate,
+                )
+            except RuntimeError as e:
+                logger.warning(f"[Pipeline] harvest_cues failed, silent fallback: {e}")
+            silent_tts = SilentTTSEngine()
+            await silent_tts.generate(
+                text=narration_text or "placeholder",
+                output_path=combined_audio,
+                duration_sec=total_duration,
+            )
         else:
             silent_tts = SilentTTSEngine()
             await silent_tts.generate(

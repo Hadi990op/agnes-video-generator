@@ -4,6 +4,7 @@
 """
 
 import asyncio
+import datetime
 import json
 import logging
 import os
@@ -274,6 +275,22 @@ class MockRateLimiter:
     def acquire(self): pass
 
 
+class _FakeCue:
+    """mock 用的最小化 cue：仅含 generate_cue_aware_srt 需要的字段。"""
+
+    def __init__(self, start: float, end: float, content: str):
+        self.start = datetime.timedelta(seconds=start)
+        self.end = datetime.timedelta(seconds=end)
+        self.content = content
+
+
+class _FakeSubMaker:
+    """mock 用的最小化 SubMaker：仅含 .cues。"""
+
+    def __init__(self, cues):
+        self.cues = cues
+
+
 class MockEdgeTTSEngine:
     """模拟 Edge TTS（路由到静音，不发起任何 HTTP 请求）。
 
@@ -289,3 +306,20 @@ class MockEdgeTTSEngine:
         total_duration = max(len(text) / 4.0, 2.0)
         return await silent.generate(text=text, output_path=output_path,
                                       duration_sec=total_duration)
+
+    async def harvest_cues(self, text: str, voice: str = "zh-CN-XiaoxiaoNeural",
+                           rate: str = "+0%"):
+        """仅采集逐词时间戳（mock，路径 B 用）。
+
+        不发起网络请求：按原文非空白字符顺序生成 fake cues，时序线性贴合，
+        使 generate_cue_aware_srt 的策略 A（文本锚定）能正确归属场景。
+        """
+        cues = []
+        t = 0.0
+        step = 0.4
+        for ch in text:
+            if ch.strip() == "":
+                continue
+            cues.append(_FakeCue(t, t + step, ch))
+            t += step
+        return _FakeSubMaker(cues)

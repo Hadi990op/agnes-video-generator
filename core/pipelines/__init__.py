@@ -235,8 +235,10 @@ class BasePipeline(ABC):
 
         # ── 2. 生成 SRT ──
         num_segments = len(segment_texts)
+        use_cue_timeline = getattr(subtitle_config, "use_cue_timeline", True)
+
         if subtitle_config.enabled and num_segments > 1:
-            # 按音频时长等比缩放段落时长
+            # 按音频时长等比缩放段落时长（场景时间轴/策略B 用；cues 路径计时本身不依赖缩放）
             total_est = sum(segment_durations)
             scaled_durations = list(segment_durations)
             if actual_audio_dur > 0 and total_est > 0:
@@ -247,10 +249,34 @@ class BasePipeline(ABC):
                     scale, actual_audio_dur, total_est,
                 )
 
-            srt_content = SubtitleGenerator._generate_scene_aware_srt(
-                segment_texts, scaled_durations,
-                word_cues=sub_maker if sub_maker is not None else None,
-            )
+            # cues 精确对齐（有 sub_maker 且开关开启）；否则回退 legacy 启发式
+            if sub_maker is not None and use_cue_timeline:
+                scene_start_times = []
+                acc = 0.0
+                for d in scaled_durations:
+                    scene_start_times.append(acc)
+                    acc += d
+                srt_content = SubtitleGenerator.generate_cue_aware_srt(
+                    sub_maker,
+                    segment_texts=segment_texts,
+                    scene_start_times=scene_start_times,
+                    scene_durations=scaled_durations,
+                    audio_duration=actual_audio_dur if actual_audio_dur > 0 else None,
+                )
+                if not srt_content.strip():
+                    # cues 不足（如 raw_cues 粒度过低）→ 回退 legacy
+                    logger.warning(
+                        "[Subtitle] cue-aware produced empty SRT, "
+                        "falling back to scene-aware"
+                    )
+                    srt_content = SubtitleGenerator._generate_scene_aware_srt(
+                        segment_texts, scaled_durations, word_cues=None,
+                    )
+            else:
+                srt_content = SubtitleGenerator._generate_scene_aware_srt(
+                    segment_texts, scaled_durations, word_cues=None,
+                )
+
             if srt_content.strip():
                 with open(srt_path, "w", encoding="utf-8") as f:
                     f.write(srt_content)
@@ -326,6 +352,34 @@ class BasePipeline(ABC):
         """检查是否需要停止流水线，收到停止信号则抛出 PipelineShutdown。"""
         if self._is_shutdown():
             raise PipelineShutdown("Pipeline shutdown requested")
+
+    async def _recover_sub_maker(
+        self, narration_text: str, audio_config, subtitle_config
+    ) -> object:
+        """音频文件已存在、TTS 步骤被跳过时，若字幕需要 cues 则仅重新采集 cues。
+
+        续传场景下 ``_step_audio`` 常因音频文件已存在而跳过，导致 ``sub_maker``
+        丢失，进而字幕退回 legacy 启发式（v2.0 cue 精确对齐失效）。此方法在不重新
+        生成音频字节的前提下，仅消费 TTS 流采集 WordBoundary cues，恢复精确时间线。
+
+        Returns:
+            SubMaker cues 对象；不需要或失败时返回 None。
+        """
+        if not narration_text:
+            return None
+        use_cue = getattr(subtitle_config, "use_cue_timeline", True)
+        if not (getattr(subtitle_config, "enabled", False) and use_cue):
+            return None
+        try:
+            from core.audio.tts import EdgeTTSEngine
+            return await EdgeTTSEngine().harvest_cues(
+                text=narration_text,
+                voice=getattr(audio_config, "voice", ""),
+                rate=getattr(audio_config, "rate", "+0%"),
+            )
+        except RuntimeError as e:
+            logger.warning("[Subtitle] recover sub_maker via harvest_cues failed: %s", e)
+            return None
 
     @staticmethod
     def _make_curl(video_id: str) -> str:

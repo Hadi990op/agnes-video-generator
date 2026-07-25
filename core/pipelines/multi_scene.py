@@ -254,7 +254,13 @@ class MultiScenePipeline(BasePipeline):
         if os.path.exists(audio_path) and os.path.getsize(audio_path) > 0:
             self._state.combined_audio = audio_path
             logger.info("[MultiScene] audio: file already exists, skipping")
-            return None
+            # 续传：音频已存在则仅重采 cues，避免字幕退回 legacy 启发式
+            text = self._get_narration_text()
+            return await self._recover_sub_maker(
+                text,
+                self._state.audio_config if hasattr(self._state, "audio_config") else AudioConfig(),
+                self._state.subtitle_config if hasattr(self._state, "subtitle_config") else None,
+            )
 
         text = self._get_narration_text()
         if not text:
@@ -271,6 +277,11 @@ class MultiScenePipeline(BasePipeline):
         await self._emit("audio", "running", f"生成配音 ({len(text)} 字)...", 0.75)
 
         sub_maker = None
+        # 路径 B（v2.0）：音频关但字幕开 → 仅采集 cues，不落音频（silent 占位供合成）
+        subtitle_config = self._state.subtitle_config if hasattr(self._state, "subtitle_config") else None
+        subtitle_enabled = bool(getattr(subtitle_config, "enabled", False))
+        harvest_cues = bool(getattr(subtitle_config, "harvest_cues_when_audio_off", True))
+
         if audio_config.enabled:
             try:
                 _, sub_maker = await edge_tts.generate(
@@ -283,6 +294,17 @@ class MultiScenePipeline(BasePipeline):
                     text=text, output_path=audio_path,
                     duration_sec=total_duration,
                 )
+        elif subtitle_enabled and harvest_cues:
+            try:
+                sub_maker = await edge_tts.harvest_cues(
+                    text=text, voice=audio_config.voice, rate=audio_config.rate,
+                )
+            except RuntimeError as e:
+                logger.warning(f"[MultiScene] harvest_cues failed, silent fallback: {e}")
+            await silent_tts.generate(
+                text=text, output_path=audio_path,
+                duration_sec=total_duration,
+            )
         else:
             await silent_tts.generate(
                 text=text, output_path=audio_path,
