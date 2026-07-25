@@ -257,7 +257,10 @@ class AnchorPipeline(MultiScenePipeline):
         if os.path.exists(audio_path) and os.path.getsize(audio_path) > 0:
             self._state.combined_audio = audio_path
             logger.info("[Anchor] audio: file already exists, skipping")
-            return None
+            # 续传：音频已存在则仅重采 cues，避免字幕退回 legacy 启发式
+            return await self._recover_sub_maker(
+                full_text, self._state.audio_config, self._state.subtitle_config,
+            )
 
         audio_config = self._state.audio_config
         edge_tts = EdgeTTSEngine()

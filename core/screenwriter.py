@@ -33,6 +33,68 @@ def _xml_escape(text: str) -> str:
     return html.escape(text, quote=True)
 
 
+# ----------------------------------------------------------------------
+# 旁白文本清洗：防止 LLM 把结构化文档（标题/受众/大纲等元数据）当旁白念出
+# ----------------------------------------------------------------------
+
+# 元数据行前缀（中英文），命中则整行丢弃
+_NARRATION_METADATA_PREFIXES = (
+    "故事标题", "目标受众", "故事大纲", "角色介绍", "主要角色", "故事梗概",
+    "故事正文", "故事设定", "内容风格", "视频类型",
+    "story title", "target audience", "story outline", "main character",
+    "character introduction", "full story narrative", "synopsis", "logline",
+    "content style", "video type",
+)
+_NARRATION_HEADING_RE = re.compile(r"^\s{0,3}#{1,6}\s+")
+_NARRATION_BULLET_RE = re.compile(r"^\s*[-*]\s+")
+# 元数据字段行：**字段**：值（定义列表项，典型的文档结构而非旁白）
+_NARRATION_FIELD_RE = re.compile(r"^\*\*.+?\*\*[:：]")
+
+
+def clean_narration_text(text: str) -> str:
+    """清洗 LLM 返回的旁白文本，去除 Markdown 结构与元数据行。
+
+    用于防止把 ``# 故事标题`` / ``## 目标受众`` / ``**受众**：…`` 等文档结构
+    当作旁白念出，只保留纯叙事正文，并合并为**单独的一段纯文本**（配音不需要换行）。
+
+    清洗规则：
+        - 丢弃 ``**字段**：值`` 形式的元数据字段行（定义列表项）
+        - 去除 Markdown 标题符号（``#`` / ``##`` …）
+        - 去除加粗符号（``**``）与列表符号（``- `` / ``* ``）
+        - 丢弃以元数据前缀开头的整行（标题/受众/大纲/角色等）
+        - 合并为单行连续文本，压缩多余空白
+
+    若清洗后文本过短（< 5 字），返回空串交由调用方回退。
+    """
+    if not text:
+        return ""
+    out_lines: list[str] = []
+    for line in text.split("\n"):
+        s = line.strip()
+        if not s:
+            continue
+        s = _NARRATION_HEADING_RE.sub("", s).strip()   # 去标题 #
+        if not s:
+            continue
+        s = _NARRATION_BULLET_RE.sub("", s).strip()     # 去列表符号
+        if not s:
+            continue
+        # 元数据字段行：**字段**：值（如 **受众**：16-35岁…）
+        if _NARRATION_FIELD_RE.match(s):
+            continue
+        s = s.replace("**", "").strip()                 # 去加粗
+        if not s:
+            continue
+        low = s.lower()
+        if any(low.startswith(p) for p in _NARRATION_METADATA_PREFIXES):
+            continue
+        out_lines.append(s)
+    # 合并为一段连续旁白（配音不需要换行）
+    result = "".join(out_lines)
+    result = re.sub(r"\s{2,}", " ", result).strip()
+    return result
+
+
 class Screenwriter:
     def __init__(self, api_key: str, model: str = "agnes-2.0-flash", language: str = None):
         self.api_key = api_key
@@ -1367,8 +1429,13 @@ The target length is approximately {max_chars} characters total.
             f"[Screenwriter] Generating narration for video "
             f"(max {max_chars} chars, {total_duration:.0f}s total, {scene_count} scenes)..."
         )
-        narration = strip_code_fence(self._chat(system_prompt, user_prompt))
-        logger.info(f"[Screenwriter] Narration: {narration[:80]}... ({len(narration)} chars)")
+        raw = strip_code_fence(self._chat(system_prompt, user_prompt))
+        # 清洗：剥离 LLM 可能回显的 Markdown 标题/加粗与元数据（故事标题/受众/大纲等）
+        narration = clean_narration_text(raw)
+        logger.info(
+            f"[Screenwriter] Narration: {narration[:80]!r} "
+            f"({len(narration)} chars, raw={len(raw)})"
+        )
         return narration
 
     def generate_subtitle_styles(

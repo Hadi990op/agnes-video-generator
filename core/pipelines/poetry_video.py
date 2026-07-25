@@ -20,7 +20,7 @@ from core.audio.subtitle import SubtitleGenerator
 from core.audio.tts import EdgeTTSEngine, SilentTTSEngine
 from core.compositor.concatenator import VideoConcatenator
 from core.pipelines import MultiScenePipeline
-from core.screenwriter import Screenwriter
+from core.screenwriter import Screenwriter, clean_narration_text
 from models.task import (
     PoetryVideoTask,
     SceneTask,
@@ -214,7 +214,8 @@ class PoetryVideoPipeline(MultiScenePipeline):
 
         scenes: List[SceneTask] = []
         for idx, sc in enumerate(raw_scenes):
-            narration = (sc.get("narration") or "").strip()
+            # 清洗旁白：剥离 LLM 可能回显的 Markdown 结构/元数据，保留原诗句
+            narration = clean_narration_text(sc.get("narration") or "").strip()
             prompt = (sc.get("scene_prompt") or "").strip()
             # 用户在该索引提供了分镜（可能含诗句）→ 覆盖对应字段
             if idx < len(user_scenes):
@@ -264,12 +265,16 @@ class PoetryVideoPipeline(MultiScenePipeline):
             scene_dir = os.path.join(self.working_dir, f"scene_{idx}")
             os.makedirs(scene_dir, exist_ok=True)
             audio_path = os.path.join(scene_dir, "narration.mp3")
+            text = (scene.narration_text or "").strip()
 
             if os.path.exists(audio_path) and os.path.getsize(audio_path) > 0:
                 scene.narration_audio = audio_path
+                # 续传：音频已存在则仅重采该场景 cues，避免字幕退回纯文本估算
+                self._scene_sub_makers[idx] = await self._recover_sub_maker(
+                    text, self._state.audio_config, self._state.subtitle_config,
+                )
                 continue
 
-            text = (scene.narration_text or "").strip()
             if not text:
                 silent = SilentTTSEngine()
                 await silent.generate(

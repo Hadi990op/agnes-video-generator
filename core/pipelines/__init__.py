@@ -353,6 +353,34 @@ class BasePipeline(ABC):
         if self._is_shutdown():
             raise PipelineShutdown("Pipeline shutdown requested")
 
+    async def _recover_sub_maker(
+        self, narration_text: str, audio_config, subtitle_config
+    ) -> object:
+        """音频文件已存在、TTS 步骤被跳过时，若字幕需要 cues 则仅重新采集 cues。
+
+        续传场景下 ``_step_audio`` 常因音频文件已存在而跳过，导致 ``sub_maker``
+        丢失，进而字幕退回 legacy 启发式（v2.0 cue 精确对齐失效）。此方法在不重新
+        生成音频字节的前提下，仅消费 TTS 流采集 WordBoundary cues，恢复精确时间线。
+
+        Returns:
+            SubMaker cues 对象；不需要或失败时返回 None。
+        """
+        if not narration_text:
+            return None
+        use_cue = getattr(subtitle_config, "use_cue_timeline", True)
+        if not (getattr(subtitle_config, "enabled", False) and use_cue):
+            return None
+        try:
+            from core.audio.tts import EdgeTTSEngine
+            return await EdgeTTSEngine().harvest_cues(
+                text=narration_text,
+                voice=getattr(audio_config, "voice", ""),
+                rate=getattr(audio_config, "rate", "+0%"),
+            )
+        except RuntimeError as e:
+            logger.warning("[Subtitle] recover sub_maker via harvest_cues failed: %s", e)
+            return None
+
     @staticmethod
     def _make_curl(video_id: str) -> str:
         """生成用于查询视频状态的 curl 命令（供调试/续传）。"""

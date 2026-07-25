@@ -254,7 +254,13 @@ class MultiScenePipeline(BasePipeline):
         if os.path.exists(audio_path) and os.path.getsize(audio_path) > 0:
             self._state.combined_audio = audio_path
             logger.info("[MultiScene] audio: file already exists, skipping")
-            return None
+            # 续传：音频已存在则仅重采 cues，避免字幕退回 legacy 启发式
+            text = self._get_narration_text()
+            return await self._recover_sub_maker(
+                text,
+                self._state.audio_config if hasattr(self._state, "audio_config") else AudioConfig(),
+                self._state.subtitle_config if hasattr(self._state, "subtitle_config") else None,
+            )
 
         text = self._get_narration_text()
         if not text:
