@@ -1,7 +1,7 @@
 {
   "name": "free-short-video",
   "version": "0.0.0",
-  "description": "Free AI short-video generator — run the full Agnes Video Generator service locally with one command. Text-to-video, image generation, Edge-TTS narration, subtitles, and compositing, all free.",
+  "description": "Free AI short-video generator — run the full Free Short Video service locally with one command. Text-to-video, image generation, Edge-TTS narration, subtitles, and compositing, all free.",
   "bin": {
     "free-short-video": "bin/cli.js",
     "fsv": "bin/cli.js"

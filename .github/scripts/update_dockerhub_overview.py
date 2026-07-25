@@ -23,7 +23,8 @@ def main() -> int:
 
     # Docker Hub description cap: 100 bytes. Use a hand-written concise summary.
     desc = (
-        "Self-hosted AI video generator — "
+        "Free Short Video — "
+        "Self-hosted AI video generator: "
         "create multi-scene videos with narration and subtitles."
     )
 
@@ -39,6 +40,16 @@ def main() -> int:
             break
     if not readme:
         readme = desc
+
+    # Brand the Docker Hub overview title as "Free Short Video" without altering
+    # the source README (which keeps the project name "Agnes Video Generator").
+    # Only the top-level H1 line is rewritten; body mentions of "Agnes AI" stay.
+    readme_lines = readme.split("\n")
+    for i, line in enumerate(readme_lines):
+        if line.startswith("# ") and "Agnes Video Generator" in line:
+            readme_lines[i] = line.replace("Agnes Video Generator", "Free Short Video", 1)
+            break
+    readme = "\n".join(readme_lines)
 
     # Docker Hub caps full_description; truncate at a newline before the limit.
     limit = 24000
