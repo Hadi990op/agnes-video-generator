@@ -21,12 +21,12 @@ def main() -> int:
     user = os.environ["DH_USER"]
     token = os.environ["DH_TOKEN"]
 
-    # Docker Hub description cap: 100 bytes. Use a hand-written concise summary.
-    desc = (
-        "Free Short Video — "
-        "Self-hosted AI video generator: "
-        "create multi-scene videos with narration and subtitles."
-    )
+    # Docker Hub caps the short `description` at 100 bytes. Exceeding it
+    # rejects the ENTIRE PATCH (including full_description), so we keep this
+    # concise and defensively truncate on a character boundary just in case.
+    desc = "Free Short Video — Self-hosted AI video generator with subtitles"
+    while len(desc.encode("utf-8")) > 100:
+        desc = desc[:-1]
 
     image = os.environ.get("IMAGE_NAME", "free-short-video")
     repo_path = f"{user}/{image}"
