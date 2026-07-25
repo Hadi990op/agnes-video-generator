@@ -12,6 +12,7 @@ import tempfile
 from typing import Optional
 
 from core.config import get_working_dir
+from core.path_security import safe_join, UnsafePathError
 from models.task import (
     AnyTaskState,
     BaseTaskState,
@@ -38,11 +39,22 @@ class TaskManager:
     def __init__(self, task_id: str, dir_name: str = None):
         self.task_id = task_id
         self.dir_name = dir_name or task_id
-        self.task_dir = os.path.join(get_working_dir(), self.dir_name)
-        self._task_file = os.path.join(self.task_dir, "task_state.json")
+        # Path-injection hardening: ensure the task directory can never escape the
+        # working directory, even if task_id/dir_name come from untrusted input
+        # (e.g. a URL path parameter). Unsafe values make the task unresolvable
+        # (load() returns None -> callers respond 404) instead of leaking files.
+        try:
+            self.task_dir = safe_join(get_working_dir(), self.dir_name)
+        except UnsafePathError:
+            self.task_dir = None
+        self._task_file = (
+            os.path.join(self.task_dir, "task_state.json") if self.task_dir else None
+        )
         self._state: Optional[BaseTaskState] = None
 
     def _ensure_dir(self):
+        if not self.task_dir:
+            return
         os.makedirs(self.task_dir, exist_ok=True)
 
     def create(self, state: BaseTaskState) -> BaseTaskState:
@@ -61,7 +73,7 @@ class TaskManager:
         向后兼容：旧数据无 task_type → 自动视为 CreativeVideoTask（D6）。
         注意：load 是读操作，不调用 _ensure_dir()，避免为不存在的任务创建空目录。
         """
-        if not os.path.exists(self._task_file):
+        if not self._task_file or not os.path.exists(self._task_file):
             return None
 
         try:
@@ -119,7 +131,7 @@ class TaskManager:
         P13: 使用 tempfile.mkstemp 生成唯一临时文件名，避免多写者竞争。
         """
         self._ensure_dir()
-        if self._state:
+        if self._state and self._task_file:
             task_dir = os.path.dirname(self._task_file)
             tmp_fd, tmp_path = tempfile.mkstemp(dir=task_dir, suffix=".tmp")
             try:
@@ -171,7 +183,7 @@ class TaskManager:
 
     def exists(self) -> bool:
         """检查任务状态文件是否存在。"""
-        return os.path.exists(self._task_file)
+        return bool(self._task_file) and os.path.exists(self._task_file)
 
     def list_tasks(self) -> list:
         """列举所有任务（包含 task_type 字段，v2.0 增强）。"""

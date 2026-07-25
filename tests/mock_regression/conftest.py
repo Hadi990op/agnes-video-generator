@@ -21,6 +21,8 @@ from .mock_apis import (
     MockRateLimiter,
 )
 
+from core.config import REGRESSION_WORKING_DIR_ENV
+
 logging.basicConfig(level=logging.WARNING)
 
 
@@ -106,6 +108,19 @@ def temp_workdir(tmp_path):
     workdir = tmp_path / "agnes_test"
     workdir.mkdir()
     return str(workdir)
+
+
+@pytest.fixture(autouse=True)
+def _regression_working_dir(temp_workdir, monkeypatch):
+    """将 get_working_dir() 指向测试临时目录。
+
+    TaskManager 现在用 safe_join() 做路径穿越防护：task_dir = safe_join(working目录, dir_name)。
+    测试以绝对路径 temp_workdir 作为 dir_name 传入，等价于“任务目录就是这个绝对路径”。
+    把 AGNES_REGRESSION_WORKING_DIR 设为 realpath(temp_workdir)，使 safe_join 的
+    root 与 dir_name 同源（os.path.join 对绝对第二部分会采用 dir_name 本身，再通过
+    realpath 与 root 一致性检查），从而既通过防护又不改变测试期望的任务目录。
+    """
+    monkeypatch.setenv(REGRESSION_WORKING_DIR_ENV, os.path.realpath(temp_workdir))
 
 
 @pytest.fixture

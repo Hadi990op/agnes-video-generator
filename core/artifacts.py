@@ -24,6 +24,9 @@ from models.task import (
     StepStatus,
 )
 
+from core.config import get_working_dir
+from core.path_security import safe_join
+
 
 # ═══════════════════════════════════════════════════════════════
 # 数据类
@@ -271,6 +274,10 @@ def list_artifacts(state: BaseTaskState, task_dir: str) -> list[ArtifactDescript
     defs = _get_artifact_defs(state)
     if not defs:
         return []
+
+    # Path-injection hardening: ensure the task directory stays within the working
+    # directory even if it originated from untrusted input downstream.
+    task_dir = safe_join(get_working_dir(), task_dir)
 
     # 获取场景/段落数量
     if isinstance(state, CreativeVideoTask):
