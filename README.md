@@ -246,6 +246,42 @@ AGNES_API_KEY=<your-key> npx free-short-video
 
 Options: `--port <n>`, `--host <h>` (use `0.0.0.0` for LAN access), `--no-open`.
 
+#### ffmpeg: bundled by default, or install your own
+
+With the npm package you normally **don't need to install ffmpeg yourself** — the launcher (`bin/cli.js`) automatically installs `imageio-ffmpeg` (a static ffmpeg binary, now an explicit dependency in `requirements.txt`) into the local venv and prepends its directory to `PATH`, so every `ffmpeg` call inside the Python service resolves to the bundled binary. This works out of the box on macOS, Linux, and Windows.
+
+**If you prefer to install ffmpeg on your system** (recommended for production / maximum stability — your system ffmpeg takes precedence over the bundled one because it appears earlier on `PATH`):
+
+```bash
+# macOS
+brew install ffmpeg
+
+# Ubuntu / Debian
+sudo apt update && sudo apt install ffmpeg
+
+# CentOS / RHEL (requires RPM Fusion)
+sudo dnf install ffmpeg
+
+# Windows (Chocolatey)
+choco install ffmpeg
+
+# Windows (Scoop)
+scoop install ffmpeg
+```
+
+Or download a build from <https://ffmpeg.org/download.html> and add it to your `PATH`. Verify with:
+
+```bash
+ffmpeg -version
+```
+
+**Risks if you do NOT install a system ffmpeg (i.e. rely solely on the bundled `imageio-ffmpeg`):**
+
+- **Platform / architecture support** — `imageio-ffmpeg` ships pre-built binaries only for common platforms (macOS x86_64/arm64, Linux x86_64/arm64, Windows x64). On niche or very old architectures a matching wheel may not exist, and the bundled binary would be missing.
+- **Single source of truth** — all ffmpeg capability comes from that one static binary. If its install/extract fails (disk permissions, corruption), the failure only surfaces **when you generate a video**, not at server startup — the error is a low-level `FileNotFoundError: 'ffmpeg'`, which is harder to diagnose than a startup check.
+- **Pinned version** — the bundled ffmpeg is locked to whatever version `imageio-ffmpeg` ships (e.g. ffmpeg 7.1); you can't easily upgrade it on your own.
+- **Mitigation** — for production or stability-critical use, install a system ffmpeg as shown above; the bundled one then acts only as a fallback.
+
 ### Option D: AI Agent Assisted Setup
 
 This project is designed for AI coding assistants. First, download the code and prepare your API key:
