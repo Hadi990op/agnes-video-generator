@@ -57,15 +57,15 @@ jobs:
           pip install -r requirements.txt -r requirements-dev.txt
 
       - name: Run tests with coverage
-        # --cov-fail-under=50：覆盖率跌破当前基线（55%）即判红，防静默退化。
-        # 补完 artifacts.py / server.py 等单测后可逐步上调。
+        # --cov-fail-under=55：覆盖率跌破当前基线（58%）即判红，防静默退化。
+        # 补完 server.py / config.py 等单测后可逐步上调（目标 65）。
         run: |
           python -m pytest tests/ \
             --cov=core --cov=models --cov=utils \
             --cov-report=term-missing \
             --cov-report=xml:coverage.xml \
             --cov-report=html:htmlcov \
-            --cov-fail-under=50
+            --cov-fail-under=55
 
       - name: Publish coverage to job summary
         # 即使 --cov-fail-under 判红（上一步非零退出），本步仍运行，
