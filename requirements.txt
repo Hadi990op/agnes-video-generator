@@ -11,3 +11,8 @@ python-multipart>=0.0.6,<1.0.0
 # v2.0 新增
 edge_tts>=6.1.0,<8.0.0          # Azure Edge TTS，免费无需 API Key
 srt>=3.5.0,<4.0.0               # SRT 字幕解析/生成工具
+
+# 静态 ffmpeg 二进制，替代系统 ffmpeg。
+# 显式声明后，npm 包（bin/cli.js）与 Docker 均能在无宿主机 ffmpeg 时一键拿到二进制，
+# 用户无需另行安装系统级 ffmpeg。此前仅靠 moviepy 的传递依赖隐式引入，存在断裂风险。
+imageio-ffmpeg>=0.2.0,<1.0.0
