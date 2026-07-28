@@ -17,10 +17,9 @@ import requests
 
 from core.api.error_collector import collect_error, collect_error_from_exception
 from core.api.rate_limiter import get_rate_limiter
+from core.config import get_agnes_base_url
 
 logger = logging.getLogger(__name__)
-
-BASE_URL = "https://apihub.agnes-ai.com/v1"
 
 # 重试配置
 _MAX_RETRIES = 3
@@ -111,7 +110,7 @@ class AgnesChatAPI:
             try:
                 get_rate_limiter().acquire()
                 resp = requests.post(
-                    f"{BASE_URL}/chat/completions",
+                    f"{get_agnes_base_url()}/chat/completions",
                     headers=self.headers,
                     json=payload,
                     timeout=timeout,

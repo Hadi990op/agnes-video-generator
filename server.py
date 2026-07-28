@@ -34,7 +34,7 @@ from fastapi import FastAPI, UploadFile, File, Form, HTTPException
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse, JSONResponse
 
-from core.config import get_api_key, set_api_key, delete_api_key, get_api_key_source, get_working_dir, DURATION_FRAME_MAP, get_workspaces, add_workspace, remove_workspace, set_active_workspace, get_active_workspace, REGRESSION_WORKING_DIR_ENV, get_watermark_config, set_watermark_config, WATERMARK_PROMO_TEXT_ZH, WATERMARK_PROMO_TEXT_EN, get_selected_models, set_selected_models
+from core.config import get_api_key, set_api_key, delete_api_key, get_api_key_source, get_working_dir, DURATION_FRAME_MAP, get_workspaces, add_workspace, remove_workspace, set_active_workspace, get_active_workspace, REGRESSION_WORKING_DIR_ENV, get_watermark_config, set_watermark_config, WATERMARK_PROMO_TEXT_ZH, WATERMARK_PROMO_TEXT_EN, get_selected_models, set_selected_models, get_agnes_domain, set_agnes_domain, AGNES_DOMAIN_MAP
 from core.path_security import safe_join, safe_workspace_path, UnsafePathError
 from core.audio.voices import (
     get_voice_catalog,
@@ -369,6 +369,8 @@ async def get_config():
         "watermark_promo_zh": WATERMARK_PROMO_TEXT_ZH,
         "watermark_promo_en": WATERMARK_PROMO_TEXT_EN,
         "models": get_selected_models(),
+        "agnes_domain": get_agnes_domain(),
+        "agnes_domains": list(AGNES_DOMAIN_MAP.keys()),
     }
     return data
 
@@ -459,6 +461,28 @@ async def save_watermark_config(enabled: bool = Form(False)):
     """Save watermark toggle."""
     set_watermark_config(enabled=enabled)
     return {"ok": True, "enabled": enabled}
+
+
+# ═══════════════════════════════════════════════════
+# 域名配置（v6.0）
+# ═══════════════════════════════════════════════════
+
+
+@app.post("/api/config/domain")
+async def save_agnes_domain(domain: str = Form(...)):
+    """设置 Agnes API 域名后缀。
+
+    Args:
+        domain: "com" 或 "cn"
+    """
+    domain = domain.strip().lower()
+    if domain not in AGNES_DOMAIN_MAP:
+        raise HTTPException(
+            status_code=422,
+            detail=f"域名后缀必须为 {list(AGNES_DOMAIN_MAP.keys())} 之一",
+        )
+    set_agnes_domain(domain)
+    return {"ok": True, "agnes_domain": domain}
 
 
 # ═══════════════════════════════════════════════════

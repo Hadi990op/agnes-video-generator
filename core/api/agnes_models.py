@@ -8,18 +8,14 @@ import logging
 
 import requests
 
-from core.api.agnes_chat import BASE_URL
 from core.config import (
     DEFAULT_TEXT_MODEL,
     DEFAULT_IMAGE_MODEL,
     DEFAULT_VIDEO_MODEL,
+    get_agnes_base_url,
 )
 
 logger = logging.getLogger(__name__)
-
-# 带 beta 开关的模型列表端点：裸 /v1/models 会被网关过滤掉内测模型，
-# 加 ?all=true（等价 X-Beta-Access: true / ?include_beta=true）才会返回全量（含 2.5-flash）。
-MODELS_ENDPOINT = f"{BASE_URL}/models?all=true"
 
 REQUEST_TIMEOUT = 20
 
@@ -56,8 +52,9 @@ def fetch_available_models(api_key: str) -> dict:
         接口失败（网络/鉴权/非 200）时返回硬编码兜底列表。
     """
     try:
+        endpoint = f"{get_agnes_base_url()}/models?all=true"
         resp = requests.get(
-            MODELS_ENDPOINT,
+            endpoint,
             headers={"Authorization": f"Bearer {api_key}"},
             timeout=REQUEST_TIMEOUT,
         )

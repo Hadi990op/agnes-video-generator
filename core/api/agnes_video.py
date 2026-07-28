@@ -13,12 +13,10 @@ import requests
 
 from core.api.error_collector import collect_error, collect_error_from_exception
 from core.api.rate_limiter import get_rate_limiter
+from core.config import get_agnes_base_url, get_agnes_api_root
 from utils.video import download_video
 
 logger = logging.getLogger(__name__)
-
-BASE_URL = "https://apihub.agnes-ai.com/v1"
-API_ROOT = "https://apihub.agnes-ai.com"
 
 DURATION_PRESETS = {
     5: (121, 24),
@@ -140,7 +138,7 @@ class AgnesVideoAPI:
                 await asyncio.to_thread(get_rate_limiter().acquire)
                 resp = await asyncio.to_thread(
                     requests.post,
-                    f"{BASE_URL}/images/generations",
+                    f"{get_agnes_base_url()}/images/generations",
                     headers=self.headers,
                     json=payload,
                     timeout=(30, 120),
@@ -213,7 +211,7 @@ class AgnesVideoAPI:
         start_time = asyncio.get_event_loop().time()
         curl_cmd = (
             f'curl -s -H "Authorization: Bearer $AGNES_API_KEY" '
-            f'"{API_ROOT}/agnesapi?video_id={video_id}"'
+            f'"{get_agnes_api_root()}/agnesapi?video_id={video_id}"'
         )
         while True:
             # M2: 每次轮询前检查停止信号
@@ -244,7 +242,7 @@ class AgnesVideoAPI:
                 resp = await asyncio.wait_for(
                     asyncio.to_thread(
                         requests.get,
-                        f"{API_ROOT}/agnesapi?video_id={video_id}",
+                        f"{get_agnes_api_root()}/agnesapi?video_id={video_id}",
                         headers=self.headers,
                         timeout=15,
                     ),
@@ -319,7 +317,7 @@ class AgnesVideoAPI:
                 resp = await asyncio.wait_for(
                     asyncio.to_thread(
                         requests.post,
-                        f"{BASE_URL}/videos",
+                        f"{get_agnes_base_url()}/videos",
                         headers=self.headers,
                         json=payload,
                         timeout=(15, 60),
