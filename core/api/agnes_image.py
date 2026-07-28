@@ -82,7 +82,7 @@ class AgnesImageAPI:
         prompt: str,
         reference_image_paths: List[str] = [],
         size: Optional[str] = None,
-        max_retries: int = 3,
+        max_retries: int = 4,
         retry_base_delay: float = 20.0,
         **kwargs,
     ) -> ImageOutput:
@@ -114,8 +114,8 @@ class AgnesImageAPI:
             try:
                 # 全局限速：在发起 HTTP 请求前获取令牌
                 await asyncio.to_thread(get_rate_limiter().acquire)
-                # 动态超时：第一次 60s，后续逐步增加
-                read_timeout = 60 * (attempt + 1)
+                # 动态超时：第一次 120s，后续逐步增加（图像生成较慢，放宽读超时）
+                read_timeout = 120 * (attempt + 1)
                 resp = await asyncio.to_thread(
                     requests.post,
                     f"{get_agnes_base_url()}/images/generations",
