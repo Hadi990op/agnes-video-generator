@@ -80,7 +80,7 @@ class AgnesVideoAPI:
             _URL_CACHE_MAX_AGE = 3600  # 1 小时
             if os.path.exists(url_file):
                 try:
-                    with open(url_file, "r") as f:
+                    with open(url_file, "r", encoding="utf-8") as f:
                         cache_data = json.loads(f.read())
                     cached_url = cache_data.get("url", "")
                     cached_ts = cache_data.get("ts", 0)
@@ -105,7 +105,7 @@ class AgnesVideoAPI:
                 try:
                     cache_data = {"url": url, "ts": time.time()}
                     tmp_file = url_file + ".tmp"
-                    with open(tmp_file, "w") as f:
+                    with open(tmp_file, "w", encoding="utf-8") as f:
                         json.dump(cache_data, f)
                         f.flush()
                         os.fsync(f.fileno())

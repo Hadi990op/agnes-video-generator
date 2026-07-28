@@ -374,7 +374,7 @@ class ReportManager:
         # 原子写：先写 .tmp 再 os.replace，避免崩溃/中断时损坏续传依据
         # （与 RegressionManifest.save 保持一致，见 fix_plan_v2.md B4.4）
         tmp = self.path + ".tmp"
-        with open(tmp, "w") as f:
+        with open(tmp, "w", encoding="utf-8") as f:
             json.dump(self.data, f, ensure_ascii=False, indent=2)
         os.replace(tmp, self.path)
 
@@ -568,7 +568,7 @@ class ReportManager:
 
         content = "\n".join(lines)
         os.makedirs(os.path.dirname(report_md_path), exist_ok=True)
-        with open(report_md_path, "w") as f:
+        with open(report_md_path, "w", encoding="utf-8") as f:
             f.write(content)
         logger.info(f"MD 报告: {report_md_path}")
 
@@ -673,7 +673,7 @@ class ReportManager:
 
         content = "\n".join(lines)
         os.makedirs(os.path.dirname(issues_md_path), exist_ok=True)
-        with open(issues_md_path, "w") as f:
+        with open(issues_md_path, "w", encoding="utf-8") as f:
             f.write(content)
         logger.info(f"问题清单: {issues_md_path}")
 
@@ -740,7 +740,7 @@ class RegressionManifest:
         self.data["updated_at"] = datetime.now(timezone.utc).isoformat()
         os.makedirs(os.path.dirname(self.path), exist_ok=True)
         tmp = self.path + ".tmp"
-        with open(tmp, "w") as f:
+        with open(tmp, "w", encoding="utf-8") as f:
             json.dump(self.data, f, indent=2, ensure_ascii=False)
         os.replace(tmp, self.path)
 

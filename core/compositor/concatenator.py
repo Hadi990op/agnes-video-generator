@@ -534,7 +534,7 @@ class VideoConcatenator:
         # Step 3: Build concat file list for ffmpeg
         loop_dir = os.path.dirname(output_path)
         concat_file = os.path.join(loop_dir, "_anchor_concat.txt")
-        with open(concat_file, "w") as f:
+        with open(concat_file, "w", encoding="utf-8") as f:
             for _ in range(n):
                 f.write(f"file '{clip_path}'\n")
 

@@ -233,7 +233,7 @@ class CreativeVideoPipeline(MultiScenePipeline):
         if self._state.step_image_analysis == StepStatus.COMPLETED:
             analysis_file = self._state.image_analysis_file
             if os.path.exists(analysis_file):
-                with open(analysis_file, "r") as f:
+                with open(analysis_file, "r", encoding="utf-8") as f:
                     content = f.read()
                 # 检测之前分析失败留下的错误文本，强制重新分析
                 if "(分析失败" in content:
@@ -273,7 +273,7 @@ class CreativeVideoPipeline(MultiScenePipeline):
         )
 
         analysis_file = os.path.join(self.working_dir, "image_analysis.txt")
-        with open(analysis_file, "w") as f:
+        with open(analysis_file, "w", encoding="utf-8") as f:
             f.write(image_context)
 
         self._state.step_image_analysis = StepStatus.COMPLETED
@@ -411,7 +411,7 @@ class CreativeVideoPipeline(MultiScenePipeline):
             story_path = self._state.story_file
             if os.path.exists(story_path):
                 logger.info("[Pipeline] Step story: SKIP (already completed, file exists)")
-                with open(story_path, "r") as f:
+                with open(story_path, "r", encoding="utf-8") as f:
                     return f.read()
             logger.warning("[Pipeline] Step story: marked completed but file missing, re-running")
 
@@ -428,7 +428,7 @@ class CreativeVideoPipeline(MultiScenePipeline):
         )
 
         story_path = os.path.join(self.working_dir, "story.txt")
-        with open(story_path, "w") as f:
+        with open(story_path, "w", encoding="utf-8") as f:
             f.write(story)
 
         self._state.step_story = StepStatus.COMPLETED
@@ -481,7 +481,7 @@ class CreativeVideoPipeline(MultiScenePipeline):
         if os.path.exists(ref_img_path) and os.path.exists(ref_prompt_path):
             self._state.step_character_ref = StepStatus.COMPLETED
             self._state.character_ref_file = ref_img_path
-            with open(ref_prompt_path, "r") as f:
+            with open(ref_prompt_path, "r", encoding="utf-8") as f:
                 self._state.character_ref_prompt = f.read()
             self.task_manager.update_state(
                 step_character_ref=StepStatus.COMPLETED,
@@ -494,7 +494,7 @@ class CreativeVideoPipeline(MultiScenePipeline):
         char_prompt = await asyncio.to_thread(
             self.screenwriter.extract_character_description, story, self._state.style
         )
-        with open(ref_prompt_path, "w") as f:
+        with open(ref_prompt_path, "w", encoding="utf-8") as f:
             f.write(char_prompt)
 
         await self._emit("character_ref", "running", "正在生成角色参考图 (t2i)...", 0.12)
@@ -532,7 +532,7 @@ class CreativeVideoPipeline(MultiScenePipeline):
             script_path = self._state.script_file
             if os.path.exists(script_path):
                 logger.info("[Pipeline] Step script: SKIP (already completed, file exists)")
-                with open(script_path, "r") as f:
+                with open(script_path, "r", encoding="utf-8") as f:
                     scenes = json.load(f)
                 if self._state.scene_count == len(scenes):
                     return scenes
@@ -550,7 +550,7 @@ class CreativeVideoPipeline(MultiScenePipeline):
         )
 
         script_path = os.path.join(self.working_dir, "script.json")
-        with open(script_path, "w") as f:
+        with open(script_path, "w", encoding="utf-8") as f:
             json.dump(scenes, f, ensure_ascii=False, indent=2)
 
         self._state.scene_count = len(scenes)
@@ -620,7 +620,7 @@ class CreativeVideoPipeline(MultiScenePipeline):
             prompts_path = self._state.end_frame_prompts_file
             if os.path.exists(prompts_path):
                 logger.info("[Pipeline] Step end_frame_prompts: SKIP (already completed, file exists)")
-                with open(prompts_path, "r") as f:
+                with open(prompts_path, "r", encoding="utf-8") as f:
                     return json.load(f)
             logger.warning("[Pipeline] Step end_frame_prompts: marked completed but file missing, re-running")
 
@@ -638,7 +638,7 @@ class CreativeVideoPipeline(MultiScenePipeline):
         )
 
         prompts_path = os.path.join(self.working_dir, "end_frame_prompts.json")
-        with open(prompts_path, "w") as f:
+        with open(prompts_path, "w", encoding="utf-8") as f:
             json.dump(end_frame_prompts, f, ensure_ascii=False, indent=2)
 
         self._state.step_end_frame_prompts = StepStatus.COMPLETED
@@ -921,10 +921,10 @@ class CreativeVideoPipeline(MultiScenePipeline):
             video_id: Remote video task identifier.
         """
         task_file = os.path.join(scene_dir, "task.json")
-        with open(task_file, "w") as f:
+        with open(task_file, "w", encoding="utf-8") as f:
             json.dump({"video_id": video_id}, f, indent=2)
         curl_file = os.path.join(scene_dir, "curl.sh")
-        with open(curl_file, "w") as f:
+        with open(curl_file, "w", encoding="utf-8") as f:
             f.write(self._make_curl(video_id) + "\n")
 
     def _load_scene_task(self, scene_dir: str) -> Optional[str]:
@@ -939,7 +939,7 @@ class CreativeVideoPipeline(MultiScenePipeline):
         task_file = os.path.join(scene_dir, "task.json")
         if os.path.exists(task_file):
             try:
-                with open(task_file, "r") as f:
+                with open(task_file, "r", encoding="utf-8") as f:
                     data = json.load(f)
                 return data.get("video_id") or data.get("task_id")
             except Exception as e:
