@@ -220,13 +220,13 @@ Docker 镜像已声明 `VOLUME`，纯 `docker run -p 8765:8765 <镜像>` 会将�
 > **分发渠道说明**：本项目**官方分发 = 本仓库的 GitHub Release**，包含两路产出，均由 `.github/workflows/release.yml` 在打 `v*` 标签时自动发布：
 > 1. **Docker 镜像**（多架构）— GHCR `ghcr.io/lcy362/free-short-video` + 可选 Docker Hub `lcy362/free-short-video`。
 > 2. **npm 包 `free-short-video`** — **整个项目本身就是这个 npm 包**：仓库根 `package.json` 的 `files` 白名单包含全部 Python 源码 + 字体，由 `npm-publish` job 直接发布到 npm registry。用户 `npx free-short-video`（或 `fsv`）即可在本地自动建 venv、装依赖、起服务并打开浏览器（需本机 Python 3.10+，无需系统 ffmpeg）。需仓库 Secrets 配置 `NPM_TOKEN`；未配置时该 job 自动跳过，不影响 Docker 发布。
-> 两路共用同一语义化版本标签（如 `v5.1.0` → Docker tag `5.1.0` / npm 版本 `5.1.0`）。
+> 两路共用同一语义化版本标签（如 `v5.2.0` → Docker tag `5.2.0` / npm 版本 `5.2.0`）。
 
-每次推送 `v*` 标签（如 `v4.7.8`）时，CI（`.github/workflows/release.yml`）自动执行：
+每次推送 `v*` 标签（如 `v5.2.0`）时，CI（`.github/workflows/release.yml`）自动执行：
 
 1. **冒烟测试** — 本地构建 `linux/amd64` 镜像，启动容器验证 `GET /` 返回 200
-2. **GHCR** — `docker/metadata-action` 生成 OCI labels + semver tags（`4.7.8`/`4.7`/`latest`），GITHUB_TOKEN 推送至 `ghcr.io/lcy362/free-short-video`，自动关联到仓库
-3. **Docker Hub** — 同步推送至 `lcy362/free-short-video`（tag `v4.7.8` + `latest`），`.github/scripts/update_dockerhub_overview.py` 同步仓库描述与 README 概述
+2. **GHCR** — `docker/metadata-action` 生成 OCI labels + semver tags（`5.2.0`/`5.2`/`latest`），GITHUB_TOKEN 推送至 `ghcr.io/lcy362/free-short-video`，自动关联到仓库
+3. **Docker Hub** — 同步推送至 `lcy362/free-short-video`（tag `v5.2.0` + `latest`），`.github/scripts/update_dockerhub_overview.py` 同步仓库描述与 README 概述
 4. **GitHub Release** — 生成 Release 页，附双语拉取命令与持久化启动说明
 
 **手动触发**：在 GitHub Actions → Release Docker Image → Run workflow。

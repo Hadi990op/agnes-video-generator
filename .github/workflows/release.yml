@@ -22,6 +22,20 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      # ── 版本号同步：更新 docker-compose.yml 中的镜像 tag ──
+      - name: Bump version references in project files
+        run: |
+          VERSION="${GITHUB_REF_NAME#v}"
+          echo "Bumping project files to version $VERSION"
+          # 更新 docker-compose.yml 中的镜像 tag
+          sed -i "s|free-short-video:[0-9.]*$|free-short-video:${VERSION}|g" docker-compose.yml
+          sed -i "s|free-short-video:[0-9.]*|free-short-video:${VERSION}|" docker-compose.yml
+          # 更新 AGENTS.md 中的示例版本号（仅文档示例，保持最新）
+          sed -i "s|v[0-9]\+\.[0-9]\+\.[0-9]\+ →|v${VERSION} →|g" AGENTS.md
+          echo "Updated files:"
+          grep -n "free-short-video:[0-9]" docker-compose.yml || true
+          grep -n "v[0-9]" AGENTS.md | head -5 || true
+
       - name: Set up QEMU（多架构模拟）
         uses: docker/setup-qemu-action@v3
 
