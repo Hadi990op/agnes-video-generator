@@ -12,11 +12,10 @@ import requests
 
 from core.api.error_collector import collect_error, collect_error_from_exception
 from core.api.rate_limiter import get_rate_limiter
+from core.config import get_agnes_base_url
 from utils.image import download_image
 
 logger = logging.getLogger(__name__)
-
-BASE_URL = "https://apihub.agnes-ai.com/v1"
 
 
 class ImageOutput:
@@ -119,7 +118,7 @@ class AgnesImageAPI:
                 read_timeout = 60 * (attempt + 1)
                 resp = await asyncio.to_thread(
                     requests.post,
-                    f"{BASE_URL}/images/generations",
+                    f"{get_agnes_base_url()}/images/generations",
                     headers=self.headers,
                     json=payload,
                     timeout=(30, read_timeout),

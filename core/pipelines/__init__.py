@@ -393,10 +393,10 @@ class BasePipeline(ABC):
         """持久化任务元数据（video_id 等）到 sub_dir/task.json + curl.sh。"""
         os.makedirs(sub_dir, exist_ok=True)
         task_file = os.path.join(sub_dir, "task.json")
-        with open(task_file, "w") as f:
+        with open(task_file, "w", encoding="utf-8") as f:
             json.dump(data, f, indent=2)
         curl_file = os.path.join(sub_dir, "curl.sh")
-        with open(curl_file, "w") as f:
+        with open(curl_file, "w", encoding="utf-8") as f:
             f.write(self._make_curl(data.get("video_id", "")) + "\n")
 
     def _load_task_json(self, sub_dir: str) -> Optional[str]:
@@ -404,7 +404,7 @@ class BasePipeline(ABC):
         task_file = os.path.join(sub_dir, "task.json")
         if os.path.exists(task_file):
             try:
-                with open(task_file, "r") as f:
+                with open(task_file, "r", encoding="utf-8") as f:
                     data = json.load(f)
                 return data.get("video_id") or data.get("task_id")
             except Exception as e:

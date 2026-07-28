@@ -405,6 +405,50 @@
     </div>
   </div>
 
+  <!-- 域名配置（v6.0） -->
+  <div id="domain-section" class="glass-card rounded-2xl mb-6 overflow-hidden transition-all duration-300">
+    <!-- Compact bar (shown when collapsed) -->
+    <div id="domain-compact" class="hidden flex items-center justify-between px-6 py-3 cursor-pointer hover:bg-white/[0.02] transition" onclick="toggleConfigPanel('domain')" role="button" tabindex="0" aria-expanded="false" aria-label="展开域名配置" onkeydown="if(event.key==='Enter')toggleConfigPanel('domain')">
+      <div class="flex items-center gap-3">
+        <span class="text-sm">🌐</span>
+        <span id="domain-compact-text" class="text-sm text-gray-400"></span>
+      </div>
+      <span id="domain-arrow" class="text-gray-600 text-xs transition-transform duration-300">▶</span>
+    </div>
+    <!-- Expanded body -->
+    <div id="domain-body" class="p-6 pt-4">
+      <div class="flex items-center justify-between mb-3">
+        <h2 class="text-lg font-semibold text-blue-300" data-i18n="domainTitle">Agnes 域名配置</h2>
+        <div class="flex items-center gap-2">
+          <span id="domain-status" class="text-xs px-2 py-1 rounded-full bg-gray-800 text-gray-400">apihub.agnes-ai.com</span>
+          <button onclick="toggleConfigPanel('domain')" class="text-xs text-gray-500 hover:text-gray-300 transition px-2 py-1 rounded" title="收起" aria-label="收起域名配置">▲</button>
+        </div>
+      </div>
+      <p class="text-xs text-gray-500 mb-4" data-i18n="domainHint">选择 Agnes API 的接入域名。在中国大陆推荐使用 .cn 域名，以获得更稳定流畅的访问体验。</p>
+      <div class="space-y-3">
+        <label class="flex items-center gap-3 glass-input rounded-lg px-4 py-3 cursor-pointer hover:border-blue-500/40 transition">
+          <input type="radio" name="agnes-domain" value="com" class="accent-blue-500 w-4 h-4 cursor-pointer">
+          <div>
+            <span class="text-sm text-gray-200 font-medium">apihub.agnes-ai.com</span>
+            <span class="text-xs text-gray-500 ml-2" data-i18n="domainComLabel">国际域名</span>
+          </div>
+        </label>
+        <label class="flex items-center gap-3 glass-input rounded-lg px-4 py-3 cursor-pointer hover:border-blue-500/40 transition">
+          <input type="radio" name="agnes-domain" value="cn" class="accent-blue-500 w-4 h-4 cursor-pointer">
+          <div>
+            <span class="text-sm text-gray-200 font-medium">apihub.agnes-ai.cn</span>
+            <span class="text-xs text-gray-500 ml-2" data-i18n="domainCnLabel">中国大陆推荐</span>
+          </div>
+        </label>
+      </div>
+      <div class="flex gap-3 mt-4">
+        <button id="domain-save" class="px-5 py-2.5 bg-blue-600 hover:bg-blue-500 rounded-lg text-sm font-medium transition shadow-lg shadow-blue-600/20" data-i18n="save">保存</button>
+        <span id="domain-save-status" class="self-center text-xs text-green-400 hidden" data-i18n="domainSaved">已保存</span>
+        <span id="domain-save-error" class="self-center text-xs text-red-400 hidden"></span>
+      </div>
+    </div>
+  </div>
+
   <!-- 工作目录 -->
   <div id="workspace-section" class="glass-card rounded-2xl mb-6 overflow-hidden transition-all duration-300">
     <!-- Compact bar (shown when collapsed) -->
@@ -1603,6 +1647,12 @@ const T = {
     connLostMsg: '与服务端的实时连接已断开。服务可能仍在后台运行。可到任务列表查看状态并续传。',
     gotoList: '前往任务列表',     reconnecting: '实时连接断开，正在重试...',
     ttAnchor: '数字人口播',
+    domainTitle: 'Agnes 域名配置',
+    domainHint: '选择 Agnes API 的接入域名。在中国大陆推荐使用 .cn 域名，以获得更稳定流畅的访问体验。',
+    domainComLabel: '国际域名',
+    domainCnLabel: '中国大陆推荐',
+    domainSaved: '已保存',
+    domainSaveFailed: '保存失败',
     ttPoetry: '诗词视频', poetrySettings: '诗词设置',
     poemLabel: '古诗原文', poemPlaceholder: '输入完整古诗原文，例如：春眠不觉晓，处处闻啼鸟...',
     poemHint: '可多段；诗句间用换行或标点自然分隔。AI 会按诗意拆分为若干场景。',
@@ -1743,6 +1793,12 @@ const T = {
     connLostMsg: 'Connection lost. Server may still be running. Check task list for status.',
     gotoList: 'Go to task list', reconnecting: 'Connection lost, retrying...',
     ttAnchor: 'Digital Human',
+    domainTitle: 'Agnes Domain',
+    domainHint: 'Choose the Agnes API access domain. In China, .cn is recommended for better connectivity.',
+    domainComLabel: 'Global',
+    domainCnLabel: 'China (recommended)',
+    domainSaved: 'Saved',
+    domainSaveFailed: 'Save failed',
     ttPoetry: 'Poetry Video', poetrySettings: 'Poetry Settings',
     poemLabel: 'Poem Text', poemPlaceholder: 'Enter the full poem, e.g. 春眠不觉晓，处处闻啼鸟...', poemHint: 'Multiple stanzas allowed; separated by line breaks or punctuation. AI splits into scenes by meaning.',
     scenePromptsOptional: 'Scene Prompts (Optional)', scenePromptsPlaceholder: 'Format: verse | visual description (one scene per line)', scenePromptsHint: 'Optional. One scene per line, fixed format "verse | visual description". Two ways give identical results: ① leave empty and let the system generate; ② copy the prompt below to any AI, then paste the result back.', scenePromptsExample: 'e.g. Spring sleeps, unaware of dawn... | Misty spring morning, birds singing',
@@ -1872,8 +1928,14 @@ const T = {
     resumed: 'Задача возобновлена', watchLog: 'Следите за логами.',
     task_: 'Задача', genFailed: 'Ошибка', genFailedMsg: 'Проверьте логи.',
     gotoResume: 'К списку задач', connLost: 'Соединение потеряно',
-    connLostMsg: 'Соединение потеряно.', gotoList: 'К списку', reconnecting: 'Переподключение...',
+    connLostMsg: 'Соединение потеряно.', gotoList: 'К списку',     reconnecting: 'Переподключение...',
     ttAnchor: 'Цифровой человек',
+    domainTitle: 'Домен Agnes',
+    domainHint: 'Выберите домен для API Agnes. В Китае рекомендуется .cn для стабильного доступа.',
+    domainComLabel: 'Глобальный',
+    domainCnLabel: 'Китай (рекомендуется)',
+    domainSaved: 'Сохранено',
+    domainSaveFailed: 'Ошибка сохранения',
     ttImage: 'Простое изображение', imageSettings: 'Настройки изображения',
     imagePrompt: 'Описание', imagePromptPlaceholder: 'Опишите желаемое изображение...',
     imageSize: 'Размер', refImageHint: 'Опционально. Загрузите для создания вариаций.',
@@ -1981,6 +2043,12 @@ const T = {
     task_: 'タスク', genFailed: '生成失敗', genFailedMsg: 'ログを確認。',
     gotoResume: 'タスク一覧へ', connLost: '接続切断', connLostMsg: '接続が切れました。',     gotoList: '一覧へ', reconnecting: '再接続中...',
     ttAnchor: 'デジタルヒューマン',
+    domainTitle: 'Agnes ドメイン',
+    domainHint: 'Agnes API のドメインを選択。中国では .cn が推奨されます。',
+    domainComLabel: 'グローバル',
+    domainCnLabel: '中国 (推奨)',
+    domainSaved: '保存しました',
+    domainSaveFailed: '保存に失敗しました',
     ttImage: '簡単画像', imageSettings: '画像設定',
     imagePrompt: '画像説明', imagePromptPlaceholder: '希望する画像を説明してください...',
     imageSize: '画像サイズ', refImageHint: '任意。アップロードしてバリエーションを生成。',
@@ -2088,6 +2156,12 @@ const T = {
     task_: '작업', genFailed: '생성 실패', genFailedMsg: '로그를 확인하세요.',
     gotoResume: '작업 목록으로', connLost: '연결 끊김', connLostMsg: '연결이 끊어졌습니다.',     gotoList: '목록으로', reconnecting: '재연결 중...',
     ttAnchor: '디지털 휴먼',
+    domainTitle: 'Agnes 도메인',
+    domainHint: 'Agnes API 도메인을 선택하세요. 중국에서는 .cn 사용을 권장합니다.',
+    domainComLabel: '글로벌',
+    domainCnLabel: '중국 (권장)',
+    domainSaved: '저장됨',
+    domainSaveFailed: '저장 실패',
     ttImage: '간단 이미지', imageSettings: '이미지 설정',
     imagePrompt: '이미지 설명', imagePromptPlaceholder: '원하는 이미지를 설명하세요...',
     imageSize: '이미지 크기', refImageHint: '선택사항. 업로드하여 변형을 생성합니다.',
@@ -2195,6 +2269,12 @@ const T = {
     task_: 'Tugas', genFailed: 'Gagal', genFailedMsg: 'Periksa log.',
     gotoResume: 'Ke senarai', connLost: 'Sambungan terputus', connLostMsg: 'Sambungan terputus.',     gotoList: 'Ke senarai', reconnecting: 'Menyambung semula...',
     ttAnchor: 'Digital Human',
+    domainTitle: 'Domain Agnes',
+    domainHint: 'Pilih domain API Agnes. Di China, .cn disyorkan untuk akses yang lebih stabil.',
+    domainComLabel: 'Global',
+    domainCnLabel: 'China (disyorkan)',
+    domainSaved: 'Disimpan',
+    domainSaveFailed: 'Gagal simpan',
     ttImage: 'Imej Ringkas', imageSettings: 'Tetapan Imej',
     imagePrompt: 'Penerangan Imej', imagePromptPlaceholder: 'Huraikan imej yang anda mahukan...',
     imageSize: 'Saiz Imej', refImageHint: 'Pilihan. Muat naik untuk hasilkan variasi.',
@@ -2301,6 +2381,12 @@ const T = {
     task_: 'Tugas', genFailed: 'Gagal', genFailedMsg: 'Periksa log.',
     gotoResume: 'Ke daftar', connLost: 'Koneksi terputus', connLostMsg: 'Koneksi terputus.',     gotoList: 'Ke daftar', reconnecting: 'Menyambung ulang...',
     ttAnchor: 'Digital Human',
+    domainTitle: 'Domain Agnes',
+    domainHint: 'Pilih domain API Agnes. Di China, .cn direkomendasikan untuk akses lebih stabil.',
+    domainComLabel: 'Global',
+    domainCnLabel: 'China (direkomendasikan)',
+    domainSaved: 'Disimpan',
+    domainSaveFailed: 'Gagal simpan',
     ttImage: 'Gambar Sederhana', imageSettings: 'Pengaturan Gambar',
     imagePrompt: 'Deskripsi Gambar', imagePromptPlaceholder: 'Jelaskan gambar yang Anda inginkan...',
     imageSize: 'Ukuran Gambar', refImageHint: 'Opsional. Unggah untuk menghasilkan variasi.',
@@ -2413,6 +2499,12 @@ const T = {
     connLostMsg: 'Verbindung zum Server verloren. Server läuft möglicherweise noch. Aufgabenliste prüfen.',
     gotoList: 'Zur Aufgabenliste', reconnecting: 'Verbindung verloren, neuer Versuch...',
     ttAnchor: 'Digitaler Mensch',
+    domainTitle: 'Agnes-Domain',
+    domainHint: 'Wählen Sie die API-Domain für Agnes. In China wird .cn für bessere Konnektivität empfohlen.',
+    domainComLabel: 'Global',
+    domainCnLabel: 'China (empfohlen)',
+    domainSaved: 'Gespeichert',
+    domainSaveFailed: 'Speichern fehlgeschlagen',
     ttImage: 'Einfaches Bild', imageSettings: 'Bildeinstellungen',
     imagePrompt: 'Bildbeschreibung', imagePromptPlaceholder: 'Gewünschtes Bild beschreiben...',
     imageSize: 'Bildgröße', refImageHint: 'Optional. Hochladen für Varianten; leer lassen für reine KI-Generierung.',
@@ -2525,6 +2617,12 @@ const T = {
     connLostMsg: 'Connexion au serveur perdue. Le serveur fonctionne peut-être encore. Vérifiez la liste des tâches.',
     gotoList: 'Aller à la liste', reconnecting: 'Connexion perdue, nouvelle tentative...',
     ttAnchor: 'Humain numérique',
+    domainTitle: 'Domaine Agnes',
+    domainHint: 'Choisissez le domaine API Agnes. En Chine, .cn est recommandé pour une meilleure connectivité.',
+    domainComLabel: 'Mondial',
+    domainCnLabel: 'Chine (recommandé)',
+    domainSaved: 'Enregistré',
+    domainSaveFailed: 'Échec de l\'enregistrement',
     ttImage: 'Image simple', imageSettings: 'Paramètres image',
     imagePrompt: 'Description image', imagePromptPlaceholder: 'Décrivez l\'image souhaitée...',
     imageSize: 'Taille image', refImageHint: 'Optionnel. Télécharger pour générer des variations ; laisser vide pour génération IA pure.',
@@ -2637,6 +2735,12 @@ const T = {
     connLostMsg: 'Verbinding met server verbroken. Server draait mogelijk nog. Controleer de takenlijst.',
     gotoList: 'Naar takenlijst', reconnecting: 'Verbinding verbroken, opnieuw proberen...',
     ttAnchor: 'Digitale mens',
+    domainTitle: 'Agnes-domein',
+    domainHint: 'Kies het API-domein voor Agnes. In China wordt .cn aanbevolen voor een betere connectiviteit.',
+    domainComLabel: 'Globaal',
+    domainCnLabel: 'China (aanbevolen)',
+    domainSaved: 'Opgeslagen',
+    domainSaveFailed: 'Opslaan mislukt',
     ttImage: 'Eenvoudige afbeelding', imageSettings: 'Afbeeldingsinstellingen',
     imagePrompt: 'Afbeeldingsbeschrijving', imagePromptPlaceholder: 'Beschrijf de gewenste afbeelding...',
     imageSize: 'Afbeeldingsgrootte', refImageHint: 'Optioneel. Uploaden voor variaties; leeg laten voor pure AI-generatie.',
@@ -2749,6 +2853,12 @@ const T = {
     connLostMsg: 'Conexión con el servidor perdida. El servidor puede seguir funcionando. Revise la lista de tareas.',
     gotoList: 'Ir a la lista', reconnecting: 'Conexión perdida, reintentando...',
     ttAnchor: 'Humano digital',
+    domainTitle: 'Dominio de Agnes',
+    domainHint: 'Elija el dominio de API de Agnes. En China, se recomienda .cn para una mejor conectividad.',
+    domainComLabel: 'Global',
+    domainCnLabel: 'China (recomendado)',
+    domainSaved: 'Guardado',
+    domainSaveFailed: 'Error al guardar',
     ttImage: 'Imagen simple', imageSettings: 'Configuración de imagen',
     imagePrompt: 'Descripción de imagen', imagePromptPlaceholder: 'Describa la imagen deseada...',
     imageSize: 'Tamaño de imagen', refImageHint: 'Opcional. Subir para generar variaciones; dejar vacío para generación IA pura.',
@@ -2861,6 +2971,12 @@ const T = {
     connLostMsg: 'Conexão com o servidor perdida. O servidor pode ainda estar funcionando. Verifique a lista de tarefas.',
     gotoList: 'Ir para a lista', reconnecting: 'Conexão perdida, tentando novamente...',
     ttAnchor: 'Humano digital',
+    domainTitle: 'Domínio Agnes',
+    domainHint: 'Escolha o domínio da API Agnes. Na China, recomenda-se .cn para melhor conectividade.',
+    domainComLabel: 'Global',
+    domainCnLabel: 'China (recomendado)',
+    domainSaved: 'Salvo',
+    domainSaveFailed: 'Falha ao salvar',
     ttImage: 'Imagem simples', imageSettings: 'Configurações de imagem',
     imagePrompt: 'Descrição da imagem', imagePromptPlaceholder: 'Descreva a imagem desejada...',
     imageSize: 'Tamanho da imagem', refImageHint: 'Opcional. Enviar para gerar variações; deixar vazio para geração IA pura.',
@@ -2973,6 +3089,12 @@ const T = {
     connLostMsg: 'Connessione al server persa. Il server potrebbe essere ancora in esecuzione. Controlla l\'elenco dei task.',
     gotoList: 'Vai all\'elenco', reconnecting: 'Connessione persa, nuovo tentativo...',
     ttAnchor: 'Umano digitale',
+    domainTitle: 'Dominio Agnes',
+    domainHint: 'Scegli il dominio API per Agnes. In Cina, .cn è consigliato per una migliore connettività.',
+    domainComLabel: 'Globale',
+    domainCnLabel: 'Cina (consigliato)',
+    domainSaved: 'Salvato',
+    domainSaveFailed: 'Salvataggio fallito',
     ttImage: 'Immagine semplice', imageSettings: 'Impostazioni immagine',
     imagePrompt: 'Descrizione immagine', imagePromptPlaceholder: 'Descrivi l\'immagine desiderata...',
     imageSize: 'Dimensione immagine', refImageHint: 'Opzionale. Carica per generare varianti; lascia vuoto per generazione IA pura.',
@@ -3067,6 +3189,9 @@ function applyLanguage(lang) {
     image: (document.getElementById('model-image') || {}).value || '',
     video: (document.getElementById('model-video') || {}).value || ''
   });
+  // 刷新域名紧凑栏（含 i18n 标题）
+  const domainRadio = document.querySelector('input[name="agnes-domain"]:checked');
+  if (domainRadio) updateDomainCompact(domainRadio.value);
 }
 
 function switchLang(lang) { applyLanguage(lang); }
@@ -3149,6 +3274,15 @@ const STEPS = {
     }
     // 加载模型选择（v5.0）
     try { await loadModels(); } catch(e) { console.error('init models error:', e); }
+    // 加载域名配置（v6.0）
+    if (d.agnes_domain) {
+      const radios = document.querySelectorAll('input[name="agnes-domain"]');
+      for (const r of radios) {
+        if (r.value === d.agnes_domain) r.checked = true;
+      }
+      updateDomainCompact(d.agnes_domain);
+      updateDomainStatus(d.agnes_domain);
+    }
   } catch(e) { console.error('init config load error:', e); }
 
   // Character count for manuscript
@@ -5054,6 +5188,60 @@ document.getElementById('model-save').onclick = async () => {
     } else {
       const d = await r.json().catch(() => ({}));
       errEl.textContent = d.detail || (t('modelSaveFailed') || '保存失败');
+      errEl.classList.remove('hidden');
+    }
+  } catch (e) {
+    errEl.textContent = '网络错误';
+    errEl.classList.remove('hidden');
+  }
+};
+
+// ═══════════════════════════════════════════════════
+// 域名配置（v6.0）
+// ═══════════════════════════════════════════════════
+
+function updateDomainCompact(domain) {
+  const compact = document.getElementById('domain-compact');
+  const textEl = document.getElementById('domain-compact-text');
+  const isCn = domain === 'cn';
+  textEl.innerHTML =
+    '<span class="text-gray-300 font-medium">' + t('domainTitle') + '</span>' +
+    '<span class="text-gray-600 mx-2">·</span>' +
+    '<span class="' + (isCn ? 'text-green-400' : 'text-gray-400') + '">' +
+    'apihub.agnes-ai.' + escapeHtml(domain) +
+    '</span>';
+}
+
+function updateDomainStatus(domain) {
+  const statusEl = document.getElementById('domain-status');
+  statusEl.textContent = 'apihub.agnes-ai.' + domain;
+  if (domain === 'cn') {
+    statusEl.className = 'text-xs px-2 py-1 rounded-full bg-green-900/40 text-green-300';
+  } else {
+    statusEl.className = 'text-xs px-2 py-1 rounded-full bg-gray-800 text-gray-400';
+  }
+}
+
+document.getElementById('domain-save').onclick = async () => {
+  const selected = document.querySelector('input[name="agnes-domain"]:checked');
+  if (!selected) return;
+  const domain = selected.value;
+  const errEl = document.getElementById('domain-save-error');
+  const okEl = document.getElementById('domain-save-status');
+  errEl.classList.add('hidden');
+  okEl.classList.add('hidden');
+  const form = new FormData();
+  form.append('domain', domain);
+  try {
+    const r = await fetch('/api/config/domain', { method: 'POST', body: form });
+    if (r.ok) {
+      okEl.classList.remove('hidden');
+      updateDomainCompact(domain);
+      updateDomainStatus(domain);
+      setTimeout(() => okEl.classList.add('hidden'), 2000);
+    } else {
+      const d = await r.json().catch(() => ({}));
+      errEl.textContent = d.detail || (t('domainSaveFailed') || '保存失败');
       errEl.classList.remove('hidden');
     }
   } catch (e) {

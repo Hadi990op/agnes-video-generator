@@ -472,3 +472,50 @@ def set_selected_models(text: str = None, image: str = None, video: str = None) 
     config["models"] = m
     save_config(config)
     return get_selected_models()
+
+
+# ═══════════════════════════════════════════════════
+# Agnes API 域名配置（v6.0）
+# ═══════════════════════════════════════════════════
+
+# 可用域名映射
+AGNES_DOMAIN_MAP = {
+    "com": "https://apihub.agnes-ai.com",
+    "cn": "https://apihub.agnes-ai.cn",
+}
+
+_DEFAULT_DOMAIN = "com"
+
+
+def get_agnes_domain() -> str:
+    """返回当前配置的域名后缀。
+
+    Returns:
+        "com" 或 "cn"
+    """
+    config = load_config()
+    return config.get("agnes_domain", _DEFAULT_DOMAIN)
+
+
+def set_agnes_domain(domain: str):
+    """设置 Agnes API 域名后缀。
+
+    Args:
+        domain: "com" 或 "cn"
+    """
+    config = load_config()
+    config["agnes_domain"] = domain
+    save_config(config)
+
+
+def get_agnes_base_url() -> str:
+    """返回基于当前域名配置的完整 API Base URL（含 /v1 后缀）。"""
+    domain = get_agnes_domain()
+    root = AGNES_DOMAIN_MAP.get(domain, AGNES_DOMAIN_MAP[_DEFAULT_DOMAIN])
+    return f"{root}/v1"
+
+
+def get_agnes_api_root() -> str:
+    """返回基于当前域名配置的 API Root URL（不含 /v1 后缀）。"""
+    domain = get_agnes_domain()
+    return AGNES_DOMAIN_MAP.get(domain, AGNES_DOMAIN_MAP[_DEFAULT_DOMAIN])

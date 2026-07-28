@@ -77,7 +77,7 @@ class TaskManager:
             return None
 
         try:
-            with open(self._task_file, "r") as f:
+            with open(self._task_file, "r", encoding="utf-8") as f:
                 data = json.load(f)
 
             # v2.0：通过 parse_task_state 工厂函数反序列化
@@ -195,7 +195,7 @@ class TaskManager:
             task_file = os.path.join(working_dir, name, "task_state.json")
             if os.path.exists(task_file):
                 try:
-                    with open(task_file, "r") as f:
+                    with open(task_file, "r", encoding="utf-8") as f:
                         data = json.load(f)
                     tasks.append({
                         "task_id": data.get("task_id", name),
