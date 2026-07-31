@@ -18,6 +18,13 @@
 
 > **🖥️ Try it now — no install needed:** Visit [video.lichuanyang.top](https://video.lichuanyang.top) and experience **Simple Video** mode directly in your browser. Just enter a prompt and generate a free AI video instantly.
 
+## 🚀 Two Ways to Use — Both Completely Free
+
+| Project | Run Where | Features | Link |
+|---------|-----------|----------|------|
+| **Agnes Video Generator** (this project) | **Download & run locally** | **More powerful** — TTS narration, auto subtitles, digital anchor, image-to-video, keyframes animation, manuscript-to-video, checkpoint resume & more | [GitHub](https://github.com/lcy362/agnes-video-generator) |
+| **FreeShortVideoStudio** | **Fully online, in the browser** | Lightweight, zero install — no setup at all, **features under active construction** | [video.lichuanyang.top/en/studio](https://video.lichuanyang.top/en/studio) · [GitHub](https://github.com/lcy362/free-short-video-studio) |
+
 ## ⭐ Support & Contribute
 
 If you find this project useful, please **star the [GitHub repository](https://github.com/lcy362/agnes-video-generator)** ⭐ — your support helps more people discover this free and open-source AI video generator.
