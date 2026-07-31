@@ -22,8 +22,8 @@
 
 | Project | Run Where | Features | Link |
 |---------|-----------|----------|------|
-| **Agnes Video Generator** (this project) | **Download & run locally** | **More powerful** — TTS narration, auto subtitles, digital anchor, image-to-video, keyframes animation, manuscript-to-video, checkpoint resume & more | [GitHub](https://github.com/lcy362/agnes-video-generator) |
-| **FreeShortVideoStudio** | **Fully online, in the browser** | Lightweight, zero install — no setup at all, **features under active construction** | [video.lichuanyang.top/en/studio](https://video.lichuanyang.top/en/studio) · [GitHub](https://github.com/lcy362/free-short-video-studio) |
+| **[Agnes Video Generator](https://github.com/lcy362/agnes-video-generator)** (this project) | **Download & run locally** | **More powerful** — TTS narration, auto subtitles, digital anchor, image-to-video, keyframes animation, manuscript-to-video, checkpoint resume & more | [GitHub](https://github.com/lcy362/agnes-video-generator) |
+| **[FreeShortVideoStudio](https://github.com/lcy362/free-short-video-studio)** | **Fully online, in the browser** | Lightweight, zero install — no setup at all, **features under active construction** | [video.lichuanyang.top/en/studio](https://video.lichuanyang.top/en/studio) · [GitHub](https://github.com/lcy362/free-short-video-studio) |
 
 ## ⭐ Support & Contribute
 

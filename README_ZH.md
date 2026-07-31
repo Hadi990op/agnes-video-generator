@@ -22,8 +22,8 @@
 
 | 项目 | 运行方式 | 功能定位 | 链接 |
 |------|---------|---------|------|
-| **Agnes Video Generator**（本项目） | **下载后本地运行** | **功能更强大** —— TTS 配音、自动字幕、数字人、图生视频、关键帧动画、文章成片、断点续传等 | [GitHub](https://github.com/lcy362/agnes-video-generator) |
-| **FreeShortVideoStudio** | **完全在线，浏览器内运行** | 轻量免安装、零配置，**功能建设中** | [video.lichuanyang.top/zh/studio](https://video.lichuanyang.top/zh/studio) · [GitHub](https://github.com/lcy362/free-short-video-studio) |
+| **[Agnes Video Generator](https://github.com/lcy362/agnes-video-generator)**（本项目） | **下载后本地运行** | **功能更强大** —— TTS 配音、自动字幕、数字人、图生视频、关键帧动画、文章成片、断点续传等 | [GitHub](https://github.com/lcy362/agnes-video-generator) |
+| **[FreeShortVideoStudio](https://github.com/lcy362/free-short-video-studio)** | **完全在线，浏览器内运行** | 轻量免安装、零配置，**功能建设中** | [video.lichuanyang.top/zh/studio](https://video.lichuanyang.top/zh/studio) · [GitHub](https://github.com/lcy362/free-short-video-studio) |
 
 ## ⭐ 支持与贡献
 
