@@ -1553,6 +1553,78 @@
 
 <script>
 // ═══════════════════════════════════════════════════
+// GA4 埋点（固定 Measurement ID，统一收集用户操作数据）
+// ═══════════════════════════════════════════════════
+
+const GA_MEASUREMENT_ID = 'G-RQW2189QSK';
+let _gaEnabled = false;
+
+// 动态加载 gtag.js（幂等：已初始化则跳过）
+function initGA() {
+  if (_gaEnabled) return;
+  _gaEnabled = true;
+  try {
+    window.dataLayer = window.dataLayer || [];
+    window.gtag = function(){ window.dataLayer.push(arguments); };
+    const s = document.createElement('script');
+    s.async = true;
+    s.src = 'https://www.googletagmanager.com/gtag/js?id=' + encodeURIComponent(GA_MEASUREMENT_ID);
+    document.head.appendChild(s);
+    window.gtag('js', new Date());
+    window.gtag('config', GA_MEASUREMENT_ID);
+  } catch(e) {
+    console.warn('GA init failed:', e);
+    _gaEnabled = false;
+  }
+}
+
+// 统一事件上报：GA 未启用或初始化失败时静默跳过
+function trackEvent(name, params) {
+  if (!_gaEnabled || typeof window.gtag !== 'function') return;
+  try { window.gtag('event', name, params || {}); } catch(e) { /* 静默 */ }
+}
+
+// 任务结果去重上报：轮询会反复调用，同一任务只上报一次终态
+const _trackedTaskResults = {};
+function trackTaskResultOnce(name, taskId, params) {
+  if (_trackedTaskResults[taskId] === name) return;
+  _trackedTaskResults[taskId] = name;
+  trackEvent(name, params || {});
+}
+
+// 全局报错捕获 → GA4 exception 事件（description + fatal 参数）
+let _lastErrSig = '';
+let _lastErrTime = 0;
+function reportException(description, fatal) {
+  const now = Date.now();
+  // 同类错误 10 秒内只上报一次，避免轮询/循环导致的刷屏
+  if (description === _lastErrSig && now - _lastErrTime < 10000) return;
+  _lastErrSig = description;
+  _lastErrTime = now;
+  trackEvent('exception', {
+    description: (description || '').slice(0, 500),
+    fatal: fatal ? '1' : '0',
+  });
+}
+
+// JS 运行时错误（含堆栈位置）
+window.addEventListener('error', function(e) {
+  reportException(
+    (e.message || 'Unknown error') + ' @ ' + (e.filename || 'inline') + ':' + (e.lineno || 0),
+    true
+  );
+});
+
+// 未处理的 Promise 拒绝
+window.addEventListener('unhandledrejection', function(e) {
+  let msg = '';
+  const r = e.reason;
+  if (r instanceof Error) msg = r.message;
+  else if (r != null) msg = String(r);
+  reportException('Unhandled promise rejection: ' + (msg || 'unknown'), false);
+});
+
+// ═══════════════════════════════════════════════════
 // i18n
 // ═══════════════════════════════════════════════════
 
@@ -3283,6 +3355,8 @@ const STEPS = {
       updateDomainCompact(d.agnes_domain);
       updateDomainStatus(d.agnes_domain);
     }
+    // GA4 埋点：固定 Measurement ID，页面加载即启用（统一收集操作数据）
+    initGA();
   } catch(e) { console.error('init config load error:', e); }
 
   // Character count for manuscript
@@ -3562,6 +3636,7 @@ function showToast(msg, duration = 2500) {
 // ═══════════════════════════════════════════════════
 
 function switchMainTab(tab) {
+  trackEvent('ui_action', { action: 'switch_main_tab', tab });
   document.querySelectorAll('.mtab-btn').forEach(b => {
     b.className = b.className.replace(/tab-active/, 'tab-inactive');
   });
@@ -3581,6 +3656,7 @@ function switchMainTab(tab) {
 // ═══════════════════════════════════════════════════
 
 function switchTaskType(type) {
+  trackEvent('ui_action', { action: 'switch_task_type', type });
   currentTaskType = type;
   document.querySelectorAll('.ttype-btn').forEach(b => {
     b.className = b.className.replace(/tab-active/, 'tab-inactive');
@@ -3712,6 +3788,12 @@ async function submitSimple() {
     const r = await fetch('/api/tasks/simple', { method: 'POST', body: form });
     const d = await r.json();
     if (!d.ok) throw new Error(d.detail || t('failCreate'));
+    trackEvent('create_task', {
+      task_type: 'simple',
+      mode: document.getElementById('s_mode').value,
+      duration: document.getElementById('s_duration').value,
+      resolution: document.getElementById('s_resolution').value,
+    });
     currentTaskType = 'simple';
     setRunning(d.task_id);
     currentDirName = d.dir_name;
@@ -3719,6 +3801,7 @@ async function submitSimple() {
     await startPolling(d.task_id);
     showToast(t('submitted'), 5000);
   } catch(e) {
+    trackEvent('create_task_failed', { task_type: 'simple', error: (e.message || '').slice(0, 120) });
     alert(t('failCreate') + ': ' + e.message);
     btn.disabled = false; btn.textContent = t('startGenerate');
   }
@@ -3830,6 +3913,15 @@ async function submitCreative() {
     const r = await fetch('/api/tasks/creative', { method: 'POST', body: form });
     const d = await r.json();
     if (!d.ok) throw new Error(d.detail || t('failCreate'));
+    trackEvent('create_task', {
+      task_type: 'creative',
+      style: document.getElementById('c_style').value,
+      chaining_mode: document.getElementById('c_chaining').value,
+      duration_source: durationSource,
+      resolution: document.getElementById('c_resolution').value,
+      audio: document.getElementById('c_audio_enabled').checked ? 'on' : 'off',
+      subtitle: document.getElementById('c_subtitle_enabled').checked ? 'on' : 'off',
+    });
     currentTaskType = 'creative';
     setRunning(d.task_id);
     currentDirName = d.dir_name;
@@ -3837,6 +3929,7 @@ async function submitCreative() {
     await startPolling(d.task_id);
     showToast(t('submitted'), 5000);
   } catch(e) {
+    trackEvent('create_task_failed', { task_type: 'creative', error: (e.message || '').slice(0, 120) });
     alert(t('failCreate') + ': ' + e.message);
     btn.disabled = false; btn.textContent = t('startGenerate');
   }
@@ -3877,6 +3970,13 @@ async function submitManuscript() {
     const r = await fetch('/api/tasks/manuscript', { method: 'POST', body: form });
     const d = await r.json();
     if (!d.ok) throw new Error(d.detail || t('failCreate'));
+    trackEvent('create_task', {
+      task_type: 'manuscript',
+      resolution: document.getElementById('m_resolution').value,
+      text_len: (text || '').length,
+      audio: document.getElementById('m_audio_enabled').checked ? 'on' : 'off',
+      subtitle: document.getElementById('m_subtitle_enabled').checked ? 'on' : 'off',
+    });
     currentTaskType = 'manuscript';
     setRunning(d.task_id);
     currentDirName = d.dir_name;
@@ -3884,6 +3984,7 @@ async function submitManuscript() {
     await startPolling(d.task_id);
     showToast(t('submitted'), 5000);
   } catch(e) {
+    trackEvent('create_task_failed', { task_type: 'manuscript', error: (e.message || '').slice(0, 120) });
     alert(t('failCreate') + ': ' + e.message);
     btn.disabled = false; btn.textContent = t('startGenerate');
   }
@@ -3931,6 +4032,13 @@ async function submitAnchor() {
     const r = await fetch('/api/tasks/anchor', { method: 'POST', body: form });
     const d = await r.json();
     if (!d.ok) throw new Error(d.detail || t('failCreate'));
+    trackEvent('create_task', {
+      task_type: 'anchor',
+      resolution: document.getElementById('a_resolution').value,
+      audio_source: (audioSource ? audioSource.value : 'post_stitch'),
+      audio: document.getElementById('a_audio_enabled').checked ? 'on' : 'off',
+      subtitle: document.getElementById('a_subtitle_enabled').checked ? 'on' : 'off',
+    });
     currentTaskType = 'anchor';
     setRunning(d.task_id);
     currentDirName = d.dir_name;
@@ -3938,6 +4046,7 @@ async function submitAnchor() {
     await startPolling(d.task_id);
     showToast(t('submitted'), 5000);
   } catch(e) {
+    trackEvent('create_task_failed', { task_type: 'anchor', error: (e.message || '').slice(0, 120) });
     alert(t('failCreate') + ': ' + e.message);
     btn.disabled = false; btn.textContent = t('startGenerate');
   }
@@ -3990,6 +4099,14 @@ async function submitPoetry() {
     const r = await fetch('/api/tasks/poetry', { method: 'POST', body: form });
     const d = await r.json();
     if (!d.ok) throw new Error(d.detail || t('failCreate'));
+    trackEvent('create_task', {
+      task_type: 'poetry',
+      style: document.getElementById('p_style').value,
+      scene_count: sceneCount,
+      resolution: document.getElementById('p_resolution').value,
+      audio: document.getElementById('p_audio_enabled').checked ? 'on' : 'off',
+      subtitle: document.getElementById('p_subtitle_enabled').checked ? 'on' : 'off',
+    });
     currentTaskType = 'poetry';
     setRunning(d.task_id);
     currentDirName = d.dir_name;
@@ -3997,6 +4114,7 @@ async function submitPoetry() {
     await startPolling(d.task_id);
     showToast(t('submitted'), 5000);
   } catch(e) {
+    trackEvent('create_task_failed', { task_type: 'poetry', error: (e.message || '').slice(0, 120) });
     alert(t('failCreate') + ': ' + e.message);
     btn.disabled = false; btn.textContent = t('startGenerate');
   }
@@ -4144,10 +4262,15 @@ async function submitImage() {
     const d = await r.json();
     if (!d.ok) throw new Error(d.detail || t('failCreate'));
 
+    trackEvent('create_task', {
+      task_type: 'image',
+      size: document.getElementById('i_size').value,
+    });
     document.getElementById('result-image').src = '/api/image/' + d.task_id;
     document.getElementById('image-result').classList.remove('hidden');
     showToast(t('imgComplete'), 5000);
   } catch(e) {
+    trackEvent('create_task_failed', { task_type: 'image', error: (e.message || '').slice(0, 120) });
     alert(t('failCreate') + ': ' + e.message);
   } finally {
     btn.disabled = false; btn.textContent = t('imgGenerate');
@@ -4278,6 +4401,9 @@ async function pollTaskProgress(taskId) {
 
     // 任务完成
     if (state.status === 'completed') {
+      trackTaskResultOnce('task_completed', taskId, {
+        task_type: state.task_type || currentTaskType,
+      });
       showResult(state.final_video_file);
       clearRunning();
       scheduleArtifactRefresh();
@@ -4285,6 +4411,10 @@ async function pollTaskProgress(taskId) {
 
     // 任务失败
     if (state.status === 'failed' || (step === 'error' && status === 'failed')) {
+      trackTaskResultOnce('task_failed', taskId, {
+        task_type: state.task_type || currentTaskType,
+        error: (state.current_message || '').slice(0, 120),
+      });
       clearRunning();
       document.getElementById('progress-message').innerHTML = `
         <div class="p-4 bg-red-950 border border-red-800 rounded-lg space-y-2">
@@ -4532,6 +4662,7 @@ async function stopTask() {
     const r = await fetch('/api/tasks/' + currentTaskId + '/stop', { method: 'POST' });
     const d = await r.json();
     if (!d.ok) throw new Error(d.detail || t('failStop'));
+    trackEvent('task_stopped', { task_type: currentTaskType || '', source: 'progress' });
     showToast(t('stopped'), 4000);
   } catch(e) {
     alert(t('failStop') + ': ' + e.message);
@@ -4545,6 +4676,7 @@ async function stopTaskById(taskId) {
     const r = await fetch('/api/tasks/' + taskId + '/stop', { method: 'POST' });
     const d = await r.json();
     if (!d.ok) throw new Error(d.detail || t('failStop'));
+    trackEvent('task_stopped', { task_type: currentTaskType || '', source: 'list' });
     showToast(t('stoppedById'), 3000);
     loadTaskList();
   } catch(e) { alert(t('failStop') + ': ' + e.message); }
@@ -5019,6 +5151,7 @@ document.getElementById('apikey-save').onclick = async () => {
   form.append('api_key', key);
   const r = await fetch('/api/config', { method: 'POST', body: form });
   if (r.ok) {
+    trackEvent('config_action', { action: 'save_api_key' });
     setApiKeyConfiguredUI('config', true);
   }
 };
@@ -5032,6 +5165,7 @@ document.getElementById('apikey-clear').onclick = async () => {
   try {
     const r = await fetch('/api/config', { method: 'DELETE' });
     if (r.ok) {
+      trackEvent('config_action', { action: 'clear_api_key' });
       resetApiKeyUI();
     } else {
       const d = await r.json();
@@ -5182,6 +5316,7 @@ document.getElementById('model-save').onclick = async () => {
   try {
     const r = await fetch('/api/config/models', { method: 'POST', body: form });
     if (r.ok) {
+      trackEvent('config_action', { action: 'save_models', text_model: text });
       okEl.classList.remove('hidden');
       updateModelCompact({ text });
       setTimeout(() => okEl.classList.add('hidden'), 2000);
@@ -5235,6 +5370,7 @@ document.getElementById('domain-save').onclick = async () => {
   try {
     const r = await fetch('/api/config/domain', { method: 'POST', body: form });
     if (r.ok) {
+      trackEvent('config_action', { action: 'save_domain', domain });
       okEl.classList.remove('hidden');
       updateDomainCompact(domain);
       updateDomainStatus(domain);
@@ -5261,6 +5397,7 @@ async function toggleWatermark(el) {
   try {
     const r = await fetch('/api/config/watermark', { method: 'POST', body: form });
     if (r.ok) {
+      trackEvent('config_action', { action: 'toggle_watermark', enabled: enabled ? 'on' : 'off' });
       document.querySelectorAll('.watermark-toggle').forEach(t => t.checked = enabled);
       showToast(enabled ? t('watermarkEnabled') : t('watermarkDisabled'));
     }
