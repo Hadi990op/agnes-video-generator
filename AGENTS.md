@@ -2,7 +2,7 @@
 
 > **面向对象**：SoftwareCompany 团队（产品经理 / 架构师 / 工程师 / QA 工程师）及 AI Agent
 > **当前阶段**：🟢 **开发完成（v2.0） — 维护模式**
-> **配套文档**：`docs/regression_test_plan.md`（大版本回归）、`docs/plans-v1.0/system_design.md`（v1.0 原始设计）
+> **配套文档**：`docs/regression_test_plan.md`（大版本回归）、`docs/plans-v1.0/system_design.md`（v1.0 原始设计）、`docs/plans-v5.0/refactor_plan.md`（工程化重构计划，重构唯一状态源）
 
 ---
 
@@ -258,6 +258,7 @@ Docker 镜像已声明 `VOLUME`，纯 `docker run -p 8765:8765 <镜像>` 会将�
 | **"部署项目" / "初始化环境"** | 按「〇、新环境部署与验证」执行 | 全新环境部署 |
 | **"Docker 部署" / "容器化部署"** | 按「0.5 Docker 部署」执行 | Docker 容器部署，无需 Python/FFmpeg |
 | **"验证项目" / "跑一下检查"** | 按「0.4 部署验证清单」执行 | 部署后验证 |
+| **"执行重构" / "推进重构批次"** | 按 `docs/plans-v5.0/refactor_plan.md` 执行对应批次任务 | 每完成一个任务须更新文档 §五 状态表 + §六 验证清单 |
 
 ---
 
@@ -390,6 +391,7 @@ agnes-video-generator/
     ├── plans-v2.0/                   # v2.0 计划 & 审查（code review、bug fix、i2i 优化）
     ├── plans-v3.0/                   # v3.0 计划文档
     ├── plans-v4.0/                   # v4.0 计划（mock 回归设计、pipeline 重构）
+    ├── plans-v5.0/                   # v5.0 计划（工程化重构：server 模块化、音频收敛、契约修复等）
     └── release-notes/                # v2.0 ~ v3.0 发布说明
 ```
 
