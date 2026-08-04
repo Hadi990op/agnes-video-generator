@@ -195,10 +195,10 @@
 
 | 任务 | 批次 | 状态 | 完成日期 | 验证记录 |
 |------|------|------|---------|---------|
-| 1.1 提取 `app_state.py` | B1 | 🔲 | — | — |
-| 1.2 提取 `deps.py` | B1 | 🔲 | — | — |
-| 1.3 拆分 8 个 router 模块 | B1 | 🔲 | — | — |
-| 1.4 收敛残留工具函数 | B1 | 🔲 | — | — |
+| 1.1 提取 `app_state.py` | B1 | ✅ | 2026-08-04 | py_compile + import OK；并发状态/生命周期事件集中管理 |
+| 1.2 提取 `deps.py` | B1 | ✅ | 2026-08-04 | py_compile + import OK；Pipeline 工厂与执行器，含下划线兼容别名 |
+| 1.3 拆分 8 个 router 模块 | B1 | ✅ | 2026-08-04 | 36 端点全量挂载（40 条 method+path 含 root/static/docs）；`import server` 无循环依赖 |
+| 1.4 收敛残留工具函数 | B1 | ✅ | 2026-08-04 | `server.py` 2050→145 行；helper 迁入 `web/helpers.py`；兼容 re-export 使 `tests/test_core.py` 53 用例通过 |
 | 2.1 BasePipeline 共享音频方法 | B2 | 🔲 | — | — |
 | 2.2 三处调用方改造 | B2 | 🔲 | — | — |
 | 2.3 行为差异对照用例 | B2 | 🔲 | — | — |
