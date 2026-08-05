@@ -14,7 +14,7 @@ from typing import Callable, List, Optional
 from core.compositor.watermark import add_watermark, detect_language
 from core.config import get_watermark_config
 from core.task_manager import TaskManager
-from models.task import BaseTaskState, SubtitleConfig, SubtitleStyle
+from models.task import AudioConfig, BaseTaskState, SubtitleConfig, SubtitleStyle
 
 logger = logging.getLogger(__name__)
 
@@ -380,6 +380,111 @@ class BasePipeline(ABC):
         except RuntimeError as e:
             logger.warning("[Subtitle] recover sub_maker via harvest_cues failed: %s", e)
             return None
+
+    async def _generate_audio_with_fallback(
+        self,
+        output_path: str,
+        text: str,
+        audio_config: AudioConfig,
+        subtitle_config: Optional[SubtitleConfig] = None,
+        duration_sec: float = 0.0,
+        empty_placeholder: str = "",
+    ) -> Optional[object]:
+        """统一 TTS 音频生成（EdgeTTS → Silent 降级 + cues 采集）。
+
+        S2 收敛目标：替代 multi_scene / creative / poetry / manuscript / anchor
+        五处复制的"EdgeTTS → Silent 降级 + harvest_cues"逻辑（v5.0 Batch 2）。
+
+        行为矩阵：
+            1. text 为空：empty_placeholder="" → 跳过返回 None（不落盘）；
+               非空 → 以占位文本直接走 Silent 落盘（不调用 EdgeTTS）。
+            2. audio_config.enabled → EdgeTTSEngine.generate：
+               成功 → 校验 cues（无逐词时间戳 → warning 并返回 None，
+               字幕回退 legacy 启发式）；
+               RuntimeError → Silent(duration_sec) 落盘。
+            3. 音频关 + 字幕开 + harvest_cues_when_audio_off（路径 B）：
+               harvest_cues 采集（RuntimeError 仅警告）→ 随后 Silent 落盘，返回 cues。
+            4. 其他（音频关 / 不采集 cues）→ Silent 落盘，返回 None。
+
+        Args:
+            output_path: 输出音频文件路径。
+            text: 配音文本。
+            audio_config: 音频配置（AudioConfig 或含 enabled/voice/rate 的鸭子类型）。
+            subtitle_config: 字幕配置（音频关闭时决定是否采集 cues）。
+            duration_sec: Silent 降级音频时长（秒）；0 表示由引擎按文本估算。
+            empty_placeholder: 文本为空时的占位文本；"" 表示空文本直接跳过。
+
+        Returns:
+            SubMaker cues 对象（有 cues 可用时）；否则 None。
+        """
+        from core.audio.tts import EdgeTTSEngine, SilentTTSEngine
+
+        audio_enabled = bool(getattr(audio_config, "enabled", True))
+        subtitle_enabled = bool(getattr(subtitle_config, "enabled", False))
+        harvest_cues = bool(getattr(subtitle_config, "harvest_cues_when_audio_off", True))
+        voice = getattr(audio_config, "voice", "zh-CN-XiaoxiaoNeural")
+        rate = getattr(audio_config, "rate", "+0%")
+
+        # 空文本：无占位 → 跳过；有占位 → 直接 Silent 落盘（不调用 EdgeTTS）
+        if not text:
+            if not empty_placeholder:
+                logger.info("[Audio] empty text, skipping TTS: %s", output_path)
+                return None
+            text = empty_placeholder
+            await SilentTTSEngine().generate(
+                text=text, output_path=output_path,
+                **({"duration_sec": duration_sec} if duration_sec else {}),
+            )
+            return None
+
+        silent_tts = SilentTTSEngine()
+
+        # 路径 A：音频开 → EdgeTTS 生成
+        if audio_enabled:
+            try:
+                edge_tts = EdgeTTSEngine()
+                _, sub_maker = await edge_tts.generate(
+                    text=text, output_path=output_path, voice=voice, rate=rate,
+                )
+                # cues 不足 → 字幕回退 legacy 启发式（不删音频，仅返回 None）
+                if sub_maker is not None and not getattr(sub_maker, "cues", None):
+                    logger.warning(
+                        "[Audio] EdgeTTS produced no cues, "
+                        "subtitles fall back to legacy: %s",
+                        output_path,
+                    )
+                    return None
+                return sub_maker
+            except RuntimeError as e:
+                logger.warning("[Audio] EdgeTTS failed, falling back to silent: %s", e)
+                await silent_tts.generate(
+                    text=text, output_path=output_path,
+                    **({"duration_sec": duration_sec} if duration_sec else {}),
+                )
+                return None
+
+        # 路径 B：音频关 + 字幕开 + harvest_cues_when_audio_off → 仅采集 cues
+        if subtitle_enabled and harvest_cues:
+            sub_maker = None
+            try:
+                edge_tts = EdgeTTSEngine()
+                sub_maker = await edge_tts.harvest_cues(
+                    text=text, voice=voice, rate=rate,
+                )
+            except RuntimeError as e:
+                logger.warning("[Audio] harvest_cues failed, silent fallback: %s", e)
+            await silent_tts.generate(
+                text=text, output_path=output_path,
+                **({"duration_sec": duration_sec} if duration_sec else {}),
+            )
+            return sub_maker
+
+        # 其他（音频关 / 不采集 cues）→ Silent 落盘
+        await silent_tts.generate(
+            text=text, output_path=output_path,
+            **({"duration_sec": duration_sec} if duration_sec else {}),
+        )
+        return None
 
     @staticmethod
     def _make_curl(video_id: str) -> str:
