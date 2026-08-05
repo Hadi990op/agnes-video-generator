@@ -18,7 +18,6 @@ import os
 from abc import abstractmethod
 from typing import Callable, List, Optional
 
-from core.audio.tts import EdgeTTSEngine, SilentTTSEngine
 from core.pipelines import BasePipeline, PipelineShutdown
 from models.task import SceneTask, StepStatus, AudioConfig, SubtitleConfig
 
@@ -270,46 +269,19 @@ class MultiScenePipeline(BasePipeline):
         total_duration = sum(float(s.duration) for s in self._state.scenes)
         audio_config = self._state.audio_config if hasattr(self._state, "audio_config") \
             else AudioConfig()
-
-        edge_tts = EdgeTTSEngine()
-        silent_tts = SilentTTSEngine()
+        # 兼容层（Batch 3 移除 hasattr 探测）
+        subtitle_config = self._state.subtitle_config if hasattr(self._state, "subtitle_config") else None
 
         await self._emit("audio", "running", f"生成配音 ({len(text)} 字)...", 0.75)
 
-        sub_maker = None
-        # 路径 B（v2.0）：音频关但字幕开 → 仅采集 cues，不落音频（silent 占位供合成）
-        subtitle_config = self._state.subtitle_config if hasattr(self._state, "subtitle_config") else None
-        subtitle_enabled = bool(getattr(subtitle_config, "enabled", False))
-        harvest_cues = bool(getattr(subtitle_config, "harvest_cues_when_audio_off", True))
-
-        if audio_config.enabled:
-            try:
-                _, sub_maker = await edge_tts.generate(
-                    text=text, output_path=audio_path,
-                    voice=audio_config.voice, rate=audio_config.rate,
-                )
-            except RuntimeError as e:
-                logger.warning(f"[MultiScene] EdgeTTS failed, falling back to silent: {e}")
-                await silent_tts.generate(
-                    text=text, output_path=audio_path,
-                    duration_sec=total_duration,
-                )
-        elif subtitle_enabled and harvest_cues:
-            try:
-                sub_maker = await edge_tts.harvest_cues(
-                    text=text, voice=audio_config.voice, rate=audio_config.rate,
-                )
-            except RuntimeError as e:
-                logger.warning(f"[MultiScene] harvest_cues failed, silent fallback: {e}")
-            await silent_tts.generate(
-                text=text, output_path=audio_path,
-                duration_sec=total_duration,
-            )
-        else:
-            await silent_tts.generate(
-                text=text, output_path=audio_path,
-                duration_sec=total_duration,
-            )
+        sub_maker = await self._generate_audio_with_fallback(
+            output_path=audio_path,
+            text=text,
+            audio_config=audio_config,
+            subtitle_config=subtitle_config,
+            duration_sec=total_duration,
+            empty_placeholder="",
+        )
 
         self._state.combined_audio = audio_path
         self.task_manager.update_state(combined_audio=audio_path)

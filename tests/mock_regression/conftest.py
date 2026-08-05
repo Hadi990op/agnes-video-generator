@@ -74,10 +74,11 @@ def mock_edge_tts(monkeypatch):
 
     需要 patch 所有 pipeline 中直接 import EdgeTTSEngine 的位置。
     """
+    # Batch 2（S2）：creative 已收敛到共享方法（函数级 import core.audio.tts），
+    # manuscript/anchor/poetry 尚为模块级 import，下一提交收敛后一并移除
     paths = [
         "core.audio.tts.EdgeTTSEngine",
         "core.pipelines.manuscript_video.EdgeTTSEngine",
-        "core.pipelines.creative_video.EdgeTTSEngine",
         "core.pipelines.anchor_video.EdgeTTSEngine",
         "core.pipelines.poetry_video.EdgeTTSEngine",
     ]
