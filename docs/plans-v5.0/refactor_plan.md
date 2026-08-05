@@ -83,18 +83,19 @@
 
 ### Batch 2 — 音频生成逻辑收敛（S2，P0）
 
-**目标**：消除三处复制的"EdgeTTS→Silent 降级 + harvest_cues"逻辑，收敛为 `BasePipeline` 共享方法。
+**目标**：消除五处复制的"EdgeTTS→Silent 降级 + harvest_cues"逻辑（multi_scene/creative/poetry/manuscript/anchor），收敛为 `BasePipeline` 共享方法。
 
 **2.1 在 `core/pipelines/__init__.py`（BasePipeline）新增共享方法**
 - `_generate_audio_with_fallback(audio_path, text, ...) -> SubMaker|None`：封装 EdgeTTS 调用 → 失败降级 Silent → cues 不足时的 legacy 启发式 → 统一的日志与降级上报。
 
-**2.2 三处调用方改造**
+**2.2 调用方改造（实际 5 处：发现 manuscript/anchor 亦复制同逻辑）**
 - `multi_scene.py:251-335` `_generate_audio`：改为调用共享方法（保留其 `getattr` 兼容层，等待 Batch 3 移除）。
-- `poetry_video.py` 逐场景 TTS：改为循环调用共享方法。
+- `poetry_video.py` 逐场景 TTS：改为循环调用共享方法（保留场景间延迟与时长校验增强）。
 - `creative_video.py:1597` `_step_audio`：复用共享方法（删除其私有降级分支）。
+- `manuscript_video.py:366` / `anchor_video.py:243` `_generate_audio`：同样收敛为共享方法（范围扩展）。
 
 **2.3 行为差异确认**
-- 三处当前对"音频关闭 + 字幕开启"（`harvest_cues_when_audio_off`）的处理细节需先写 3 个对照用例锁定行为，再统一实现。
+- 各调用点对"音频关闭 + 字幕开启"（`harvest_cues_when_audio_off`）的处理细节先写对照用例锁定行为，再统一实现（实际产出 4 用例）。
 
 **验收标准**
 - 共享方法被 3+ 处调用，私有降级分支全部删除；
@@ -199,9 +200,9 @@
 | 1.2 提取 `deps.py` | B1 | ✅ | 2026-08-04 | py_compile + import OK；Pipeline 工厂与执行器，含下划线兼容别名 |
 | 1.3 拆分 8 个 router 模块 | B1 | ✅ | 2026-08-04 | 36 端点全量挂载（40 条 method+path 含 root/static/docs）；`import server` 无循环依赖 |
 | 1.4 收敛残留工具函数 | B1 | ✅ | 2026-08-04 | `server.py` 2050→145 行；helper 迁入 `web/helpers.py`；兼容 re-export 使 `tests/test_core.py` 53 用例通过 |
-| 2.1 BasePipeline 共享音频方法 | B2 | 🔲 | — | — |
-| 2.2 三处调用方改造 | B2 | 🔲 | — | — |
-| 2.3 行为差异对照用例 | B2 | 🔲 | — | — |
+| 2.1 BasePipeline 共享音频方法 | B2 | ✅ | 2026-08-05 | `_generate_audio_with_fallback` 落位 BasePipeline（含 cues 不足→legacy 启发式）；py_compile/import OK，逐批 push 触发 GitHub Actions 回归 |
+| 2.2 调用方改造（5 处） | B2 | ✅ | 2026-08-05 | 范围扩展：原计划 3 处，实际发现 manuscript/anchor 亦复制同逻辑，共收敛 5 处（multi_scene/creative/poetry/manuscript/anchor）；`grep EdgeTTSEngine core/pipelines/` 仅剩 `__init__.py` 函数级 import；私有降级分支全部删除 |
+| 2.3 行为差异对照用例 | B2 | ✅ | 2026-08-05 | 新增 `tests/test_audio_fallback.py` 4 用例（Edge 失败→Silent / cues 不足→legacy / audio-off+subtitle-on / 成功返回 sub_maker）锁定行为矩阵 |
 | 3.1 修复 `_execute_step` 契约 | B3 | 🔲 | — | — |
 | 3.2 状态字段对齐 | B3 | 🔲 | — | — |
 | 4.1 拆分 `screenwriter.py` | B4 | 🔲 | — | — |

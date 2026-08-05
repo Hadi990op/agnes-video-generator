@@ -383,6 +383,7 @@ agnes-video-generator/
 │
 ├── tests/
 │   ├── test_core.py                  # 核心单元测试
+│   ├── test_audio_fallback.py        # 共享音频降级方法行为对照用例（Batch 2/S2）
 │   └── mock_regression/              # mock 回归框架（mock API + fixture + 流水线测试）
 │       ├── conftest.py / mock_apis.py / test_pipelines.py
 │       ├── assets/                   # 测试图片/视频
