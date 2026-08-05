@@ -16,7 +16,6 @@ import re
 from typing import Callable, List, Optional
 
 from core.api.agnes_video import AgnesVideoAPI
-from core.audio.tts import EdgeTTSEngine, SilentTTSEngine
 from core.compositor.concatenator import VideoConcatenator
 from core.screenwriter import Screenwriter
 from core.pipelines import MultiScenePipeline, PipelineShutdown
@@ -382,54 +381,23 @@ class ManuscriptVideoPipeline(MultiScenePipeline):
                 full_text, self._state.audio_config, self._state.subtitle_config,
             )
 
-        edge_tts = EdgeTTSEngine()
-        silent_tts = SilentTTSEngine()
-
         await self._emit(
             "audio", "running",
             f"生成整段旁白 ({len(full_text)} 字)...",
             0.60,
         )
 
-        sub_maker = None
-        subtitle_config = self._state.subtitle_config
-        harvest = bool(subtitle_config.enabled) and bool(subtitle_config.harvest_cues_when_audio_off)
-        if audio_config.enabled:
-            try:
-                audio_result, sub_maker = await edge_tts.generate(
-                    text=full_text,
-                    output_path=audio_path,
-                    voice=audio_config.voice,
-                    rate=audio_config.rate,
-                )
-            except RuntimeError as e:
-                logger.warning(f"[Manuscript] EdgeTTS failed, falling back to silent: {e}")
-                audio_result, sub_maker = await silent_tts.generate(
-                    text=full_text,
-                    output_path=audio_path,
-                )
-        elif harvest:
-            # 路径 B（v2.0）：音频关、字幕开 → 仅采集 cues，不落音频；silent 占位供合成
-            try:
-                sub_maker = await edge_tts.harvest_cues(
-                    text=full_text,
-                    voice=audio_config.voice,
-                    rate=audio_config.rate,
-                )
-            except RuntimeError as e:
-                logger.warning(f"[Manuscript] harvest_cues failed, silent fallback: {e}")
-            audio_result, _ = await silent_tts.generate(
-                text=full_text,
-                output_path=audio_path,
-            )
-        else:
-            audio_result, sub_maker = await silent_tts.generate(
-                text=full_text,
-                output_path=audio_path,
-            )
+        sub_maker = await self._generate_audio_with_fallback(
+            output_path=audio_path,
+            text=full_text,
+            audio_config=audio_config,
+            subtitle_config=self._state.subtitle_config,
+            duration_sec=0.0,  # 原实现未指定时长，由引擎按文本估算
+            empty_placeholder="",
+        )
 
-        self._state.combined_audio = audio_result
-        self.task_manager.update_state(combined_audio=audio_result)
+        self._state.combined_audio = audio_path
+        self.task_manager.update_state(combined_audio=audio_path)
         logger.info("[Manuscript] audio: combined → %s", audio_path)
         return sub_maker
 

@@ -17,7 +17,7 @@ from typing import List, Optional
 
 from core.api.agnes_video import AgnesVideoAPI
 from core.audio.subtitle import SubtitleGenerator
-from core.audio.tts import EdgeTTSEngine, SilentTTSEngine
+from core.audio.tts import SilentTTSEngine
 from core.compositor.concatenator import VideoConcatenator
 from core.pipelines import MultiScenePipeline
 from core.screenwriter import Screenwriter, clean_narration_text
@@ -276,10 +276,14 @@ class PoetryVideoPipeline(MultiScenePipeline):
                 continue
 
             if not text:
-                silent = SilentTTSEngine()
-                await silent.generate(
-                    text=" ", output_path=audio_path,
+                # 空文本：占位静音落盘（不调用 EdgeTTS）
+                await self._generate_audio_with_fallback(
+                    output_path=audio_path,
+                    text="",
+                    audio_config=audio_config,
+                    subtitle_config=sub_config,
                     duration_sec=max(int(scene.duration), 2),
+                    empty_placeholder=" ",
                 )
                 scene.narration_audio = audio_path
                 self._scene_sub_makers[idx] = None
@@ -294,56 +298,32 @@ class PoetryVideoPipeline(MultiScenePipeline):
             if idx > 0:
                 await asyncio.sleep(self._SCENE_TTS_DELAY)
 
-            silent = SilentTTSEngine()
             min_dur = max(len(text) / self._AUDIO_MIN_CHARS_PER_SEC, 2.0)
 
-            sub_maker = None
+            sub_maker = await self._generate_audio_with_fallback(
+                output_path=audio_path,
+                text=text,
+                audio_config=audio_config,
+                subtitle_config=sub_config,
+                duration_sec=max(int(scene.duration), int(min_dur)),
+                empty_placeholder=" ",
+            )
+
+            # 时长校验（仅真实 EdgeTTS 产物）：实际时长不足预期 60% → 删除 + Silent 重生成
             if has_audio:
-                try:
-                    edge_tts = EdgeTTSEngine()
-                    _, sub_maker = await edge_tts.generate(
-                        text=text, output_path=audio_path,
-                        voice=audio_config.voice, rate=audio_config.rate,
+                actual_dur = self._probe_duration(audio_path, _sp)
+                if actual_dur is not None and actual_dur < min_dur * 0.6:
+                    logger.warning(
+                        f"[Poetry] scene {idx} audio incomplete "
+                        f"(actual={actual_dur:.1f}s < expected={min_dur:.1f}s*0.6), "
+                        f"falling back to silent"
                     )
-                    # 校验：音频文件存在且时长不低于预期的 60%
-                    actual_dur = self._probe_duration(audio_path, _sp)
-                    if actual_dur is not None and actual_dur < min_dur * 0.6:
-                        logger.warning(
-                            f"[Poetry] scene {idx} audio incomplete "
-                            f"(actual={actual_dur:.1f}s < expected={min_dur:.1f}s*0.6), "
-                            f"falling back to silent"
-                        )
-                        os.remove(audio_path)
-                        await silent.generate(
-                            text=text, output_path=audio_path,
-                            duration_sec=max(int(scene.duration), int(min_dur)),
-                        )
-                        sub_maker = None
-                except RuntimeError as e:
-                    logger.warning(f"[Poetry] scene {idx} TTS failed: {e}, silent")
-                    await silent.generate(
+                    os.remove(audio_path)
+                    await SilentTTSEngine().generate(
                         text=text, output_path=audio_path,
                         duration_sec=max(int(scene.duration), int(min_dur)),
                     )
                     sub_maker = None
-            elif sub_config.enabled and sub_config.harvest_cues_when_audio_off:
-                # 路径 B（v2.0）：采集 cues，不落音频；silent 占位供合成
-                try:
-                    edge_tts = EdgeTTSEngine()
-                    sub_maker = await edge_tts.harvest_cues(
-                        text=text, voice=audio_config.voice, rate=audio_config.rate,
-                    )
-                except RuntimeError as e:
-                    logger.warning(f"[Poetry] scene {idx} harvest_cues failed: {e}")
-                await silent.generate(
-                    text=text, output_path=audio_path,
-                    duration_sec=max(int(scene.duration), int(min_dur)),
-                )
-            else:
-                await silent.generate(
-                    text=text, output_path=audio_path,
-                    duration_sec=max(int(scene.duration), int(min_dur)),
-                )
             self._scene_sub_makers[idx] = sub_maker
             scene.narration_audio = audio_path
 
