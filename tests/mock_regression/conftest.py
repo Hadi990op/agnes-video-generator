@@ -36,7 +36,7 @@ def mock_video_api(monkeypatch):
     paths = [
         "core.api.agnes_video.AgnesVideoAPI",
         "core.pipelines.simple_video.AgnesVideoAPI",
-        "core.pipelines.creative_video.AgnesVideoAPI",
+        "core.pipelines.creative.pipeline.AgnesVideoAPI",
         "core.pipelines.manuscript_video.AgnesVideoAPI",
         "core.pipelines.anchor_video.AgnesVideoAPI",
         "core.pipelines.poetry_video.AgnesVideoAPI",
@@ -50,7 +50,7 @@ def mock_image_api(monkeypatch):
     """替换 AgnesImageAPI 为 mock 版本。"""
     paths = [
         "core.api.agnes_image.AgnesImageAPI",
-        "core.pipelines.creative_video.AgnesImageAPI",
+        "core.pipelines.creative.pipeline.AgnesImageAPI",
         "core.pipelines.anchor_video.AgnesImageAPI",
     ]
     for p in paths:
