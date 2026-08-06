@@ -1271,10 +1271,12 @@ def _validate_sync(dir_name: str, scenario: ScenarioConfig) -> dict:
         elif scenario.type == "anchor":
             # anchor 任务：根据 audio_source 决定哪些 step 必须完成
             audio_source = sd.get("audio_source", "post_stitch")
-            _SKIPPABLE_STEPS = set()
+            # v2.0 legacy 字段：v4.0 重构后 MultiScenePipeline 不再更新，
+            # 永远停在 PENDING，检查时豁免（step_clip_generation 仍被更新，不豁免）
+            _SKIPPABLE_STEPS = {"step_generate_anchor", "step_split", "step_clip_prompts"}
             if audio_source == "model":
-                # 模型音频模式：跳过 split/prompts/audio/subtitle/concatenation 步骤
-                _SKIPPABLE_STEPS = {"step_split", "step_clip_prompts", "step_audio", "step_subtitle", "step_concatenation"}
+                # 模型音频模式：跳过 audio/subtitle/concatenation 步骤
+                _SKIPPABLE_STEPS |= {"step_audio", "step_subtitle", "step_concatenation"}
             active_steps = {k: v for k, v in steps.items() if k not in _SKIPPABLE_STEPS}
             incomplete = [k for k, v in active_steps.items() if v != "completed"]
             checks["R3_all_completed"] = not incomplete if active_steps else "N/A"
@@ -1283,7 +1285,10 @@ def _validate_sync(dir_name: str, scenario: ScenarioConfig) -> dict:
             # 对于非 keyframes 模式的创意任务，end_frame_prompts/end_frame_generation
             # 步骤不会被触发，不应计入"未完成"
             chaining_mode = sd.get("chaining_mode", "none")
-            _SKIPPABLE_STEPS = {"step_audio_subtitle"}  # v2.0 legacy, never set by v3.0
+            # v2.0 legacy 字段：v4.0 重构后 MultiScenePipeline 不再更新，
+            # 永远停在 PENDING，检查时豁免（manuscript: step_split/step_scene_prompts；
+            # creative: step_audio_subtitle；poetry 无 legacy 字段）
+            _SKIPPABLE_STEPS = {"step_audio_subtitle", "step_split", "step_scene_prompts"}
             if scenario.type == "creative" and chaining_mode not in ("keyframes",):
                 _SKIPPABLE_STEPS |= {"step_end_frame_prompts", "step_end_frame_generation"}
 
