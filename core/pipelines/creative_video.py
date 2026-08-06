@@ -170,6 +170,11 @@ class CreativeVideoPipeline(MultiScenePipeline):
     task-manager integration) from :class:`BasePipeline`.
     """
 
+    # v5.0 Batch 3（S3，方案 A）：禁用粗粒度步骤级 skip。
+    # 本类依赖各 ``_step_*`` 读盘做细粒度断点续传，通过类属性关闭
+    # MultiScenePipeline._execute_step 的粗粒度 skip（原覆写已删除，行为一致）。
+    coarse_skip = False
+
     def __init__(
         self,
         api_key: str,
@@ -1837,18 +1842,9 @@ class CreativeVideoPipeline(MultiScenePipeline):
     # ==================================================================
     # v4.0 模板钩子（继承 MultiScenePipeline，复用模板 run() + 步骤编排）
     # ==================================================================
-
-    async def _execute_step(
-        self, step_name, action, progress_start, progress_end,
-        running_msg, completed_msg,
-    ):
-        """覆写：禁粗粒度 skip，依赖各 ``_step_*`` 读盘自 skip（保持细粒度 resume）。"""
-        self.task_manager.update_step(step_name, StepStatus.RUNNING)
-        await self._emit(step_name, "running", running_msg, progress_start)
-        result = await action()
-        self.task_manager.update_step(step_name, StepStatus.COMPLETED)
-        await self._emit(step_name, "completed", completed_msg, progress_end)
-        return result
+    # Batch 3（S3，方案 A）：不再覆写 _execute_step —— MultiScenePipeline 现支持
+    # coarse_skip 开关，本类通过类属性 coarse_skip=False 禁用粗粒度 skip，
+    # 依赖各 _step_* 读盘自 skip（保持细粒度 resume，行为与覆写时一致）。
 
     def _get_init_message(self) -> str:
         return "开始视频生成流程..."

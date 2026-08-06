@@ -163,6 +163,12 @@ class BaseTaskState(BaseModel):
     current_progress: float = 0.0  # 0.0 ~ 1.0
     current_message: str = ""     # 人类可读消息
 
+    # ── v5.0 Batch 3（S4）：音频/字幕配置上提为共享字段 ──
+    # Creative/Manuscript/Anchor/Poetry 统一继承，消除子类重复声明与
+    # multi_scene.py 中的 hasattr 探测。旧 JSON 缺字段时自动取默认值（向后兼容）。
+    audio_config: AudioConfig = Field(default_factory=AudioConfig)
+    subtitle_config: SubtitleConfig = Field(default_factory=SubtitleConfig)
+
 
 class SimpleVideoTask(BaseTaskState):
     """简单视频任务（类型 1）
@@ -243,8 +249,6 @@ class CreativeVideoTask(BaseTaskState):
 
     # ── v2.0 新增：音频 + 字幕 ──
     step_audio_subtitle: StepStatus = StepStatus.PENDING
-    audio_config: AudioConfig = Field(default_factory=AudioConfig)
-    subtitle_config: SubtitleConfig = Field(default_factory=SubtitleConfig)
     narrations: List[str] = Field(default_factory=list)
 
     # ── v3.0 拆分：音频和字幕后向兼容字段 ──
@@ -281,8 +285,6 @@ class ManuscriptVideoTask(BaseTaskState):
     paragraphs: List[ManuscriptParagraph] = Field(default_factory=list)
     # v4.0 重构：通用场景列表（由 _build_scenes 填充，供模板与下游步骤引用）
     scenes: List[SceneTask] = Field(default_factory=list)
-    audio_config: AudioConfig = Field(default_factory=AudioConfig)
-    subtitle_config: SubtitleConfig = Field(default_factory=SubtitleConfig)
     video_duration: int = 10
 
     combined_audio: str = ""
@@ -323,8 +325,6 @@ class AnchorVideoTask(BaseTaskState):
 
     # 配置
     audio_source: str = "post_stitch"  # "post_stitch" | "model"
-    audio_config: AudioConfig = Field(default_factory=AudioConfig)
-    subtitle_config: SubtitleConfig = Field(default_factory=SubtitleConfig)
 
     # 步骤状态
     step_generate_anchor: StepStatus = StepStatus.PENDING
@@ -384,9 +384,6 @@ class PoetryVideoTask(BaseTaskState):
     # 各场景时长是否统一（统一=每场景 uniform_duration 秒；独立=scene_durations 逐场景）
     uniform_duration: bool = True
     scene_durations: List[int] = Field(default_factory=lambda: [5, 5, 5])
-
-    audio_config: AudioConfig = Field(default_factory=AudioConfig)
-    subtitle_config: SubtitleConfig = Field(default_factory=SubtitleConfig)
 
     # v4.0 重构：MultiScenePipeline 规范步骤字段
     scenes: List[SceneTask] = Field(default_factory=list)

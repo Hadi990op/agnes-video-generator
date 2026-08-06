@@ -19,7 +19,7 @@ from abc import abstractmethod
 from typing import Callable, List, Optional
 
 from core.pipelines import BasePipeline, PipelineShutdown
-from models.task import SceneTask, StepStatus, AudioConfig, SubtitleConfig
+from models.task import SceneTask, StepStatus
 
 logger = logging.getLogger(__name__)
 
@@ -44,6 +44,10 @@ class MultiScenePipeline(BasePipeline):
         - ``_get_audio_path``             音频文件输出路径
         - ``_set_subtitle_paths``         字幕路径写回 state
     """
+
+    # v5.0 Batch 3（S3，方案 A）：粗粒度步骤级 skip 默认开启；
+    # Creative 依赖各 ``_step_*`` 读盘做细粒度续传，置 False 禁用（原覆写已删除）。
+    coarse_skip: bool = True
 
     # ==================================================================
     # 模板方法：run()
@@ -128,12 +132,16 @@ class MultiScenePipeline(BasePipeline):
         self, step_name: str, action: Callable,
         progress_start: float, progress_end: float,
         running_msg: str, completed_msg: str,
+        coarse_skip: Optional[bool] = None,
     ):
         """统一的步骤执行器：自动处理断点续传、状态标记、进度上报。
 
-        若 ``self._state`` 上对应步骤字段已为 COMPLETED，则跳过（断点续传）。
+        断点续传规则：启用粗粒度 skip 时（显式 ``coarse_skip`` 覆盖，缺省取
+        ``self.coarse_skip``），若 ``self._state`` 上对应步骤字段已为 COMPLETED
+        则整步跳过；禁用时总是执行，由步骤内部按文件/字段做细粒度续传。
         """
-        if getattr(self._state, step_name, StepStatus.PENDING) == StepStatus.COMPLETED:
+        skip_enabled = self.coarse_skip if coarse_skip is None else coarse_skip
+        if skip_enabled and getattr(self._state, step_name, StepStatus.PENDING) == StepStatus.COMPLETED:
             logger.info(f"[Pipeline] Step {step_name}: already completed, skipping")
             return None
 
@@ -257,8 +265,8 @@ class MultiScenePipeline(BasePipeline):
             text = self._get_narration_text()
             return await self._recover_sub_maker(
                 text,
-                self._state.audio_config if hasattr(self._state, "audio_config") else AudioConfig(),
-                self._state.subtitle_config if hasattr(self._state, "subtitle_config") else None,
+                self._state.audio_config,
+                self._state.subtitle_config,
             )
 
         text = self._get_narration_text()
@@ -267,10 +275,9 @@ class MultiScenePipeline(BasePipeline):
             return None
 
         total_duration = sum(float(s.duration) for s in self._state.scenes)
-        audio_config = self._state.audio_config if hasattr(self._state, "audio_config") \
-            else AudioConfig()
-        # 兼容层（Batch 3 移除 hasattr 探测）
-        subtitle_config = self._state.subtitle_config if hasattr(self._state, "subtitle_config") else None
+        # Batch 3（S4）：audio_config/subtitle_config 已为 BaseTaskState 共享字段
+        audio_config = self._state.audio_config
+        subtitle_config = self._state.subtitle_config
 
         await self._emit("audio", "running", f"生成配音 ({len(text)} 字)...", 0.75)
 
@@ -289,7 +296,7 @@ class MultiScenePipeline(BasePipeline):
 
     async def _generate_subtitles(self, sub_maker: Optional[object] = None) -> None:
         """通用字幕生成（复用 BasePipeline.generate_subtitles_common）。"""
-        if not getattr(self._state.subtitle_config, "enabled", True):
+        if not self._state.subtitle_config.enabled:
             return
         texts, durs = self._get_segment_texts_and_durations()
         srt_path, styles_path = await self.generate_subtitles_common(
@@ -298,7 +305,7 @@ class MultiScenePipeline(BasePipeline):
             subtitle_config=self._state.subtitle_config,
             sub_maker=sub_maker,
             audio_path=self._state.combined_audio or "",
-            screenwriter=self.screenwriter if hasattr(self, "screenwriter") else None,
+            screenwriter=self.screenwriter,
             video_width=self._state.video_width,
             video_height=self._state.video_height,
         )

@@ -46,6 +46,9 @@ class BasePipeline(ABC):
         self.shutdown_event = shutdown_event
         self._stop_event = asyncio.Event()
         self._state: Optional[BaseTaskState] = None
+        # Batch 3（S4）：screenwriter 统一初始化，子类（creative/manuscript/anchor/poetry）
+        # 在自身 __init__ 中赋真实实例；仅 LLM 样式生成使用，None 表示不可用。
+        self.screenwriter = None
 
     async def _emit(
         self,
