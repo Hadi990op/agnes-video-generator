@@ -205,7 +205,7 @@
 | 2.3 行为差异对照用例 | B2 | ✅ | 2026-08-05 | 新增 `tests/test_audio_fallback.py` 4 用例（Edge 失败→Silent / cues 不足→legacy / audio-off+subtitle-on / 成功返回 sub_maker）锁定行为矩阵 |
 | 3.1 修复 `_execute_step` 契约 | B3 | ✅ | 2026-08-06 | 方案 A：`_execute_step` 增加 `coarse_skip` 参数（显式覆盖，缺省取类属性 `self.coarse_skip`，默认 True）；Creative 以类属性 `coarse_skip=False` 禁用，覆写已删除（方法解析指向基类）；6 个契约用例（tests/test_pipeline_contract.py）锁定行为矩阵 |
 | 3.2 状态字段对齐 | B3 | ✅ | 2026-08-06 | `audio_config`/`subtitle_config` 上提 `BaseTaskState`（default_factory），Creative/Manuscript/Anchor/Poetry 子类重复声明移除；`multi_scene.py` hasattr/getattr 探测全部移除（含 `screenwriter` 上提 BasePipeline 初始化为 None）；`grep hasattr core/pipelines/` 清零；新增 3 个兼容用例（旧 JSON 缺字段取默认/含字段保留/6 类继承） |
-| 4.1 拆分 `screenwriter.py` | B4 | 🔲 | — | — |
+| 4.1 拆分 `screenwriter.py` | B4 | ✅ | 2026-08-06 | `core/screenwriter/` 包：story（旁白清洗+故事/脚本/旁白）/scenes（分镜/段落场景/诗词场景）/characters（角色/尾帧/数字人）/style（字幕 LLM 样式）4 个 mixin + `__init__.py` 组合（核心聊天基础设施保留本模块，保证 mock 回归 patch 目标 `core.screenwriter.AgnesChatAPI` 有效）；全部原符号 re-export（外部调用点零修改）；29 个符号（3 模块级函数+26 方法）与拆分前逐字节一致（inspect.getsource）；新增 tests/test_screenwriter_package.py 8 契约用例；本地 80 用例通过，GitHub Actions 149 passed、覆盖率 59% |
 | 4.2 拆分 `creative_video.py` | B4 | 🔲 | — | — |
 | 4.3 拆分 subtitle/concatenator | B4 | 🔲 | — | — |
 | 5.1 僵尸任务磁盘清理 | B5 | 🔲 | — | — |
