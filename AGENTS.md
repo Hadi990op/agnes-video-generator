@@ -792,6 +792,7 @@ def resolve_font_path(font: str) -> str:
 | GET | `/api/tasks/{id}` | 查询任务详情（轮询进度） |
 | POST | `/api/tasks/{id}/resume` | 续传中断任务 |
 | POST | `/api/tasks/{id}/stop` | 停止运行中的任务 |
+| POST | `/api/tasks/sweep` | 僵尸任务磁盘清理（v5.0：超龄且非活跃任务，默认保护 running/queued/pending） |
 | GET | `/api/video/{id}` | 下载/流式播放最终视频 |
 
 ### 中间产物（artifacts）
