@@ -58,7 +58,37 @@ KEY_EVENTS = [
 ]
 
 
-def build_client():
+def get_service_account_email() -> str:
+    """从 GOOGLE_APPLICATION_CREDENTIALS 指向的 JSON 中读取服务账号邮箱。"""
+    path = os.environ.get("GOOGLE_APPLICATION_CREDENTIALS", "")
+    if not path or not os.path.exists(path):
+        return ""
+    try:
+        import json
+
+        with open(path, encoding="utf-8") as f:
+            return json.load(f).get("client_email", "")
+    except Exception:
+        return ""
+
+
+def print_permission_help(property_id: str):
+    """403 时的授权指引（服务账号需先在 GA4 媒体资源中加为查看者）。"""
+    email = get_service_account_email()
+    print("\n" + "=" * 60)
+    print("权限不足（403 PERMISSION_DENIED）")
+    print("=" * 60)
+    print("服务账号尚未被授权访问该 GA4 媒体资源，请完成以下两步：")
+    if email:
+        print(f"\n  1. 打开 https://analytics.google.com 并登录（需媒体资源所有者账号）")
+        print(f"  2. 左下角「管理」→「媒体资源访问权限管理」→ 右上角「+」")
+        print(f"     添加用户/邮箱：{email}")
+    print(f"     角色选「查看者」即可（Admin API 写入会自动获得对应权限）")
+    print(f"\n完成后重新运行本脚本即可继续（无需其他改动）。")
+    print("=" * 60)
+
+
+def build_client(transport: str = "rest"):
     try:
         from google.analytics.admin_v1beta import AnalyticsAdminServiceClient
     except ImportError:
@@ -67,13 +97,17 @@ def build_client():
             "  pip install google-analytics-admin\n"
             "并使用 GOOGLE_APPLICATION_CREDENTIALS 指向服务账号 JSON。"
         )
-    return AnalyticsAdminServiceClient()
+    # transport=rest 走 HTTP/JSON，使用 requests（尊重 HTTPS_PROXY/HTTP_PROXY 环境变量）；
+    # 国内网络访问 Google 需配置代理，gRPC 通道不走系统代理是常见坑。
+    if transport == "grpc":
+        return AnalyticsAdminServiceClient()
+    return AnalyticsAdminServiceClient(transport="rest")
 
 
-def run(property_id: str, dry_run: bool) -> int:
+def run(property_id: str, dry_run: bool, transport: str = "rest") -> int:
     from google.analytics.admin_v1beta.types import CustomDimension, KeyEvent
 
-    client = build_client()
+    client = build_client(transport)
     parent = f"properties/{property_id}"
     print(f"目标资源：{parent}\n")
 
@@ -85,7 +119,10 @@ def run(property_id: str, dry_run: bool) -> int:
             existing[dim.parameter_name] = dim.display_name
     except Exception as e:
         print(f"[!] 读取现有维度失败：{e}")
-        print("    请确认：Property ID 正确、Admin API 已启用、服务账号已授权。")
+        if "PERMISSION_DENIED" in str(e) or "403" in str(e):
+            print_permission_help(property_id)
+        else:
+            print("    请确认：Property ID 正确、Admin API 已启用、网络/代理可用。")
         return 1
 
     created = 0
@@ -97,12 +134,19 @@ def run(property_id: str, dry_run: bool) -> int:
             print(f"  [dry]  将创建维度 {param}（{display}）")
             continue
         try:
+            # 兼容不同 SDK 版本的事件作用域枚举命名：
+            #   旧版: CustomDimension.Scope.SCOPE_EVENT
+            #   新版 (>=0.30): CustomDimension.DimensionScope.EVENT
+            try:
+                event_scope = CustomDimension.Scope.SCOPE_EVENT
+            except AttributeError:
+                event_scope = CustomDimension.DimensionScope.EVENT
             client.create_custom_dimension(
                 parent=parent,
                 custom_dimension=CustomDimension(
                     parameter_name=param,
                     display_name=display,
-                    scope=CustomDimension.Scope.SCOPE_EVENT,
+                    scope=event_scope,
                 ),
             )
             created += 1
@@ -156,6 +200,13 @@ def main():
         action="store_true",
         help="仅预览将要创建的项目，不实际修改",
     )
+    parser.add_argument(
+        "--transport",
+        choices=["rest", "grpc"],
+        default="rest",
+        help="API 传输方式。rest 走 HTTP/JSON（默认，尊重系统代理环境变量）；"
+             "grpc 走 gRPC（不读 HTTPS_PROXY，国内网络可能连不上）",
+    )
     args = parser.parse_args()
 
     if not os.environ.get("GOOGLE_APPLICATION_CREDENTIALS"):
@@ -163,7 +214,7 @@ def main():
             "请设置 GOOGLE_APPLICATION_CREDENTIALS 环境变量指向服务账号 JSON，"
             "例如：GOOGLE_APPLICATION_CREDENTIALS=/path/to/sa.json"
         )
-    sys.exit(run(args.property_id, args.dry_run))
+    sys.exit(run(args.property_id, args.dry_run, args.transport))
 
 
 if __name__ == "__main__":

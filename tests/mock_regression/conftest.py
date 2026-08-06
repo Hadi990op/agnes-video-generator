@@ -36,7 +36,7 @@ def mock_video_api(monkeypatch):
     paths = [
         "core.api.agnes_video.AgnesVideoAPI",
         "core.pipelines.simple_video.AgnesVideoAPI",
-        "core.pipelines.creative_video.AgnesVideoAPI",
+        "core.pipelines.creative.pipeline.AgnesVideoAPI",
         "core.pipelines.manuscript_video.AgnesVideoAPI",
         "core.pipelines.anchor_video.AgnesVideoAPI",
         "core.pipelines.poetry_video.AgnesVideoAPI",
@@ -50,7 +50,7 @@ def mock_image_api(monkeypatch):
     """替换 AgnesImageAPI 为 mock 版本。"""
     paths = [
         "core.api.agnes_image.AgnesImageAPI",
-        "core.pipelines.creative_video.AgnesImageAPI",
+        "core.pipelines.creative.pipeline.AgnesImageAPI",
         "core.pipelines.anchor_video.AgnesImageAPI",
     ]
     for p in paths:
@@ -74,12 +74,10 @@ def mock_edge_tts(monkeypatch):
 
     需要 patch 所有 pipeline 中直接 import EdgeTTSEngine 的位置。
     """
+    # Batch 2（S2）：全部 pipeline 已收敛到共享方法（函数级 import core.audio.tts），
+    # 仅 patch 引擎源头即可覆盖所有调用点
     paths = [
         "core.audio.tts.EdgeTTSEngine",
-        "core.pipelines.manuscript_video.EdgeTTSEngine",
-        "core.pipelines.creative_video.EdgeTTSEngine",
-        "core.pipelines.anchor_video.EdgeTTSEngine",
-        "core.pipelines.poetry_video.EdgeTTSEngine",
     ]
     for p in paths:
         monkeypatch.setattr(p, MockEdgeTTSEngine)

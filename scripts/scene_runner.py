@@ -433,10 +433,12 @@ def validate_artifacts(dir_name: str, sc: ScenarioDef) -> dict:
         elif sc.type == "anchor":
             # anchor: 根据 audio_source 决定哪些 step 必须完成
             audio_source = sd.get("audio_source", "post_stitch")
-            _skippable = set()
+            # v2.0 legacy 字段：v4.0 重构后 MultiScenePipeline 不再更新，
+            # 永远停在 PENDING，检查时豁免（step_clip_generation 仍被更新，不豁免）
+            _skippable = {"step_generate_anchor", "step_split", "step_clip_prompts"}
             if audio_source == "model":
                 # 模型音频模式：跳过 audio/subtitle/concatenation 步骤
-                _skippable = {"step_subtitle", "step_concatenation"}
+                _skippable |= {"step_audio", "step_subtitle", "step_concatenation"}
             active_steps = {k: v for k, v in steps.items() if k not in _skippable}
             incomplete = [k for k, v in active_steps.items() if v != "completed"]
             checks["R3_all_completed"] = not incomplete if active_steps else "N/A"
@@ -444,9 +446,12 @@ def validate_artifacts(dir_name: str, sc: ScenarioDef) -> dict:
         else:
             # creative: 非 keyframes 模式下 end_frame 步骤可跳过
             chaining_mode = sd.get("chaining_mode", "none")
-            _skippable = set()
+            # v2.0 legacy 字段：v4.0 重构后 MultiScenePipeline 不再更新，
+            # 永远停在 PENDING，检查时豁免（manuscript: step_split/step_scene_prompts；
+            # creative: step_audio_subtitle；poetry 无 legacy 字段）
+            _skippable = {"step_audio_subtitle", "step_split", "step_scene_prompts"}
             if sc.type == "creative" and chaining_mode not in ("keyframes",):
-                _skippable = {"step_end_frame_prompts", "step_end_frame_generation"}
+                _skippable |= {"step_end_frame_prompts", "step_end_frame_generation"}
             active_steps = {k: v for k, v in steps.items() if k not in _skippable}
             incomplete = [k for k, v in active_steps.items() if v != "completed"]
             checks["R3_all_completed"] = not incomplete if active_steps else "N/A"

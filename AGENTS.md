@@ -2,7 +2,7 @@
 
 > **面向对象**：SoftwareCompany 团队（产品经理 / 架构师 / 工程师 / QA 工程师）及 AI Agent
 > **当前阶段**：🟢 **开发完成（v2.0） — 维护模式**
-> **配套文档**：`docs/regression_test_plan.md`（大版本回归）、`docs/plans-v1.0/system_design.md`（v1.0 原始设计）
+> **配套文档**：`docs/regression_test_plan.md`（大版本回归）、`docs/plans-v1.0/system_design.md`（v1.0 原始设计）、`docs/plans-v5.0/refactor_plan.md`（工程化重构计划，重构唯一状态源）
 
 ---
 
@@ -258,6 +258,7 @@ Docker 镜像已声明 `VOLUME`，纯 `docker run -p 8765:8765 <镜像>` 会将�
 | **"部署项目" / "初始化环境"** | 按「〇、新环境部署与验证」执行 | 全新环境部署 |
 | **"Docker 部署" / "容器化部署"** | 按「0.5 Docker 部署」执行 | Docker 容器部署，无需 Python/FFmpeg |
 | **"验证项目" / "跑一下检查"** | 按「0.4 部署验证清单」执行 | 部署后验证 |
+| **"执行重构" / "推进重构批次"** | 按 `docs/plans-v5.0/refactor_plan.md` 执行对应批次任务 | 每完成一个任务须更新文档 §五 状态表 + §六 验证清单 |
 
 ---
 
@@ -301,7 +302,13 @@ Docker 镜像已声明 `VOLUME`，纯 `docker run -p 8765:8765 <镜像>` 会将�
 
 ```
 agnes-video-generator/
-├── server.py                         # FastAPI 主服务，六种任务路由 + 图片生成 + 工作区管理 + artifacts
+├── server.py                         # FastAPI 入口（瘦身版 ~145 行）：app 组装 + lifespan + 启动 + 兼容 re-export
+├── web/                              # Web 路由层（Batch 1 模块化拆分，v5.0）
+│   ├── __init__.py
+│   ├── app_state.py                  # 应用级全局状态：并发控制（WeightedSemaphore）/ active_pipelines / 生命周期
+│   ├── helpers.py                    # 纯工具函数：字幕样式解析、音色试听/兼容、时长提取、图片 prompt
+│   ├── deps.py                       # 共享依赖：Pipeline 工厂 + 并发受控执行器（含下划线兼容别名）
+│   └── routes/                       # 8 个 APIRouter 模块（config/workspace/voice/image/video/task/creation/utility）
 ├── start.sh                          # 一键启动脚本（venv + pip install + run）
 ├── Dockerfile                        # 多平台 Docker 镜像（Python 3.11 + imageio-ffmpeg 静态二进制）
 ├── docker-compose.yml                # Docker Compose（bind mount 持久化工作区 + 配置）
@@ -318,7 +325,12 @@ agnes-video-generator/
 │   ├── __init__.py
 │   ├── config.py                     # API Key/水印/工作区持久化、字体 CJK 回退、音视频默认配置
 │   ├── task_manager.py               # 任务状态持久化，多态反序列化，向后兼容
-│   ├── screenwriter.py               # 编剧 Agent（故事/脚本/旁白/角色提取/尾帧/诗词场景 prompt）
+│   ├── screenwriter/                  # 编剧 Agent 包（Batch 4/4.1 拆分；story/scenes/characters/style mixin）
+│   │   ├── __init__.py                # Screenwriter 组合 + 核心聊天基础设施 + re-export
+│   │   ├── story.py                   # 旁白清洗 + 故事/脚本/旁白生成
+│   │   ├── scenes.py                  # 分镜/段落场景/诗词场景 prompt
+│   │   ├── characters.py              # 角色提取/尾帧/数字人 prompt
+│   │   └── style.py                   # 字幕 LLM 智能样式
 │   ├── artifacts.py                  # 中间产物注册表 + 级联删除计划（creative/manuscript/anchor）
 │   │
 │   ├── pipeline.py                   # 向后兼容别名 → core.pipelines.creative_video
@@ -336,12 +348,20 @@ agnes-video-generator/
 │   ├── audio/
 │   │   ├── __init__.py
 │   │   ├── tts.py                    # EdgeTTSEngine（旁白+词级时间戳）+ SilentTTSEngine
-│   │   ├── subtitle.py               # SRT 生成（词级细粒度 + 多行换行）+ moviepy 字幕叠加
+│   │   ├── subtitle/                  # 字幕包（Batch 4/4.3 拆分）
+│   │   │   ├── __init__.py            # 包入口：SubtitleGenerator = SubtitleSrtMixin + SubtitleRenderMixin 组合（含运行时注入）
+│   │   │   ├── generator.py           # SubtitleSrtMixin：SRT 生成（词级细粒度 + 多行换行）+ 6 常量
+│   │   │   └── renderer.py            # SubtitleRenderMixin：moviepy 字幕叠加
+│   │   ├── subtitle.py               # 兼容 re-export → core.audio.subtitle
 │   │   └── voices.py                 # 音色目录（13 语言分组）+ 跨脚本兼容性校验矩阵
 │   │
 │   ├── compositor/
 │   │   ├── __init__.py
-│   │   ├── concatenator.py           # 视频拼接 + 统一音频/字幕叠加（MoneyPrinterTurbo 方式）
+│   │   ├── concatenator/              # 拼接包（Batch 4/4.3 拆分）
+│   │   │   ├── __init__.py            # 包入口：VideoConcatenator = ConcatMixin + AudioOverlayMixin 组合（含运行时注入）
+│   │   │   ├── concat.py              # ConcatMixin：视频拼接 + 字幕 clip 解析 + 4 常量
+│   │   │   └── audio_overlay.py       # AudioOverlayMixin：音频叠加拼接 + 数字人合成（常量复用 .concat）
+│   │   ├── concatenator.py           # 兼容 re-export → core.compositor.concatenator
 │   │   ├── processor.py              # 视频缩放/帧提取/定格延长/静音音频生成
 │   │   └── watermark.py              # ffmpeg overlay 水印叠加 + 语言检测
 │   │
@@ -349,7 +369,14 @@ agnes-video-generator/
 │       ├── __init__.py               # BasePipeline 抽象基类（共享 shutdown/WS 推送/字幕/水印）
 │       ├── multi_scene.py            # MultiScenePipeline 多场景模板方法基类（v4.0 重构核心）
 │       ├── simple_video.py           # 类型 1：单 prompt → 单视频（直接继承 BasePipeline）
-│       ├── creative_video.py         # 类型 2：创意长视频（继承 MultiScenePipeline）
+│       ├── creative/                  # 类型 2：创意长视频包（Batch 4/4.2 拆分）
+│       │   ├── __init__.py            # 包入口 re-export（CreativeVideoPipeline + 4 mixin）
+│       │   ├── pipeline.py            # 主类：mixin 组合 + 模板钩子 + state（mock patch 目标）
+│       │   ├── steps_script.py        # 编剧步骤（图片分析/场景配置/故事/角色/脚本/尾帧 prompt）
+│       │   ├── steps_frames.py        # 参考图/尾帧（归一化/预生成/场景任务落盘）
+│       │   ├── steps_video.py         # 视频生成（independent/chained/keyframes）
+│       │   └── steps_audio.py         # 音频/字幕/拼接 + 旁白切分（常量/helper）
+│       ├── creative_video.py          # 类型 2 兼容 re-export → core.pipelines.creative
 │       ├── manuscript_video.py       # 类型 3：稿件长视频（继承 MultiScenePipeline）
 │       ├── anchor_video.py           # 类型 4：数字人口播（继承 MultiScenePipeline）
 │       └── poetry_video.py           # 类型 6：诗词视频（继承 MultiScenePipeline）
@@ -376,6 +403,7 @@ agnes-video-generator/
 │
 ├── tests/
 │   ├── test_core.py                  # 核心单元测试
+│   ├── test_audio_fallback.py        # 共享音频降级方法行为对照用例（Batch 2/S2）
 │   └── mock_regression/              # mock 回归框架（mock API + fixture + 流水线测试）
 │       ├── conftest.py / mock_apis.py / test_pipelines.py
 │       ├── assets/                   # 测试图片/视频
@@ -390,6 +418,7 @@ agnes-video-generator/
     ├── plans-v2.0/                   # v2.0 计划 & 审查（code review、bug fix、i2i 优化）
     ├── plans-v3.0/                   # v3.0 计划文档
     ├── plans-v4.0/                   # v4.0 计划（mock 回归设计、pipeline 重构）
+    ├── plans-v5.0/                   # v5.0 计划（工程化重构：server 模块化、音频收敛、契约修复等）
     └── release-notes/                # v2.0 ~ v3.0 发布说明
 ```
 
@@ -763,6 +792,7 @@ def resolve_font_path(font: str) -> str:
 | GET | `/api/tasks/{id}` | 查询任务详情（轮询进度） |
 | POST | `/api/tasks/{id}/resume` | 续传中断任务 |
 | POST | `/api/tasks/{id}/stop` | 停止运行中的任务 |
+| POST | `/api/tasks/sweep` | 僵尸任务磁盘清理（v5.0：超龄且非活跃任务，默认保护 running/queued/pending） |
 | GET | `/api/video/{id}` | 下载/流式播放最终视频 |
 
 ### 中间产物（artifacts）

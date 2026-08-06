@@ -16,13 +16,40 @@ import asyncio
 import logging
 import os
 from abc import abstractmethod
+from dataclasses import dataclass
 from typing import Callable, List, Optional
 
-from core.audio.tts import EdgeTTSEngine, SilentTTSEngine
 from core.pipelines import BasePipeline, PipelineShutdown
-from models.task import SceneTask, StepStatus, AudioConfig, SubtitleConfig
+from models.task import SceneTask, StepStatus
 
 logger = logging.getLogger(__name__)
+
+
+# ═══════════════════════════════════════════════════════════════
+# 命名常量（v5.0 Batch 5 / 5.3 魔法数字收敛）
+# ═══════════════════════════════════════════════════════════════
+
+@dataclass(frozen=True)
+class StepProgressLimits:
+    """模板方法各阶段的进度边界（0.0 ~ 1.0）。"""
+
+    build_start: float = 0.0      # Phase 1 分镜
+    build_end: float = 0.15
+    reference_end: float = 0.30   # Phase 2 参考图
+    video_end: float = 0.75       # Phase 3 视频生成
+    audio_end: float = 0.85       # Phase 4 配音
+    subtitle_end: float = 0.90    # Phase 5 字幕
+    composite_end: float = 0.98   # Phase 6 合成
+    done: float = 1.0             # 完成
+
+
+_PROGRESS = StepProgressLimits()
+
+# 失败/中断事件的统一进度值
+_PROGRESS_FAILED = 0.0
+
+# 视频等待失败的重试间隔基数（秒）：delay = 基数 * (retry + 1)
+_RETRY_INTERVAL_BASE_SECONDS = 20
 
 
 class MultiScenePipeline(BasePipeline):
@@ -46,6 +73,10 @@ class MultiScenePipeline(BasePipeline):
         - ``_set_subtitle_paths``         字幕路径写回 state
     """
 
+    # v5.0 Batch 3（S3，方案 A）：粗粒度步骤级 skip 默认开启；
+    # Creative 依赖各 ``_step_*`` 读盘做细粒度续传，置 False 禁用（原覆写已删除）。
+    coarse_skip: bool = True
+
     # ==================================================================
     # 模板方法：run()
     # ==================================================================
@@ -56,44 +87,44 @@ class MultiScenePipeline(BasePipeline):
         self._state.status = StepStatus.RUNNING
         self.task_manager.create(self._state)
 
-        await self._emit("init", "running", self._get_init_message(), 0.0)
+        await self._emit("init", "running", self._get_init_message(), _PROGRESS.build_start)
 
         try:
             # Phase 1: 分镜/拆段 → List[SceneTask]
             await self._execute_step(
                 "step_build_scenes", self._build_scenes,
-                0.0, 0.15, "构建分镜", "分镜构建完成",
+                _PROGRESS.build_start, _PROGRESS.build_end, "构建分镜", "分镜构建完成",
             )
 
             # Phase 2: 参考图（可选，子类可空实现跳过）
             await self._execute_step(
                 "step_reference_images", self._build_reference_images,
-                0.15, 0.30, "生成参考图", "参考图生成完成",
+                _PROGRESS.build_end, _PROGRESS.reference_end, "生成参考图", "参考图生成完成",
             )
 
             # Phase 3: 视频生成（通用，子类可覆写保留链式/循环逻辑）
             await self._execute_step(
                 "step_video_generation", self._generate_videos,
-                0.30, 0.75, "生成视频", "视频生成完成",
+                _PROGRESS.reference_end, _PROGRESS.video_end, "生成视频", "视频生成完成",
             )
 
             # Phase 4: 配音（通用，子类可覆写）
             sub_maker = await self._execute_step(
                 "step_audio", self._generate_audio,
-                0.75, 0.85, "生成配音", "配音完成",
+                _PROGRESS.video_end, _PROGRESS.audio_end, "生成配音", "配音完成",
             )
 
             # Phase 5: 字幕（通用，子类可覆写）
             await self._execute_step(
                 "step_subtitle",
                 lambda: self._generate_subtitles(sub_maker),
-                0.85, 0.90, "生成字幕", "字幕完成",
+                _PROGRESS.audio_end, _PROGRESS.subtitle_end, "生成字幕", "字幕完成",
             )
 
             # Phase 6: 合成
             final_video = await self._execute_step(
                 "step_concatenation", self._composite_final,
-                0.90, 0.98, "合成视频", "合成完成",
+                _PROGRESS.subtitle_end, _PROGRESS.composite_end, "合成视频", "合成完成",
             )
 
             # 后处理：水印（继承自 BasePipeline）
@@ -107,18 +138,18 @@ class MultiScenePipeline(BasePipeline):
                 final_video_file=final_video,
             )
             await self._emit(
-                "done", "completed", "视频生成完成!", 1.0,
+                "done", "completed", "视频生成完成!", _PROGRESS.done,
                 {"final_video": final_video},
             )
             return final_video
 
         except PipelineShutdown:
-            await self._emit("error", "failed", "任务已被中断，可从任务列表续传", 0.0)
+            await self._emit("error", "failed", "任务已被中断，可从任务列表续传", _PROGRESS_FAILED)
             raise
         except Exception as e:
             self._state.status = StepStatus.FAILED
             self.task_manager.update_state(status=StepStatus.FAILED)
-            await self._emit("error", "failed", str(e), 0.0)
+            await self._emit("error", "failed", str(e), _PROGRESS_FAILED)
             raise
 
     # ==================================================================
@@ -129,12 +160,16 @@ class MultiScenePipeline(BasePipeline):
         self, step_name: str, action: Callable,
         progress_start: float, progress_end: float,
         running_msg: str, completed_msg: str,
+        coarse_skip: Optional[bool] = None,
     ):
         """统一的步骤执行器：自动处理断点续传、状态标记、进度上报。
 
-        若 ``self._state`` 上对应步骤字段已为 COMPLETED，则跳过（断点续传）。
+        断点续传规则：启用粗粒度 skip 时（显式 ``coarse_skip`` 覆盖，缺省取
+        ``self.coarse_skip``），若 ``self._state`` 上对应步骤字段已为 COMPLETED
+        则整步跳过；禁用时总是执行，由步骤内部按文件/字段做细粒度续传。
         """
-        if getattr(self._state, step_name, StepStatus.PENDING) == StepStatus.COMPLETED:
+        skip_enabled = self.coarse_skip if coarse_skip is None else coarse_skip
+        if skip_enabled and getattr(self._state, step_name, StepStatus.PENDING) == StepStatus.COMPLETED:
             logger.info(f"[Pipeline] Step {step_name}: already completed, skipping")
             return None
 
@@ -237,7 +272,7 @@ class MultiScenePipeline(BasePipeline):
                 return await self.video_api.wait_for_video(video_id)
             except Exception as e:
                 if retry < max_retries - 1:
-                    delay = 20 * (retry + 1)
+                    delay = _RETRY_INTERVAL_BASE_SECONDS * (retry + 1)
                     logger.warning(
                         f"Video {video_id[:16]} retry {retry + 1}/{max_retries}: {e}"
                     )
@@ -258,8 +293,8 @@ class MultiScenePipeline(BasePipeline):
             text = self._get_narration_text()
             return await self._recover_sub_maker(
                 text,
-                self._state.audio_config if hasattr(self._state, "audio_config") else AudioConfig(),
-                self._state.subtitle_config if hasattr(self._state, "subtitle_config") else None,
+                self._state.audio_config,
+                self._state.subtitle_config,
             )
 
         text = self._get_narration_text()
@@ -268,48 +303,20 @@ class MultiScenePipeline(BasePipeline):
             return None
 
         total_duration = sum(float(s.duration) for s in self._state.scenes)
-        audio_config = self._state.audio_config if hasattr(self._state, "audio_config") \
-            else AudioConfig()
+        # Batch 3（S4）：audio_config/subtitle_config 已为 BaseTaskState 共享字段
+        audio_config = self._state.audio_config
+        subtitle_config = self._state.subtitle_config
 
-        edge_tts = EdgeTTSEngine()
-        silent_tts = SilentTTSEngine()
+        await self._emit("audio", "running", f"生成配音 ({len(text)} 字)...", _PROGRESS.audio_end)
 
-        await self._emit("audio", "running", f"生成配音 ({len(text)} 字)...", 0.75)
-
-        sub_maker = None
-        # 路径 B（v2.0）：音频关但字幕开 → 仅采集 cues，不落音频（silent 占位供合成）
-        subtitle_config = self._state.subtitle_config if hasattr(self._state, "subtitle_config") else None
-        subtitle_enabled = bool(getattr(subtitle_config, "enabled", False))
-        harvest_cues = bool(getattr(subtitle_config, "harvest_cues_when_audio_off", True))
-
-        if audio_config.enabled:
-            try:
-                _, sub_maker = await edge_tts.generate(
-                    text=text, output_path=audio_path,
-                    voice=audio_config.voice, rate=audio_config.rate,
-                )
-            except RuntimeError as e:
-                logger.warning(f"[MultiScene] EdgeTTS failed, falling back to silent: {e}")
-                await silent_tts.generate(
-                    text=text, output_path=audio_path,
-                    duration_sec=total_duration,
-                )
-        elif subtitle_enabled and harvest_cues:
-            try:
-                sub_maker = await edge_tts.harvest_cues(
-                    text=text, voice=audio_config.voice, rate=audio_config.rate,
-                )
-            except RuntimeError as e:
-                logger.warning(f"[MultiScene] harvest_cues failed, silent fallback: {e}")
-            await silent_tts.generate(
-                text=text, output_path=audio_path,
-                duration_sec=total_duration,
-            )
-        else:
-            await silent_tts.generate(
-                text=text, output_path=audio_path,
-                duration_sec=total_duration,
-            )
+        sub_maker = await self._generate_audio_with_fallback(
+            output_path=audio_path,
+            text=text,
+            audio_config=audio_config,
+            subtitle_config=subtitle_config,
+            duration_sec=total_duration,
+            empty_placeholder="",
+        )
 
         self._state.combined_audio = audio_path
         self.task_manager.update_state(combined_audio=audio_path)
@@ -317,7 +324,7 @@ class MultiScenePipeline(BasePipeline):
 
     async def _generate_subtitles(self, sub_maker: Optional[object] = None) -> None:
         """通用字幕生成（复用 BasePipeline.generate_subtitles_common）。"""
-        if not getattr(self._state.subtitle_config, "enabled", True):
+        if not self._state.subtitle_config.enabled:
             return
         texts, durs = self._get_segment_texts_and_durations()
         srt_path, styles_path = await self.generate_subtitles_common(
@@ -326,7 +333,7 @@ class MultiScenePipeline(BasePipeline):
             subtitle_config=self._state.subtitle_config,
             sub_maker=sub_maker,
             audio_path=self._state.combined_audio or "",
-            screenwriter=self.screenwriter if hasattr(self, "screenwriter") else None,
+            screenwriter=self.screenwriter,
             video_width=self._state.video_width,
             video_height=self._state.video_height,
         )

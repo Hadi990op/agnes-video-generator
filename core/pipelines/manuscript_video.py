@@ -16,7 +16,6 @@ import re
 from typing import Callable, List, Optional
 
 from core.api.agnes_video import AgnesVideoAPI
-from core.audio.tts import EdgeTTSEngine, SilentTTSEngine
 from core.compositor.concatenator import VideoConcatenator
 from core.screenwriter import Screenwriter
 from core.pipelines import MultiScenePipeline, PipelineShutdown
@@ -40,6 +39,21 @@ _CHARS_PER_SEC = 4.0
 # Greedy-merge duration thresholds (seconds).
 _MAX_SEGMENT_DURATION = 12.0
 _MIN_SEGMENT_DURATION = 5.0
+
+# 重试间隔基数（秒）：delay = 基数 * (retry + 1)
+_SUBMIT_RETRY_INTERVAL_BASE_SECONDS = 15
+_WAIT_RETRY_INTERVAL_BASE_SECONDS = 20
+
+# 进度映射基数（阶段内线性插值）：progress = 起始 + 跨度 * (i / max(total, 1))
+_PROGRESS_SCENE_PROMPTS_START = 0.05
+_PROGRESS_SCENE_PROMPTS_SPAN = 0.10
+_PROGRESS_SUBMIT_START = 0.15
+_PROGRESS_SUBMIT_SPAN = 0.20
+_PROGRESS_WAIT_START = 0.35
+_PROGRESS_WAIT_SPAN = 0.25
+_PROGRESS_AUDIO_START = 0.60
+_PROGRESS_SUBTITLE_START = 0.75
+_PROGRESS_CONCAT_START = 0.80
 
 
 class ManuscriptVideoPipeline(MultiScenePipeline):
@@ -228,7 +242,7 @@ class ManuscriptVideoPipeline(MultiScenePipeline):
             await self._emit(
                 "scene_prompts", "running",
                 f"生成场景描述 {i + 1}/{total}",
-                0.05 + 0.10 * (i / max(total, 1)),
+                _PROGRESS_SCENE_PROMPTS_START + _PROGRESS_SCENE_PROMPTS_SPAN * (i / max(total, 1)),
             )
 
             prompt = await asyncio.to_thread(
@@ -297,7 +311,7 @@ class ManuscriptVideoPipeline(MultiScenePipeline):
             await self._emit(
                 "video_gen", "running",
                 f"提交视频 {i + 1}/{total}",
-                0.15 + 0.20 * (i / max(total, 1)),
+                _PROGRESS_SUBMIT_START + _PROGRESS_SUBMIT_SPAN * (i / max(total, 1)),
             )
 
             para_duration = max(int(math.ceil(len(para.text) / _CHARS_PER_SEC)), 3)
@@ -316,7 +330,7 @@ class ManuscriptVideoPipeline(MultiScenePipeline):
                     break
                 except Exception as e:
                     if retry < _SUBMIT_RETRIES - 1:
-                        delay = 15 * (retry + 1)
+                        delay = _SUBMIT_RETRY_INTERVAL_BASE_SECONDS * (retry + 1)
                         logger.warning(
                             "[Manuscript] video: paragraph %d submit failed "
                             "(%s), retry %d/%d in %ds...",
@@ -336,7 +350,7 @@ class ManuscriptVideoPipeline(MultiScenePipeline):
             await self._emit(
                 "video_gen", "running",
                 f"等待视频 {j + 1}/{len(pending)} ({video_id[:16]}...)",
-                0.35 + 0.25 * (j / max(len(pending), 1)),
+                _PROGRESS_WAIT_START + _PROGRESS_WAIT_SPAN * (j / max(len(pending), 1)),
             )
 
             for retry in range(_WAIT_RETRIES):
@@ -346,7 +360,7 @@ class ManuscriptVideoPipeline(MultiScenePipeline):
                     break
                 except Exception as e:
                     if retry < _WAIT_RETRIES - 1:
-                        delay = 20 * (retry + 1)
+                        delay = _WAIT_RETRY_INTERVAL_BASE_SECONDS * (retry + 1)
                         logger.warning(
                             "[Manuscript] video: paragraph %d wait failed "
                             "(%s), retry %d/%d in %ds...",
@@ -382,54 +396,23 @@ class ManuscriptVideoPipeline(MultiScenePipeline):
                 full_text, self._state.audio_config, self._state.subtitle_config,
             )
 
-        edge_tts = EdgeTTSEngine()
-        silent_tts = SilentTTSEngine()
-
         await self._emit(
             "audio", "running",
             f"生成整段旁白 ({len(full_text)} 字)...",
-            0.60,
+            _PROGRESS_AUDIO_START,
         )
 
-        sub_maker = None
-        subtitle_config = self._state.subtitle_config
-        harvest = bool(subtitle_config.enabled) and bool(subtitle_config.harvest_cues_when_audio_off)
-        if audio_config.enabled:
-            try:
-                audio_result, sub_maker = await edge_tts.generate(
-                    text=full_text,
-                    output_path=audio_path,
-                    voice=audio_config.voice,
-                    rate=audio_config.rate,
-                )
-            except RuntimeError as e:
-                logger.warning(f"[Manuscript] EdgeTTS failed, falling back to silent: {e}")
-                audio_result, sub_maker = await silent_tts.generate(
-                    text=full_text,
-                    output_path=audio_path,
-                )
-        elif harvest:
-            # 路径 B（v2.0）：音频关、字幕开 → 仅采集 cues，不落音频；silent 占位供合成
-            try:
-                sub_maker = await edge_tts.harvest_cues(
-                    text=full_text,
-                    voice=audio_config.voice,
-                    rate=audio_config.rate,
-                )
-            except RuntimeError as e:
-                logger.warning(f"[Manuscript] harvest_cues failed, silent fallback: {e}")
-            audio_result, _ = await silent_tts.generate(
-                text=full_text,
-                output_path=audio_path,
-            )
-        else:
-            audio_result, sub_maker = await silent_tts.generate(
-                text=full_text,
-                output_path=audio_path,
-            )
+        sub_maker = await self._generate_audio_with_fallback(
+            output_path=audio_path,
+            text=full_text,
+            audio_config=audio_config,
+            subtitle_config=self._state.subtitle_config,
+            duration_sec=0.0,  # 原实现未指定时长，由引擎按文本估算
+            empty_placeholder="",
+        )
 
-        self._state.combined_audio = audio_result
-        self.task_manager.update_state(combined_audio=audio_result)
+        self._state.combined_audio = audio_path
+        self.task_manager.update_state(combined_audio=audio_path)
         logger.info("[Manuscript] audio: combined → %s", audio_path)
         return sub_maker
 
@@ -450,7 +433,7 @@ class ManuscriptVideoPipeline(MultiScenePipeline):
         await self._emit(
             "subtitle", "running",
             f"生成整段字幕 ({sum(len(t) for t in segment_texts)} 字, {len(paragraphs)} 段)...",
-            0.75,
+            _PROGRESS_SUBTITLE_START,
         )
 
         srt_path, styles_path = await self.generate_subtitles_common(
@@ -516,7 +499,7 @@ class ManuscriptVideoPipeline(MultiScenePipeline):
         if has_audio or has_subtitle:
             await self._emit(
                 "concatenate", "running",
-                f"拼接 {len(video_paths)} 段视频+音频+字幕...", 0.80,
+                f"拼接 {len(video_paths)} 段视频+音频+字幕...", _PROGRESS_CONCAT_START,
             )
             await asyncio.to_thread(
                 VideoConcatenator.concat_videos_with_audio_overlay,
@@ -530,7 +513,7 @@ class ManuscriptVideoPipeline(MultiScenePipeline):
         else:
             await self._emit(
                 "concatenate", "running",
-                f"拼接 {len(video_paths)} 段视频（无音频字幕）...", 0.80,
+                f"拼接 {len(video_paths)} 段视频（无音频字幕）...", _PROGRESS_CONCAT_START,
             )
             await asyncio.to_thread(
                 VideoConcatenator.concat_videos, video_paths, output_path
