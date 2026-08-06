@@ -3,6 +3,9 @@
 覆盖 list_artifacts / resolve_artifact / get_cascade_plan / apply_cascade_plan
 以及内部辅助函数。不依赖 ffmpeg / 网络，秒级运行。
 """
+import os
+import time
+
 import pytest
 
 from core.artifacts import (
@@ -16,6 +19,7 @@ from core.artifacts import (
     get_cascade_plan,
     list_artifacts,
     resolve_artifact,
+    sweep_stale_tasks,
 )
 from models.task import (
     AnchorVideoTask,
@@ -259,3 +263,89 @@ def test_apply_cascade_plan_returns_scenes_kwargs(monkeypatch, tmp_path):
     kwargs = apply_cascade_plan(state, plan)
     assert "scenes" in kwargs
     assert kwargs["scenes"] is state.scenes
+
+
+# ── sweep_stale_tasks：僵尸任务磁盘清理（v5.0 Batch 5 / 5.1）──────────────────
+
+def _make_task(working, name, status, age_days=30, broken=False):
+    """在 working 下构造任务目录：task_state.json（可指定 mtime 距今天数）。"""
+    d = working / name
+    d.mkdir(parents=True)
+    payload = '{"broken' if broken else f'{{"status": "{status}", "task_type": "creative"}}'
+    f = d / "task_state.json"
+    f.write_text(payload, encoding="utf-8")
+    if age_days is not None:
+        ts = time.time() - age_days * 86400
+        os.utime(f, (ts, ts))
+    return d
+
+
+def test_sweep_removes_stale_completed(monkeypatch, tmp_path):
+    monkeypatch.setattr("core.artifacts.get_working_dir", lambda: str(tmp_path))
+    _make_task(tmp_path, "old_done", "completed", age_days=30)
+    _make_task(tmp_path, "old_failed", "failed", age_days=30)
+    result = sweep_stale_tasks(age_days=7)
+    assert result["swept"] == ["old_done", "old_failed"]
+    assert result["protected"] == []
+    assert not (tmp_path / "old_done").exists()
+
+
+def test_sweep_protects_running_queued_pending(monkeypatch, tmp_path):
+    """活跃/排队/断点续传状态即使超龄也不清理（默认保护集合）。"""
+    monkeypatch.setattr("core.artifacts.get_working_dir", lambda: str(tmp_path))
+    _make_task(tmp_path, "t_run", "running", age_days=30)
+    _make_task(tmp_path, "t_queued", "queued", age_days=30)
+    _make_task(tmp_path, "t_pending", "pending", age_days=30)
+    result = sweep_stale_tasks(age_days=7)
+    assert result["swept"] == []
+    assert sorted(result["protected"]) == ["t_pending", "t_queued", "t_run"]
+    assert (tmp_path / "t_pending").exists()
+
+
+def test_sweep_keeps_fresh_tasks(monkeypatch, tmp_path):
+    """未超龄任务即使已完成也不清理。"""
+    monkeypatch.setattr("core.artifacts.get_working_dir", lambda: str(tmp_path))
+    _make_task(tmp_path, "fresh_done", "completed", age_days=1)
+    result = sweep_stale_tasks(age_days=7)
+    assert result["swept"] == []
+    assert result["protected"] == ["fresh_done"]
+
+
+def test_sweep_protect_statuses_override(monkeypatch, tmp_path):
+    """调用方可用 protect_statuses 放开 PENDING（白名单配置）。"""
+    monkeypatch.setattr("core.artifacts.get_working_dir", lambda: str(tmp_path))
+    _make_task(tmp_path, "t_pending", "pending", age_days=30)
+    result = sweep_stale_tasks(
+        age_days=7, protect_statuses={StepStatus.RUNNING, StepStatus.QUEUED}
+    )
+    assert result["swept"] == ["t_pending"]
+
+
+def test_sweep_skips_non_task_dirs_and_reports_broken(monkeypatch, tmp_path):
+    """无 task_state.json 的目录跳过；损坏 JSON 记录 errors 不删除。"""
+    monkeypatch.setattr("core.artifacts.get_working_dir", lambda: str(tmp_path))
+    (tmp_path / "uploads").mkdir()
+    _make_task(tmp_path, "broken", "completed", age_days=30, broken=True)
+    result = sweep_stale_tasks(age_days=7)
+    assert result["swept"] == []
+    assert result["protected"] == []
+    assert len(result["errors"]) == 1
+    assert (tmp_path / "broken").exists()
+    assert (tmp_path / "uploads").exists()
+
+
+def test_sweep_zero_age_days(monkeypatch, tmp_path):
+    """age_days=0 时所有非保护任务均视为超龄。"""
+    monkeypatch.setattr("core.artifacts.get_working_dir", lambda: str(tmp_path))
+    _make_task(tmp_path, "any_done", "completed", age_days=0)
+    _make_task(tmp_path, "any_pending", "pending", age_days=0)
+    result = sweep_stale_tasks(age_days=0)
+    assert result["swept"] == ["any_done"]
+    assert result["protected"] == ["any_pending"]
+
+
+def test_sweep_missing_working_dir(monkeypatch, tmp_path):
+    """工作区不存在时安全返回空结果。"""
+    monkeypatch.setattr("core.artifacts.get_working_dir", lambda: str(tmp_path / "nope"))
+    result = sweep_stale_tasks(age_days=7)
+    assert result == {"swept": [], "protected": [], "errors": []}
