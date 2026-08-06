@@ -325,7 +325,12 @@ agnes-video-generator/
 │   ├── __init__.py
 │   ├── config.py                     # API Key/水印/工作区持久化、字体 CJK 回退、音视频默认配置
 │   ├── task_manager.py               # 任务状态持久化，多态反序列化，向后兼容
-│   ├── screenwriter.py               # 编剧 Agent（故事/脚本/旁白/角色提取/尾帧/诗词场景 prompt）
+│   ├── screenwriter/                  # 编剧 Agent 包（Batch 4/4.1 拆分；story/scenes/characters/style mixin）
+│   │   ├── __init__.py                # Screenwriter 组合 + 核心聊天基础设施 + re-export
+│   │   ├── story.py                   # 旁白清洗 + 故事/脚本/旁白生成
+│   │   ├── scenes.py                  # 分镜/段落场景/诗词场景 prompt
+│   │   ├── characters.py              # 角色提取/尾帧/数字人 prompt
+│   │   └── style.py                   # 字幕 LLM 智能样式
 │   ├── artifacts.py                  # 中间产物注册表 + 级联删除计划（creative/manuscript/anchor）
 │   │
 │   ├── pipeline.py                   # 向后兼容别名 → core.pipelines.creative_video
@@ -356,7 +361,14 @@ agnes-video-generator/
 │       ├── __init__.py               # BasePipeline 抽象基类（共享 shutdown/WS 推送/字幕/水印）
 │       ├── multi_scene.py            # MultiScenePipeline 多场景模板方法基类（v4.0 重构核心）
 │       ├── simple_video.py           # 类型 1：单 prompt → 单视频（直接继承 BasePipeline）
-│       ├── creative_video.py         # 类型 2：创意长视频（继承 MultiScenePipeline）
+│       ├── creative/                  # 类型 2：创意长视频包（Batch 4/4.2 拆分）
+│       │   ├── __init__.py            # 包入口 re-export（CreativeVideoPipeline + 4 mixin）
+│       │   ├── pipeline.py            # 主类：mixin 组合 + 模板钩子 + state（mock patch 目标）
+│       │   ├── steps_script.py        # 编剧步骤（图片分析/场景配置/故事/角色/脚本/尾帧 prompt）
+│       │   ├── steps_frames.py        # 参考图/尾帧（归一化/预生成/场景任务落盘）
+│       │   ├── steps_video.py         # 视频生成（independent/chained/keyframes）
+│       │   └── steps_audio.py         # 音频/字幕/拼接 + 旁白切分（常量/helper）
+│       ├── creative_video.py          # 类型 2 兼容 re-export → core.pipelines.creative
 │       ├── manuscript_video.py       # 类型 3：稿件长视频（继承 MultiScenePipeline）
 │       ├── anchor_video.py           # 类型 4：数字人口播（继承 MultiScenePipeline）
 │       └── poetry_video.py           # 类型 6：诗词视频（继承 MultiScenePipeline）
