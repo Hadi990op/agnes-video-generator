@@ -556,7 +556,6 @@ async def create_task_legacy(
     return await create_creative_task(
         idea=idea,
         creative_name=creative_name,
-        user_requirement=user_requirement,
         style=style,
         chaining_mode=chaining_mode,
         video_width=video_width,
@@ -565,11 +564,20 @@ async def create_task_legacy(
         end_frame_images=end_frame_images,
         use_custom_end_frames=use_custom_end_frames,
         generate_end_frames_from_ref=generate_end_frames_from_ref,
+        # v3.x 场景配置：直接调用时 Form() 默认值是对象而非字符串，
+        # 必须显式传值（旧端点语义：3 个场景，每场景 10 秒）
+        duration_source="manual",
+        scene_count=3,
+        uniform_duration=True,
+        scene_durations_json="[10,10,10]",
         # 提供音频/字幕默认值（旧端点不传这些参数）
         audio_enabled=False,
         audio_voice="zh-CN-XiaoxiaoNeural",
         audio_rate="+0%",
+        audio_lang="",
         subtitle_enabled=True,
+        subtitle_style_mode="fixed",
+        subtitle_style_hints="",
         subtitle_font="STHeitiMedium.ttc",
         subtitle_color="white",
         subtitle_fontsize=48,
