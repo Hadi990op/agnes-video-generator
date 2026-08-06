@@ -348,12 +348,20 @@ agnes-video-generator/
 │   ├── audio/
 │   │   ├── __init__.py
 │   │   ├── tts.py                    # EdgeTTSEngine（旁白+词级时间戳）+ SilentTTSEngine
-│   │   ├── subtitle.py               # SRT 生成（词级细粒度 + 多行换行）+ moviepy 字幕叠加
+│   │   ├── subtitle/                  # 字幕包（Batch 4/4.3 拆分）
+│   │   │   ├── __init__.py            # 包入口：SubtitleGenerator = SubtitleSrtMixin + SubtitleRenderMixin 组合（含运行时注入）
+│   │   │   ├── generator.py           # SubtitleSrtMixin：SRT 生成（词级细粒度 + 多行换行）+ 6 常量
+│   │   │   └── renderer.py            # SubtitleRenderMixin：moviepy 字幕叠加
+│   │   ├── subtitle.py               # 兼容 re-export → core.audio.subtitle
 │   │   └── voices.py                 # 音色目录（13 语言分组）+ 跨脚本兼容性校验矩阵
 │   │
 │   ├── compositor/
 │   │   ├── __init__.py
-│   │   ├── concatenator.py           # 视频拼接 + 统一音频/字幕叠加（MoneyPrinterTurbo 方式）
+│   │   ├── concatenator/              # 拼接包（Batch 4/4.3 拆分）
+│   │   │   ├── __init__.py            # 包入口：VideoConcatenator = ConcatMixin + AudioOverlayMixin 组合（含运行时注入）
+│   │   │   ├── concat.py              # ConcatMixin：视频拼接 + 字幕 clip 解析 + 4 常量
+│   │   │   └── audio_overlay.py       # AudioOverlayMixin：音频叠加拼接 + 数字人合成（常量复用 .concat）
+│   │   ├── concatenator.py           # 兼容 re-export → core.compositor.concatenator
 │   │   ├── processor.py              # 视频缩放/帧提取/定格延长/静音音频生成
 │   │   └── watermark.py              # ffmpeg overlay 水印叠加 + 语言检测
 │   │
