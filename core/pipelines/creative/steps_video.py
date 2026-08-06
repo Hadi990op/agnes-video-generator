@@ -1,6 +1,7 @@
 """core.pipelines.creative.steps_video — 视频生成步骤 mixin（v5.0 Batch 4 / 4.2 拆分）"""
 import logging
 import os
+import re
 from typing import List
 
 from core.pipelines import PipelineShutdown
