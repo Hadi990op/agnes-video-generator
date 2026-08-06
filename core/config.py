@@ -72,6 +72,65 @@ def resolve_font_path(font: str) -> str:
 
 
 # ═══════════════════════════════════════════════════
+# 类型化配置模型（v5.0 Batch 5 / 5.2）
+# ═══════════════════════════════════════════════════
+
+from pydantic import BaseModel, ConfigDict, Field
+
+
+class WorkspaceEntry(BaseModel):
+    """工作目录条目。"""
+
+    model_config = ConfigDict(strict=True)
+
+    path: str
+    name: str = ""
+    is_default: bool = False
+
+
+class WatermarkSettings(BaseModel):
+    """水印配置。"""
+
+    model_config = ConfigDict(strict=True)
+
+    enabled: bool = False
+    language: str = "auto"
+
+
+class AppSettings(BaseModel):
+    """config.json 的类型化视图（Pydantic 构造期强制类型校验）。
+
+    字段与 config.json 顶层键一一对应；未知/多余键自动忽略（向后兼容
+    旧配置文件）；缺省字段取模型默认值。strict 模式下任何类型错误
+    （如 watermark.enabled 存了字符串、api_key 存了数字）在构造期抛
+    ValidationError，不静默强转。
+    """
+
+    model_config = ConfigDict(strict=True)
+
+    api_key: str = ""
+    active_workspace: str = ""
+    workspaces: list[WorkspaceEntry] = Field(default_factory=list)
+    watermark: WatermarkSettings = Field(default_factory=WatermarkSettings)
+    models: dict[str, str] = Field(default_factory=dict)
+    agnes_domain: str = "com"
+
+
+def load_settings() -> AppSettings:
+    """读取 config.json 并返回类型化 AppSettings（构造期校验）。
+
+    文件不存在 / 为空时返回全默认设置；损坏 JSON 或类型错误抛
+    ValidationError（由调用方决定兜底策略，不静默降级）。
+    """
+    _ensure_config_dir()
+    if os.path.exists(CONFIG_FILE):
+        with open(CONFIG_FILE, "r", encoding="utf-8") as f:
+            raw = json.load(f)
+        return AppSettings(**raw)
+    return AppSettings()
+
+
+# ═══════════════════════════════════════════════════
 # API Key 管理（保持现有逻辑）
 # ═══════════════════════════════════════════════════
 
@@ -111,8 +170,7 @@ def get_api_key() -> str:
     env_key = os.environ.get("AGNES_API_KEY", "")
     if env_key:
         return env_key
-    config = load_config()
-    return config.get("api_key", "")
+    return load_settings().api_key
 
 
 def set_api_key(key: str):
@@ -149,8 +207,7 @@ def get_api_key_source() -> str:
     """
     if os.environ.get("AGNES_API_KEY", ""):
         return "env"
-    config = load_config()
-    if config.get("api_key"):
+    if load_settings().api_key:
         return "config"
     return "none"
 
@@ -187,8 +244,7 @@ def get_working_dir() -> str:
     env_dir = os.environ.get(REGRESSION_WORKING_DIR_ENV, "")
     if env_dir:
         return env_dir
-    config = load_config()
-    active = config.get("active_workspace", "")
+    active = load_settings().active_workspace
     if active:
         return active
     return _default_working_dir()
@@ -211,8 +267,8 @@ def get_workspaces() -> list:
     Returns:
         [{"path": "...", "name": "...", "is_default": bool}, ...]
     """
-    config = load_config()
-    user_workspaces = config.get("workspaces", [])
+    settings = load_settings()
+    user_workspaces = [ws.model_dump() for ws in settings.workspaces]
     default_path = _default_working_dir()
     filtered = [ws for ws in user_workspaces if os.path.abspath(ws.get("path", "")) != default_path]
     return [_default_workspace_entry()] + filtered
@@ -373,11 +429,11 @@ def get_watermark_config() -> dict:
     Returns:
         {"enabled": bool, "language": str}
     """
-    config = load_config()
-    wm = config.get("watermark", {})
+    settings = load_settings()
+    wm = settings.watermark
     return {
-        "enabled": wm.get("enabled", DEFAULT_WATERMARK_ENABLED),
-        "language": wm.get("language", DEFAULT_WATERMARK_LANGUAGE),
+        "enabled": wm.enabled if wm.enabled is not None else DEFAULT_WATERMARK_ENABLED,
+        "language": wm.language or DEFAULT_WATERMARK_LANGUAGE,
     }
 
 
@@ -441,8 +497,8 @@ def get_selected_models() -> dict:
         {"text": str, "image": str, "video": str}
         缺省值回退到 Agnes 三个 API 客户端的默认模型。
     """
-    config = load_config()
-    m = config.get("models", {}) or {}
+    settings = load_settings()
+    m = settings.models or {}
     return {
         "text": m.get("text") or DEFAULT_TEXT_MODEL,
         "image": m.get("image") or DEFAULT_IMAGE_MODEL,
@@ -493,8 +549,7 @@ def get_agnes_domain() -> str:
     Returns:
         "com" 或 "cn"
     """
-    config = load_config()
-    return config.get("agnes_domain", _DEFAULT_DOMAIN)
+    return load_settings().agnes_domain or _DEFAULT_DOMAIN
 
 
 def set_agnes_domain(domain: str):
