@@ -16,12 +16,40 @@ import asyncio
 import logging
 import os
 from abc import abstractmethod
+from dataclasses import dataclass
 from typing import Callable, List, Optional
 
 from core.pipelines import BasePipeline, PipelineShutdown
 from models.task import SceneTask, StepStatus
 
 logger = logging.getLogger(__name__)
+
+
+# ═══════════════════════════════════════════════════════════════
+# 命名常量（v5.0 Batch 5 / 5.3 魔法数字收敛）
+# ═══════════════════════════════════════════════════════════════
+
+@dataclass(frozen=True)
+class StepProgressLimits:
+    """模板方法各阶段的进度边界（0.0 ~ 1.0）。"""
+
+    build_start: float = 0.0      # Phase 1 分镜
+    build_end: float = 0.15
+    reference_end: float = 0.30   # Phase 2 参考图
+    video_end: float = 0.75       # Phase 3 视频生成
+    audio_end: float = 0.85       # Phase 4 配音
+    subtitle_end: float = 0.90    # Phase 5 字幕
+    composite_end: float = 0.98   # Phase 6 合成
+    done: float = 1.0             # 完成
+
+
+_PROGRESS = StepProgressLimits()
+
+# 失败/中断事件的统一进度值
+_PROGRESS_FAILED = 0.0
+
+# 视频等待失败的重试间隔基数（秒）：delay = 基数 * (retry + 1)
+_RETRY_INTERVAL_BASE_SECONDS = 20
 
 
 class MultiScenePipeline(BasePipeline):
@@ -59,44 +87,44 @@ class MultiScenePipeline(BasePipeline):
         self._state.status = StepStatus.RUNNING
         self.task_manager.create(self._state)
 
-        await self._emit("init", "running", self._get_init_message(), 0.0)
+        await self._emit("init", "running", self._get_init_message(), _PROGRESS.build_start)
 
         try:
             # Phase 1: 分镜/拆段 → List[SceneTask]
             await self._execute_step(
                 "step_build_scenes", self._build_scenes,
-                0.0, 0.15, "构建分镜", "分镜构建完成",
+                _PROGRESS.build_start, _PROGRESS.build_end, "构建分镜", "分镜构建完成",
             )
 
             # Phase 2: 参考图（可选，子类可空实现跳过）
             await self._execute_step(
                 "step_reference_images", self._build_reference_images,
-                0.15, 0.30, "生成参考图", "参考图生成完成",
+                _PROGRESS.build_end, _PROGRESS.reference_end, "生成参考图", "参考图生成完成",
             )
 
             # Phase 3: 视频生成（通用，子类可覆写保留链式/循环逻辑）
             await self._execute_step(
                 "step_video_generation", self._generate_videos,
-                0.30, 0.75, "生成视频", "视频生成完成",
+                _PROGRESS.reference_end, _PROGRESS.video_end, "生成视频", "视频生成完成",
             )
 
             # Phase 4: 配音（通用，子类可覆写）
             sub_maker = await self._execute_step(
                 "step_audio", self._generate_audio,
-                0.75, 0.85, "生成配音", "配音完成",
+                _PROGRESS.video_end, _PROGRESS.audio_end, "生成配音", "配音完成",
             )
 
             # Phase 5: 字幕（通用，子类可覆写）
             await self._execute_step(
                 "step_subtitle",
                 lambda: self._generate_subtitles(sub_maker),
-                0.85, 0.90, "生成字幕", "字幕完成",
+                _PROGRESS.audio_end, _PROGRESS.subtitle_end, "生成字幕", "字幕完成",
             )
 
             # Phase 6: 合成
             final_video = await self._execute_step(
                 "step_concatenation", self._composite_final,
-                0.90, 0.98, "合成视频", "合成完成",
+                _PROGRESS.subtitle_end, _PROGRESS.composite_end, "合成视频", "合成完成",
             )
 
             # 后处理：水印（继承自 BasePipeline）
@@ -110,18 +138,18 @@ class MultiScenePipeline(BasePipeline):
                 final_video_file=final_video,
             )
             await self._emit(
-                "done", "completed", "视频生成完成!", 1.0,
+                "done", "completed", "视频生成完成!", _PROGRESS.done,
                 {"final_video": final_video},
             )
             return final_video
 
         except PipelineShutdown:
-            await self._emit("error", "failed", "任务已被中断，可从任务列表续传", 0.0)
+            await self._emit("error", "failed", "任务已被中断，可从任务列表续传", _PROGRESS_FAILED)
             raise
         except Exception as e:
             self._state.status = StepStatus.FAILED
             self.task_manager.update_state(status=StepStatus.FAILED)
-            await self._emit("error", "failed", str(e), 0.0)
+            await self._emit("error", "failed", str(e), _PROGRESS_FAILED)
             raise
 
     # ==================================================================
@@ -244,7 +272,7 @@ class MultiScenePipeline(BasePipeline):
                 return await self.video_api.wait_for_video(video_id)
             except Exception as e:
                 if retry < max_retries - 1:
-                    delay = 20 * (retry + 1)
+                    delay = _RETRY_INTERVAL_BASE_SECONDS * (retry + 1)
                     logger.warning(
                         f"Video {video_id[:16]} retry {retry + 1}/{max_retries}: {e}"
                     )
@@ -279,7 +307,7 @@ class MultiScenePipeline(BasePipeline):
         audio_config = self._state.audio_config
         subtitle_config = self._state.subtitle_config
 
-        await self._emit("audio", "running", f"生成配音 ({len(text)} 字)...", 0.75)
+        await self._emit("audio", "running", f"生成配音 ({len(text)} 字)...", _PROGRESS.audio_end)
 
         sub_maker = await self._generate_audio_with_fallback(
             output_path=audio_path,

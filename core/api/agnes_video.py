@@ -26,6 +26,9 @@ DURATION_PRESETS = {
     20: (409, 24),   # capped at 409 (API max for 720p); actual ~17s
 }
 
+# 图片上传 429 退避间隔基数（秒）：delay = 基数 * (attempt + 1)
+_UPLOAD_RETRY_BASE_DELAY_SECONDS = 30
+
 
 class VideoOutput:
     def __init__(self, fmt: str, ext: str, data: str):
@@ -144,7 +147,7 @@ class AgnesVideoAPI:
                     timeout=(30, 120),
                 )
                 if resp.status_code == 429:
-                    delay = 30 * (attempt + 1)
+                    delay = _UPLOAD_RETRY_BASE_DELAY_SECONDS * (attempt + 1)
                     logger.warning(f"[AgnesVideo] Image upload 429, retry in {delay}s...")
                     await asyncio.sleep(delay)
                     continue

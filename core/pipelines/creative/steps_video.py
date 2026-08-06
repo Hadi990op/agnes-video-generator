@@ -11,6 +11,16 @@ from .steps_frames import _fallback_end_frame, _localize_preserve_tags, _run_ffm
 
 logger = logging.getLogger(__name__)
 
+# 视频生成进度映射基数（阶段内线性插值）
+_PROGRESS_WAIT_START = 0.38
+_PROGRESS_WAIT_SPAN = 0.42
+_PROGRESS_CACHED_START = 0.35
+_PROGRESS_CACHED_SPAN = 0.45
+_PROGRESS_KEYFRAME_SUBMIT_START = 0.35
+_PROGRESS_KEYFRAME_SUBMIT_SPAN = 0.05
+_PROGRESS_KEYFRAME_WAIT_START = 0.40
+_PROGRESS_KEYFRAME_WAIT_SPAN = 0.40
+
 
 def _localize_transition_prompt(next_scene_text: str) -> str:
     """返回与 next_scene_text 语言一致的过渡帧描述。"""
@@ -161,7 +171,7 @@ class VideoStepsMixin:
             await self._emit(
                 "video_gen", "running",
                 f"场景 {scene_idx+1}/{total}: 提交任务 (ti2vid)...",
-                0.35 + 0.45 * scene_idx / total,
+                _PROGRESS_CACHED_START + _PROGRESS_CACHED_SPAN * scene_idx / total,
             )
             video_id = await self.video_generator.submit_video(
                 prompt=scene_text,
@@ -181,7 +191,7 @@ class VideoStepsMixin:
             await self._emit(
                 "video_gen", "running",
                 f"等待 {len(pending)} 个视频生成完成 (independent)...",
-                0.38,
+                _PROGRESS_WAIT_START,
             )
 
         # Phase 2: Wait for all submitted videos
@@ -190,7 +200,7 @@ class VideoStepsMixin:
             await self._emit(
                 "video_gen", "running",
                 f"场景 {scene_idx+1}/{total}: 等待生成中...",
-                0.38 + 0.42 * pending.index(info) / len(pending),
+                _PROGRESS_WAIT_START + _PROGRESS_WAIT_SPAN * pending.index(info) / len(pending),
             )
             try:
                 video_output = await self.video_generator.wait_for_video(info["video_id"])
@@ -198,7 +208,7 @@ class VideoStepsMixin:
                 await self._emit(
                     "video_gen", "running",
                     f"场景 {scene_idx+1}/{total}: 完成",
-                    0.38 + 0.42 * (pending.index(info) + 1) / len(pending),
+                    _PROGRESS_WAIT_START + _PROGRESS_WAIT_SPAN * (pending.index(info) + 1) / len(pending),
                 )
             except Exception as e:
                 logger.error(f"Scene {scene_idx} video failed: {e}")
@@ -248,7 +258,7 @@ class VideoStepsMixin:
                 await self._emit(
                     "video_gen", "running",
                     f"场景 {scene_idx+1}/{total}: 已缓存",
-                    0.35 + 0.45 * (scene_idx + 1) / total,
+                    _PROGRESS_CACHED_START + _PROGRESS_CACHED_SPAN * (scene_idx + 1) / total,
                 )
                 continue
 
@@ -263,13 +273,13 @@ class VideoStepsMixin:
                 await self._emit(
                     "video_gen", "running",
                     f"场景 {scene_idx+1}/{total}: 续传视频 (ti2vid)...",
-                    0.35 + 0.45 * scene_idx / total,
+                    _PROGRESS_CACHED_START + _PROGRESS_CACHED_SPAN * scene_idx / total,
                 )
             else:
                 await self._emit(
                     "video_gen", "running",
                     f"场景 {scene_idx+1}/{total}: 提交任务 (ti2vid)...",
-                    0.35 + 0.45 * scene_idx / total,
+                    _PROGRESS_CACHED_START + _PROGRESS_CACHED_SPAN * scene_idx / total,
                 )
                 video_id = await self.video_generator.submit_video(
                     prompt=scene_text,
@@ -284,7 +294,7 @@ class VideoStepsMixin:
             await self._emit(
                 "video_gen", "running",
                 f"场景 {scene_idx+1}/{total}: 等待生成中...",
-                0.35 + 0.45 * scene_idx / total,
+                _PROGRESS_CACHED_START + _PROGRESS_CACHED_SPAN * scene_idx / total,
             )
             try:
                 video_output = await self.video_generator.wait_for_video(existing_video_id)
@@ -329,7 +339,7 @@ class VideoStepsMixin:
             await self._emit(
                 "video_gen", "running",
                 f"场景 {scene_idx+1}/{total}: 完成",
-                0.35 + 0.45 * (scene_idx + 1) / total,
+                _PROGRESS_CACHED_START + _PROGRESS_CACHED_SPAN * (scene_idx + 1) / total,
             )
 
         return all_video_paths
@@ -472,7 +482,7 @@ class VideoStepsMixin:
             await self._emit(
                 "video_gen", "running",
                 f"提交 {len(new_submissions)} 个视频任务 (keyframes)...",
-                0.35,
+                _PROGRESS_KEYFRAME_SUBMIT_START,
             )
         else:
             logger.info(
@@ -485,7 +495,7 @@ class VideoStepsMixin:
             await self._emit(
                 "video_gen", "running",
                 f"场景 {scene_idx+1}/{total}: 提交任务...",
-                0.35 + 0.05 * scene_idx / total,
+                _PROGRESS_KEYFRAME_SUBMIT_START + _PROGRESS_KEYFRAME_SUBMIT_SPAN * scene_idx / total,
             )
             video_id = await self.video_generator.submit_video(
                 prompt=info["scene_text"],
@@ -502,7 +512,7 @@ class VideoStepsMixin:
             await self._emit(
                 "video_gen", "running",
                 f"等待 {len(pending)} 个视频生成完成...",
-                0.4,
+                _PROGRESS_KEYFRAME_WAIT_START,
             )
 
         for info in pending:
@@ -510,7 +520,7 @@ class VideoStepsMixin:
             await self._emit(
                 "video_gen", "running",
                 f"场景 {scene_idx+1}/{total}: 等待生成中...",
-                0.4 + 0.4 * pending.index(info) / len(pending),
+                _PROGRESS_KEYFRAME_WAIT_START + _PROGRESS_KEYFRAME_WAIT_SPAN * pending.index(info) / len(pending),
             )
             try:
                 video_output = await self.video_generator.wait_for_video(info["video_id"])
@@ -518,7 +528,7 @@ class VideoStepsMixin:
                 await self._emit(
                     "video_gen", "running",
                     f"场景 {scene_idx+1}/{total}: 完成",
-                    0.4 + 0.4 * (pending.index(info) + 1) / len(pending),
+                    _PROGRESS_KEYFRAME_WAIT_START + _PROGRESS_KEYFRAME_WAIT_SPAN * (pending.index(info) + 1) / len(pending),
                 )
             except Exception as e:
                 logger.error(f"Scene {scene_idx} video failed: {e}")

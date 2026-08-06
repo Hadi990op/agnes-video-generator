@@ -29,6 +29,9 @@ logger = logging.getLogger(__name__)
 # 示例：export PROMPT_LANGUAGE=en
 PROMPT_LANGUAGE = os.environ.get("PROMPT_LANGUAGE", "zh")
 
+# 图片描述重试间隔基数（秒）：delay = 基数 * (attempt + 1)
+_DESCRIBE_RETRY_BASE_DELAY_SECONDS = 15
+
 
 class Screenwriter(
     ScreenwriterStoryMixin,
@@ -174,7 +177,7 @@ otherwise.
                 return self._chat_multimodal(prompt, text_prompt, [img_path])
             except Exception as e:
                 if attempt < max_retries - 1:
-                    delay = 15 * (attempt + 1)
+                    delay = _DESCRIBE_RETRY_BASE_DELAY_SECONDS * (attempt + 1)
                     logger.warning(
                         f"[Screenwriter] {label} attempt {attempt+1}/{max_retries} failed: {e}. "
                         f"Retrying in {delay}s..."

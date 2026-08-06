@@ -15,6 +15,14 @@ from models.task import SimpleVideoTask, StepStatus
 
 logger = logging.getLogger(__name__)
 
+# 简单视频流水线进度常量（0.0 ~ 1.0）
+_PROGRESS_INIT = 0.0
+_PROGRESS_SUBMIT = 0.1
+_PROGRESS_WAIT = 0.3
+_PROGRESS_DONE = 0.9
+_PROGRESS_COMPLETED = 1.0
+_PROGRESS_FAILED = 0.0
+
 
 class SimpleVideoPipeline(BasePipeline):
     """简单视频生成流水线。
@@ -44,7 +52,7 @@ class SimpleVideoPipeline(BasePipeline):
         self._state.status = StepStatus.RUNNING
         self.task_manager.create(self._state)
 
-        await self._emit("init", "running", "开始简单视频生成...", 0.0)
+        await self._emit("init", "running", "开始简单视频生成...", _PROGRESS_INIT)
 
         try:
             video_path = await self._submit_and_wait()
@@ -58,17 +66,17 @@ class SimpleVideoPipeline(BasePipeline):
                 status=StepStatus.COMPLETED,
                 final_video_file=video_path,
             )
-            await self._emit("done", "completed", "视频生成完成!", 1.0, {"final_video": video_path})
+            await self._emit("done", "completed", "视频生成完成!", _PROGRESS_COMPLETED, {"final_video": video_path})
             return video_path
 
         except PipelineShutdown as e:
             logger.info(f"[Simple] Shutdown: {e}")
-            await self._emit("error", "failed", "任务已被中断，可从任务列表续传", 0.0)
+            await self._emit("error", "failed", "任务已被中断，可从任务列表续传", _PROGRESS_FAILED)
             raise
         except Exception as e:
             self._state.status = StepStatus.FAILED
             self.task_manager.update_state(status=StepStatus.FAILED)
-            await self._emit("error", "failed", str(e), 0.0)
+            await self._emit("error", "failed", str(e), _PROGRESS_FAILED)
             raise
 
     # ------------------------------------------------------------------
@@ -92,7 +100,7 @@ class SimpleVideoPipeline(BasePipeline):
             logger.info(f"[Simple] Resuming from saved task.json video_id: {saved_video_id}")
             self._state.video_id = saved_video_id
             self.task_manager.update_state(video_id=saved_video_id)
-            await self._emit("video_gen", "running", f"恢复轮询视频任务 {saved_video_id[:16]}...", 0.3)
+            await self._emit("video_gen", "running", f"恢复轮询视频任务 {saved_video_id[:16]}...", _PROGRESS_WAIT)
             video_output = await self.video_api.wait_for_video(saved_video_id)
             video_output.save(video_path)
             return video_path
@@ -101,7 +109,7 @@ class SimpleVideoPipeline(BasePipeline):
         if self._state.video_id:
             logger.info(f"[Simple] Resuming from state video_id: {self._state.video_id}")
             self._save_task_json(self.working_dir, {"video_id": self._state.video_id})
-            await self._emit("video_gen", "running", f"恢复轮询视频任务 {self._state.video_id[:16]}...", 0.3)
+            await self._emit("video_gen", "running", f"恢复轮询视频任务 {self._state.video_id[:16]}...", _PROGRESS_WAIT)
             video_output = await self.video_api.wait_for_video(self._state.video_id)
             video_output.save(video_path)
             return video_path
@@ -113,7 +121,7 @@ class SimpleVideoPipeline(BasePipeline):
         if self._state.end_frame_image:
             ref_images.append(self._state.end_frame_image)
 
-        await self._emit("video_gen", "running", f"提交视频任务 (mode={self._state.mode})...", 0.1)
+        await self._emit("video_gen", "running", f"提交视频任务 (mode={self._state.mode})...", _PROGRESS_SUBMIT)
 
         # 分隔符跟随用户 prompt 语言
         _has_chinese = bool(re.search(r'[\u4e00-\u9fff]', self._state.prompt))
@@ -134,10 +142,10 @@ class SimpleVideoPipeline(BasePipeline):
         self._save_task_json(self.working_dir, {"video_id": video_id})
         self.task_manager.update_state(video_id=video_id)
 
-        await self._emit("video_gen", "running", f"等待视频生成 {video_id[:16]}...", 0.3)
+        await self._emit("video_gen", "running", f"等待视频生成 {video_id[:16]}...", _PROGRESS_WAIT)
 
         video_output = await self.video_api.wait_for_video(video_id)
         video_output.save(video_path)
 
-        await self._emit("video_gen", "completed", "视频生成完成", 0.9)
+        await self._emit("video_gen", "completed", "视频生成完成", _PROGRESS_DONE)
         return video_path

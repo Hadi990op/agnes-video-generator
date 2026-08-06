@@ -17,6 +17,9 @@ from utils.image import download_image
 
 logger = logging.getLogger(__name__)
 
+# 图像生成读超时基数（秒）：timeout = 基数 * (attempt + 1)，首次 120s 逐步放宽
+_READ_TIMEOUT_BASE_SECONDS = 120
+
 
 class ImageOutput:
     def __init__(self, fmt: str, ext: str, data: str):
@@ -115,7 +118,7 @@ class AgnesImageAPI:
                 # 全局限速：在发起 HTTP 请求前获取令牌
                 await asyncio.to_thread(get_rate_limiter().acquire)
                 # 动态超时：第一次 120s，后续逐步增加（图像生成较慢，放宽读超时）
-                read_timeout = 120 * (attempt + 1)
+                read_timeout = _READ_TIMEOUT_BASE_SECONDS * (attempt + 1)
                 resp = await asyncio.to_thread(
                     requests.post,
                     f"{get_agnes_base_url()}/images/generations",

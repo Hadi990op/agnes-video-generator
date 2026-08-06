@@ -43,6 +43,11 @@ POETRY_SUBTITLE_STYLE = SubtitleStyle(
 
 _CHARS_PER_SEC = 4.0
 
+# 逐场景阶段起始进度（阶段内线性插值）
+_PROGRESS_AUDIO_SCENE = 0.75
+_PROGRESS_SUBTITLE_SCENE = 0.87
+_PROGRESS_COMPOSITE_SCENE = 0.90
+
 _SCENE_LABEL_RE = re.compile(r"^(场景|Scene)\s*\d+|[（(]\s*\d+\s*:\s*\d+")
 
 
@@ -291,7 +296,7 @@ class PoetryVideoPipeline(MultiScenePipeline):
 
             await self._emit(
                 "audio", "running",
-                f"生成朗诵配音 {idx+1}/{len(scenes)}...", 0.75,
+                f"生成朗诵配音 {idx+1}/{len(scenes)}...", _PROGRESS_AUDIO_SCENE,
             )
 
             # 场景间延迟（除第一个）：避免 edge_tts 流截断
@@ -398,7 +403,7 @@ class PoetryVideoPipeline(MultiScenePipeline):
             dur = max(audio_dur, 1.0)
             await self._emit(
                 "subtitle", "running",
-                f"生成字幕 {idx+1}/{len(scenes)}...", 0.87,
+                f"生成字幕 {idx+1}/{len(scenes)}...", _PROGRESS_SUBTITLE_SCENE,
             )
             # v2.0：优先用该场景 cues 生成精确字幕；cues 缺失则回退纯文本估算
             sub_maker = getattr(self, "_scene_sub_makers", {}).get(idx)
@@ -458,7 +463,7 @@ class PoetryVideoPipeline(MultiScenePipeline):
 
             await self._emit(
                 "concatenate", "running",
-                f"合成场景 {idx+1}/{len(scenes)}...", 0.90,
+                f"合成场景 {idx+1}/{len(scenes)}...", _PROGRESS_COMPOSITE_SCENE,
             )
             await asyncio.to_thread(
                 VideoConcatenator.concat_videos_with_audio_overlay,

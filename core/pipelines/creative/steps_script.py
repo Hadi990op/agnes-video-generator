@@ -10,6 +10,24 @@ from models.task import SceneTask, StepStatus
 
 logger = logging.getLogger(__name__)
 
+# 编剧步骤进度常量（scene_config 阶段）
+_PROGRESS_SCENE_CONFIG_DONE = 0.02
+_PROGRESS_SCENE_CONFIG_FAILED = 0.0
+
+# 编剧步骤进度映射（线性推进 0.0 → 0.25）
+_PROGRESS_IMAGE_ANALYSIS_START = 0.0
+_PROGRESS_IMAGE_ANALYSIS_DONE = 0.05
+_PROGRESS_SCENE_EXTRACT_START = 0.01
+_PROGRESS_STORY_START = 0.05
+_PROGRESS_STORY_DONE = 0.1
+_PROGRESS_CHARACTER_REF_START = 0.1
+_PROGRESS_CHARACTER_REF_T2I = 0.12
+_PROGRESS_CHARACTER_REF_DONE = 0.15
+_PROGRESS_SCRIPT_START = 0.15
+_PROGRESS_SCRIPT_DONE = 0.2
+_PROGRESS_END_FRAME_PROMPTS_START = 0.2
+_PROGRESS_END_FRAME_PROMPTS_DONE = 0.25
+
 
 class ScriptStepsMixin:
     """编剧步骤：图片分析 / 场景配置解析 / 故事 / 角色参考 / 脚本 / 尾帧 prompt。
@@ -68,7 +86,7 @@ class ScriptStepsMixin:
             self.task_manager.update_step("step_image_analysis", StepStatus.COMPLETED)
             return ""
 
-        await self._emit("image_analysis", "running", f"分析 {len(images_to_analyze)} 张图片...", 0.0)
+        await self._emit("image_analysis", "running", f"分析 {len(images_to_analyze)} 张图片...", _PROGRESS_IMAGE_ANALYSIS_START)
         image_context = await asyncio.to_thread(
             self.screenwriter.describe_images, images_to_analyze,
             cache_dir=self.working_dir,
@@ -85,7 +103,7 @@ class ScriptStepsMixin:
             step_image_analysis=StepStatus.COMPLETED,
             image_analysis_file=analysis_file,
         )
-        await self._emit("image_analysis", "completed", f"图片分析完成 ({len(image_context)} 字符)", 0.05)
+        await self._emit("image_analysis", "completed", f"图片分析完成 ({len(image_context)} 字符)", _PROGRESS_IMAGE_ANALYSIS_DONE)
         return image_context
 
     # ==================================================================
@@ -114,7 +132,7 @@ class ScriptStepsMixin:
         if duration_source == "prompt":
             await self._emit(
                 "scene_config", "running",
-                "正在从创意描述中提取场景信息...", 0.01,
+                "正在从创意描述中提取场景信息...", _PROGRESS_SCENE_EXTRACT_START,
             )
             try:
                 info = await asyncio.to_thread(
@@ -138,7 +156,7 @@ class ScriptStepsMixin:
                     "scene_config", "completed",
                     f"从 prompt 提取: {extracted_count} 个场景, "
                     f"时长 {extracted_durations}",
-                    0.02,
+                    _PROGRESS_SCENE_CONFIG_DONE,
                     {
                         "scene_count": extracted_count,
                         "durations": extracted_durations,
@@ -150,7 +168,7 @@ class ScriptStepsMixin:
                 await self._emit(
                     "scene_config", "failed",
                     f"无法从创意描述中提取场景信息: {e}",
-                    0.0,
+                    _PROGRESS_SCENE_CONFIG_FAILED,
                 )
                 raise PipelineShutdown(
                     f"场景信息提取失败: {e}. "
@@ -184,7 +202,7 @@ class ScriptStepsMixin:
                 "scene_config", "completed",
                 f"场景配置: {scene_count} 个场景, "
                 f"时长 {scene_durations}",
-                0.02,
+                _PROGRESS_SCENE_CONFIG_DONE,
                 {
                     "scene_count": scene_count,
                     "durations": scene_durations,
@@ -219,7 +237,7 @@ class ScriptStepsMixin:
             logger.warning("[Pipeline] Step story: marked completed but file missing, re-running")
 
         logger.info("[Pipeline] Step story: RUNNING")
-        await self._emit("story", "running", "正在生成故事...", 0.05)
+        await self._emit("story", "running", "正在生成故事...", _PROGRESS_STORY_START)
         story = await asyncio.to_thread(
             self.screenwriter.develop_story,
             self._state.idea,
@@ -240,7 +258,7 @@ class ScriptStepsMixin:
             step_story=StepStatus.COMPLETED,
             story_file=story_path,
         )
-        await self._emit("story", "completed", f"故事生成完成 ({len(story)} 字符)", 0.1)
+        await self._emit("story", "completed", f"故事生成完成 ({len(story)} 字符)", _PROGRESS_STORY_DONE)
         return story
 
     # ==================================================================
@@ -275,7 +293,7 @@ class ScriptStepsMixin:
                 step_character_ref=StepStatus.COMPLETED,
                 character_ref_file=self._state.reference_image,
             )
-            await self._emit("character_ref", "completed", "使用用户提供的参考图", 0.15)
+            await self._emit("character_ref", "completed", "使用用户提供的参考图", _PROGRESS_CHARACTER_REF_DONE)
             return self._state.reference_image
 
         ref_prompt_path = os.path.join(self.working_dir, "character_ref_prompt.txt")
@@ -290,17 +308,17 @@ class ScriptStepsMixin:
                 step_character_ref=StepStatus.COMPLETED,
                 character_ref_file=ref_img_path,
             )
-            await self._emit("character_ref", "completed", "角色参考图已缓存", 0.15)
+            await self._emit("character_ref", "completed", "角色参考图已缓存", _PROGRESS_CHARACTER_REF_DONE)
             return ref_img_path
 
-        await self._emit("character_ref", "running", "正在提取角色描述并生成参考图...", 0.1)
+        await self._emit("character_ref", "running", "正在提取角色描述并生成参考图...", _PROGRESS_CHARACTER_REF_START)
         char_prompt = await asyncio.to_thread(
             self.screenwriter.extract_character_description, story, self._state.style
         )
         with open(ref_prompt_path, "w", encoding="utf-8") as f:
             f.write(char_prompt)
 
-        await self._emit("character_ref", "running", "正在生成角色参考图 (t2i)...", 0.12)
+        await self._emit("character_ref", "running", "正在生成角色参考图 (t2i)...", _PROGRESS_CHARACTER_REF_T2I)
         img_output = await self.image_generator.generate_single_image(
             prompt=char_prompt,
             size=f"{self._state.video_width}x{self._state.video_height}",
@@ -315,7 +333,7 @@ class ScriptStepsMixin:
             character_ref_prompt=char_prompt,
             character_ref_file=ref_img_path,
         )
-        await self._emit("character_ref", "completed", "角色参考图生成完成", 0.15)
+        await self._emit("character_ref", "completed", "角色参考图生成完成", _PROGRESS_CHARACTER_REF_DONE)
         return ref_img_path
 
     # ==================================================================
@@ -344,7 +362,7 @@ class ScriptStepsMixin:
                 logger.warning("[Pipeline] Step script: marked completed but file missing, re-running")
 
         logger.info("[Pipeline] Step script: RUNNING")
-        await self._emit("script", "running", "正在编写脚本...", 0.15)
+        await self._emit("script", "running", "正在编写脚本...", _PROGRESS_SCRIPT_START)
         scenes = await asyncio.to_thread(
             self.screenwriter.write_script, story, "",
             self._state.style,
@@ -398,7 +416,7 @@ class ScriptStepsMixin:
             scene_count=len(scenes),
             scenes=[s.model_dump() for s in self._state.scenes],
         )
-        await self._emit("script", "completed", f"脚本完成，共 {len(scenes)} 个场景", 0.2)
+        await self._emit("script", "completed", f"脚本完成，共 {len(scenes)} 个场景", _PROGRESS_SCRIPT_DONE)
         return scenes
 
     # ==================================================================
@@ -428,7 +446,7 @@ class ScriptStepsMixin:
             logger.warning("[Pipeline] Step end_frame_prompts: marked completed but file missing, re-running")
 
         logger.info("[Pipeline] Step end_frame_prompts: RUNNING")
-        await self._emit("end_frame_prompts", "running", "正在生成尾帧提示词...", 0.2)
+        await self._emit("end_frame_prompts", "running", "正在生成尾帧提示词...", _PROGRESS_END_FRAME_PROMPTS_START)
         character_appearance = await asyncio.to_thread(
             self.screenwriter.get_character_appearance, story
         )
@@ -450,5 +468,5 @@ class ScriptStepsMixin:
             step_end_frame_prompts=StepStatus.COMPLETED,
             end_frame_prompts_file=prompts_path,
         )
-        await self._emit("end_frame_prompts", "completed", f"尾帧提示词完成，共 {len(end_frame_prompts)} 个", 0.25)
+        await self._emit("end_frame_prompts", "completed", f"尾帧提示词完成，共 {len(end_frame_prompts)} 个", _PROGRESS_END_FRAME_PROMPTS_DONE)
         return end_frame_prompts

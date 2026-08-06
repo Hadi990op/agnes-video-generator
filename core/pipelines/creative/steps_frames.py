@@ -11,6 +11,9 @@ from models.task import StepStatus
 
 logger = logging.getLogger(__name__)
 
+# 尾帧预生成完成进度（对齐视频阶段起始 0.35）
+_PROGRESS_END_FRAME_PREGEN_DONE = 0.35
+
 
 def _fallback_end_frame(text: str) -> str:
     """返回与输入文本语言一致的尾帧回退描述。"""
@@ -326,7 +329,7 @@ class FramesStepsMixin:
         await self._emit(
             "end_frame_gen", "completed",
             f"尾帧预生成全部完成 ({len(pregenerated)}/{len(scenes)})",
-            0.35,
+            _PROGRESS_END_FRAME_PREGEN_DONE,
         )
         return pregenerated
 
