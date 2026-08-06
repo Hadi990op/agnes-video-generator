@@ -203,8 +203,8 @@
 | 2.1 BasePipeline 共享音频方法 | B2 | ✅ | 2026-08-05 | `_generate_audio_with_fallback` 落位 BasePipeline（含 cues 不足→legacy 启发式）；py_compile/import OK，逐批 push 触发 GitHub Actions 回归 |
 | 2.2 调用方改造（5 处） | B2 | ✅ | 2026-08-05 | 范围扩展：原计划 3 处，实际发现 manuscript/anchor 亦复制同逻辑，共收敛 5 处（multi_scene/creative/poetry/manuscript/anchor）；`grep EdgeTTSEngine core/pipelines/` 仅剩 `__init__.py` 函数级 import；私有降级分支全部删除 |
 | 2.3 行为差异对照用例 | B2 | ✅ | 2026-08-05 | 新增 `tests/test_audio_fallback.py` 4 用例（Edge 失败→Silent / cues 不足→legacy / audio-off+subtitle-on / 成功返回 sub_maker）锁定行为矩阵 |
-| 3.1 修复 `_execute_step` 契约 | B3 | 🔲 | — | — |
-| 3.2 状态字段对齐 | B3 | 🔲 | — | — |
+| 3.1 修复 `_execute_step` 契约 | B3 | ✅ | 2026-08-06 | 方案 A：`_execute_step` 增加 `coarse_skip` 参数（显式覆盖，缺省取类属性 `self.coarse_skip`，默认 True）；Creative 以类属性 `coarse_skip=False` 禁用，覆写已删除（方法解析指向基类）；6 个契约用例（tests/test_pipeline_contract.py）锁定行为矩阵 |
+| 3.2 状态字段对齐 | B3 | ✅ | 2026-08-06 | `audio_config`/`subtitle_config` 上提 `BaseTaskState`（default_factory），Creative/Manuscript/Anchor/Poetry 子类重复声明移除；`multi_scene.py` hasattr/getattr 探测全部移除（含 `screenwriter` 上提 BasePipeline 初始化为 None）；`grep hasattr core/pipelines/` 清零；新增 3 个兼容用例（旧 JSON 缺字段取默认/含字段保留/6 类继承） |
 | 4.1 拆分 `screenwriter.py` | B4 | 🔲 | — | — |
 | 4.2 拆分 `creative_video.py` | B4 | 🔲 | — | — |
 | 4.3 拆分 subtitle/concatenator | B4 | 🔲 | — | — |
