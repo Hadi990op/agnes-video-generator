@@ -122,6 +122,65 @@ class TestParseTaskState:
         assert restored.prompt == "roundtrip prompt"
         assert restored.duration == 10
 
+    def test_old_json_missing_audio_config_defaults(self):
+        """Batch 3（S4）向后兼容：旧 JSON 缺 audio_config/subtitle_config 字段时取默认值。"""
+        from models.task import (
+            parse_task_state, TaskType, AudioConfig, SubtitleConfig,
+        )
+        old_creative = {
+            "task_id": "legacy-abc",
+            "task_type": TaskType.CREATIVE,
+            "idea": "太空探险故事",
+            "step_audio": "completed",
+        }
+        state = parse_task_state(old_creative)
+        assert isinstance(state.audio_config, AudioConfig)
+        assert state.audio_config.enabled is True
+        assert state.audio_config.voice == "zh-CN-XiaoxiaoNeural"
+        assert isinstance(state.subtitle_config, SubtitleConfig)
+        assert state.subtitle_config.enabled is True
+
+        old_manuscript = parse_task_state({
+            "task_id": "legacy-m",
+            "task_type": TaskType.MANUSCRIPT,
+            "manuscript_text": "测试文本",
+        })
+        assert isinstance(old_manuscript.audio_config, AudioConfig)
+
+    def test_audio_config_preserved_when_present(self):
+        """Batch 3（S4）：JSON 含 audio_config 时反序列化保留原值。"""
+        from models.task import parse_task_state, TaskType
+        state = parse_task_state({
+            "task_id": "new-x",
+            "task_type": TaskType.CREATIVE,
+            "audio_config": {"enabled": False, "voice": "zh-CN-YunxiNeural", "rate": "+5%"},
+            "subtitle_config": {"enabled": False},
+        })
+        assert state.audio_config.enabled is False
+        assert state.audio_config.voice == "zh-CN-YunxiNeural"
+        assert state.audio_config.rate == "+5%"
+        assert state.subtitle_config.enabled is False
+
+    def test_all_task_types_inherit_shared_config(self):
+        """Batch 3（S4）：全部 6 种任务类型均继承 audio_config/subtitle_config 共享字段。"""
+        from models.task import (
+            SimpleVideoTask, CreativeVideoTask, ManuscriptVideoTask,
+            AnchorVideoTask, PoetryVideoTask, SimpleImageTask, TaskType,
+        )
+        cases = [
+            (SimpleVideoTask, {"prompt": "x"}),
+            (CreativeVideoTask, {"idea": "x"}),
+            (ManuscriptVideoTask, {"manuscript_text": "x"}),
+            (AnchorVideoTask, {"script_text": "x"}),
+            (PoetryVideoTask, {"poem_text": "x"}),
+            (SimpleImageTask, {"prompt": "x"}),
+        ]
+        for cls, kw in cases:
+            obj = cls(**kw)
+            assert obj.audio_config.enabled is True, cls.__name__
+            assert obj.subtitle_config.enabled is True, cls.__name__
+            assert "audio_config" in obj.model_dump(), cls.__name__
+
 
 # ═══════════════════════════════════════════════════
 # 2. core/audio/subtitle.py
