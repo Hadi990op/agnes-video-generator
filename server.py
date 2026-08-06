@@ -58,6 +58,17 @@ async def lifespan(app: FastAPI):
     except Exception as e:
         logger.warning(f"[Startup] Voice catalog load failed ({e}); will use fallback")
 
+    # v5.0 (5.1): 可选启动时僵尸任务清理（AGNES_SWEEP_AGE_DAYS 设置后启用，失败不阻断）
+    sweep_days = os.environ.get("AGNES_SWEEP_AGE_DAYS", "").strip()
+    if sweep_days.isdigit():
+        try:
+            from core.artifacts import sweep_stale_tasks
+            result = sweep_stale_tasks(age_days=int(sweep_days))
+            logger.info(f"[Startup] Stale task sweep: "
+                        f"swept={result['swept']}, protected={len(result['protected'])}")
+        except Exception as e:
+            logger.warning(f"[Startup] Stale task sweep failed ({e})")
+
     yield
 
 

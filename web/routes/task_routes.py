@@ -131,6 +131,28 @@ async def stop_task(task_id: str):
     return {"ok": True, "task_id": task_id}
 
 
+@router.post("/api/tasks/sweep")
+async def sweep_stale_tasks_endpoint(age_days: int = 7):
+    """手动触发僵尸任务清理（v5.0 Batch 5 / 5.1）。
+
+    清理工作区中状态文件超龄且非活跃的任务目录；运行中/排队中/断点续传
+    （PENDING）任务默认保护不清理。活跃 pipeline 中的任务一律跳过。
+
+    Args:
+        age_days: 任务状态文件超龄阈值（天），默认 7
+    """
+    from core.artifacts import sweep_stale_tasks
+
+    # 活跃 pipeline 保护：即使状态文件超龄也不允许清理
+    active_ids = set(app_state.active_pipelines.keys()) | set(app_state._queued_tasks)
+    result = sweep_stale_tasks(age_days=age_days)
+    result["swept"] = [d for d in result["swept"] if d not in active_ids]
+    result["protected"] = result["protected"] + sorted(active_ids)
+    logger.info(f"[Cleanup] Sweep finished: swept={result['swept']}, "
+                f"protected={len(result['protected'])}, errors={len(result['errors'])}")
+    return {"ok": True, **result}
+
+
 @router.get("/api/concurrency")
 async def get_concurrency_status():
     """返回当前并发控制状态：已用权重、上限、排队任务列表。"""

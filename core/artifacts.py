@@ -12,7 +12,11 @@ core/artifacts.py — 中间产物注册表与级联删除计划
 
 from __future__ import annotations
 
+import json
+import logging
 import os
+import shutil
+import time
 from dataclasses import dataclass, field
 from typing import Any, Optional
 
@@ -572,3 +576,82 @@ def apply_cascade_plan(state: BaseTaskState, plan: CascadePlan) -> dict:
     update_kwargs["status"] = StepStatus.PENDING
 
     return update_kwargs
+
+
+# ═══════════════════════════════════════════════════════════════
+# 僵尸任务磁盘清理（v5.0 Batch 5 / 5.1）
+# ═══════════════════════════════════════════════════════════════
+
+_DEFAULT_PROTECT_STATUSES = {StepStatus.RUNNING, StepStatus.QUEUED, StepStatus.PENDING}
+
+
+def sweep_stale_tasks(age_days: int = 7,
+                      protect_statuses: Optional[set] = None) -> dict:
+    """扫描并清理僵尸任务目录（状态文件超龄且任务非活跃）。
+
+    清理条件（全部满足才删除）：
+    1. 工作区中存在 ``task_state.json`` 且可解析出 ``status`` 字段；
+    2. ``status`` 不在保护集合中；
+    3. ``task_state.json`` 的修改时间距今超过 ``age_days`` 天。
+
+    默认保护 ``RUNNING``（运行中）/ ``QUEUED``（排队中）/ ``PENDING``（断点续传
+    候选），保证活跃任务与可恢复任务永不误删；调用方可传 ``protect_statuses``
+    显式覆盖（如仅保护活跃状态，放开 PENDING）。
+
+    删除策略：整目录 ``shutil.rmtree``（等价于按级联计划删除全部产物 + 状态文件），
+    删除前校验 realpath 必须位于工作区内，防符号链接逃逸。
+
+    Args:
+        age_days: 状态文件超龄阈值（天）
+        protect_statuses: 保护的状态集合；None 时使用默认保护集合
+
+    Returns:
+        {"swept": [目录名], "protected": [目录名], "errors": [描述]}
+    """
+    working_dir = get_working_dir()
+    protect = protect_statuses if protect_statuses is not None else _DEFAULT_PROTECT_STATUSES
+    swept: list[str] = []
+    protected: list[str] = []
+    errors: list[str] = []
+
+    if not os.path.isdir(working_dir):
+        return {"swept": swept, "protected": protected, "errors": errors}
+
+    real_working = os.path.realpath(working_dir)
+    cutoff = time.time() - age_days * 86400
+
+    for name in sorted(os.listdir(working_dir)):
+        task_dir = os.path.join(working_dir, name)
+        if not os.path.isdir(task_dir):
+            continue
+        task_file = os.path.join(task_dir, "task_state.json")
+        if not os.path.isfile(task_file):
+            continue  # 非任务目录（如 uploads/ 或普通文件目录）
+        try:
+            with open(task_file, "r", encoding="utf-8") as f:
+                status_str = json.load(f).get("status")
+        except (OSError, json.JSONDecodeError):
+            errors.append(f"{name}: task_state.json 无法解析")
+            continue
+        if status_str in {s.value for s in protect}:
+            protected.append(name)
+            continue
+        try:
+            mtime = os.path.getmtime(task_file)
+        except OSError:
+            errors.append(f"{name}: 无法读取 task_state.json 修改时间")
+            continue
+        if mtime > cutoff:
+            protected.append(name)  # 未超龄，保留
+            continue
+        # 路径穿越防护：任务目录 realpath 必须位于工作区内
+        if not os.path.realpath(task_dir).startswith(real_working + os.sep):
+            errors.append(f"{name}: 任务目录逃逸工作区，拒绝删除")
+            continue
+        try:
+            shutil.rmtree(task_dir)
+            swept.append(name)
+        except OSError as e:
+            errors.append(f"{name}: 删除失败 ({e})")
+
+    return {"swept": swept, "protected": protected, "errors": errors}
