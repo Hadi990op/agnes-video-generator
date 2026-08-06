@@ -1,0 +1,173 @@
+"""
+单元测试：core.config 类型化配置（v5.0 Batch 5 / 5.2）。
+
+守护 AppSettings / load_settings 契约：
+- 构造期类型校验（类型错误抛 ValidationError）；
+- 缺省字段取默认值、未知键忽略（旧配置文件兼容）；
+- load_settings 与访问函数（get_api_key / get_working_dir /
+  get_watermark_config / get_selected_models / get_agnes_domain /
+  get_workspaces）行为等价于旧 dict 路径；
+- 写函数（set_*）仍走 dict 流，与类型化读一致。
+"""
+
+import json
+import os
+import sys
+
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
+import pytest
+from pydantic import ValidationError
+
+import core.config as config
+from core.config import AppSettings, WatermarkSettings, WorkspaceEntry
+
+
+# ═══════════════════════════════════════════════
+# 1. 模型默认值与构造期校验
+# ═══════════════════════════════════════════════
+
+def test_app_settings_defaults():
+    s = AppSettings()
+    assert s.api_key == ""
+    assert s.active_workspace == ""
+    assert s.workspaces == []
+    assert s.watermark.enabled is False
+    assert s.watermark.language == "auto"
+    assert s.models == {}
+    assert s.agnes_domain == "com"
+
+
+def test_app_settings_type_errors_raise_at_construction():
+    """配置类型错误在构造期抛错（验收标准）。"""
+    with pytest.raises(ValidationError):
+        AppSettings(watermark={"enabled": "yes"})  # 非 bool
+    with pytest.raises(ValidationError):
+        AppSettings(api_key=123)  # 非 str
+    with pytest.raises(ValidationError):
+        AppSettings(workspaces=[{"path": 42}])  # path 非 str
+
+
+def test_app_settings_ignores_unknown_keys():
+    """未知键自动忽略（旧配置文件含多余字段不报错）。"""
+    s = AppSettings(api_key="k", legacy_field="x", watermark={"enabled": True})
+    assert s.api_key == "k"
+    assert s.watermark.enabled is True
+
+
+def test_workspace_entry_and_watermark_models():
+    ws = WorkspaceEntry(path="/tmp/a", is_default=True)
+    assert ws.name == ""
+    assert ws.is_default is True
+    wm = WatermarkSettings()
+    assert wm.enabled is False
+    assert wm.language == "auto"
+
+
+# ═══════════════════════════════════════════════
+# 2. load_settings 与访问函数行为等价
+# ═══════════════════════════════════════════════
+
+@pytest.fixture
+def conf_file(tmp_path, monkeypatch):
+    """将 CONFIG_FILE 指向临时目录，返回写配置辅助函数。"""
+    monkeypatch.setattr(config, "CONFIG_DIR", str(tmp_path))
+    monkeypatch.setattr(config, "CONFIG_FILE", str(tmp_path / "config.json"))
+
+    def write(payload: dict):
+        (tmp_path / "config.json").write_text(
+            json.dumps(payload), encoding="utf-8")
+
+    return write
+
+
+def test_load_settings_reads_file(conf_file):
+    conf_file({"api_key": "abc", "watermark": {"enabled": True, "language": "en"},
+               "models": {"text": "m1"}, "agnes_domain": "cn",
+               "active_workspace": "/tmp/w"})
+    s = config.load_settings()
+    assert s.api_key == "abc"
+    assert s.watermark.enabled is True
+    assert s.models == {"text": "m1"}
+    assert s.agnes_domain == "cn"
+    assert s.active_workspace == "/tmp/w"
+
+
+def test_load_settings_missing_file_returns_defaults(conf_file):
+    s = config.load_settings()
+    assert s == AppSettings()
+
+
+def test_load_settings_corrupt_json_raises(conf_file, tmp_path):
+    (tmp_path / "config.json").write_text("{broken", encoding="utf-8")
+    with pytest.raises(json.JSONDecodeError):
+        config.load_settings()
+
+
+def test_get_api_key_uses_settings(conf_file, monkeypatch):
+    monkeypatch.delenv("AGNES_API_KEY", raising=False)
+    assert config.get_api_key() == ""
+    conf_file({"api_key": "k1"})
+    assert config.get_api_key() == "k1"
+
+
+def test_get_working_dir_uses_settings(conf_file, monkeypatch):
+    monkeypatch.delenv(config.REGRESSION_WORKING_DIR_ENV, raising=False)
+    assert config.get_working_dir() == config._default_working_dir()
+    conf_file({"active_workspace": "/tmp/custom"})
+    assert config.get_working_dir() == "/tmp/custom"
+
+
+def test_get_watermark_config_uses_settings(conf_file):
+    assert config.get_watermark_config() == {
+        "enabled": False, "language": "auto"}
+    conf_file({"watermark": {"enabled": True, "language": "zh"}})
+    assert config.get_watermark_config() == {
+        "enabled": True, "language": "zh"}
+
+
+def test_get_selected_models_uses_settings(conf_file):
+    assert config.get_selected_models() == {
+        "text": config.DEFAULT_TEXT_MODEL,
+        "image": config.DEFAULT_IMAGE_MODEL,
+        "video": config.DEFAULT_VIDEO_MODEL,
+    }
+    conf_file({"models": {"video": "custom-v"}})
+    result = config.get_selected_models()
+    assert result["video"] == "custom-v"
+    assert result["text"] == config.DEFAULT_TEXT_MODEL
+
+
+def test_get_agnes_domain_uses_settings(conf_file):
+    assert config.get_agnes_domain() == "com"
+    conf_file({"agnes_domain": "cn"})
+    assert config.get_agnes_domain() == "cn"
+
+
+def test_get_workspaces_uses_settings(conf_file, monkeypatch):
+    conf_file({"workspaces": [{"path": "/tmp/ws1", "name": "空间一"},
+                              {"path": "/tmp/ws2"}]})
+    workspaces = config.get_workspaces()
+    assert workspaces[0]["is_default"] is True  # 默认空间恒在首位
+    assert len(workspaces) == 3
+    assert workspaces[1] == {"path": "/tmp/ws1", "name": "空间一",
+                             "is_default": False}
+
+
+# ═══════════════════════════════════════════════
+# 3. 写函数与类型化读一致
+# ═══════════════════════════════════════════════
+
+def test_set_then_read_roundtrip(conf_file, monkeypatch):
+    """set_* 写 dict 流后，load_settings 能正确读回。"""
+    monkeypatch.delenv("AGNES_API_KEY", raising=False)
+    config.set_api_key("roundtrip-key")
+    assert config.load_settings().api_key == "roundtrip-key"
+    config.set_watermark_config(enabled=True, language="zh")
+    s = config.load_settings()
+    assert s.watermark.enabled is True
+    assert s.watermark.language == "zh"
+    config.set_agnes_domain("cn")
+    assert config.load_settings().agnes_domain == "cn"
+    config.delete_api_key()
+    assert config.load_settings().api_key == ""
