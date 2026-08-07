@@ -534,6 +534,11 @@
 
     <!-- ═══════ Tab 1: Simple Image & Video ═══════ -->
     <div id="form-simple" class="hidden">
+      <!-- 官网引导：示例提示词 -->
+      <div class="flex items-center gap-2 mb-4 text-xs text-gray-500">
+        <span class="text-gray-600">💡</span>
+        <a href="https://video.lichuanyang.top/guides/prompt-examples-simple" target="_blank" rel="noopener" class="hover:text-blue-300 transition-colors"><span data-i18n="exampleLinkSimple">📋 简易视频示例提示词</span></a>
+      </div>
       <!-- Sub-mode selector: Video vs Image -->
       <div class="glass-card rounded-xl p-3 mb-4 flex items-center gap-3">
         <label class="text-sm text-gray-400 whitespace-nowrap" data-i18n="subModeLabel">生成类型</label>
@@ -711,6 +716,11 @@
 
     <!-- ═══════ Tab 2: Creative Video ═══════ -->
     <div id="form-creative">
+      <!-- 官网引导：示例提示词 -->
+      <div class="flex items-center gap-2 mb-4 text-xs text-gray-500">
+        <span class="text-gray-600">💡</span>
+        <a href="https://video.lichuanyang.top/guides/prompt-examples-creative" target="_blank" rel="noopener" class="hover:text-blue-300 transition-colors"><span data-i18n="exampleLinkCreative">📋 创意长视频示例提示词</span></a>
+      </div>
       <div class="glass-card rounded-2xl p-6 mb-4">
         <h2 class="text-lg font-semibold text-blue-300 mb-4" data-i18n="creativeSettings">创意设置</h2>
 
@@ -975,6 +985,11 @@
 
     <!-- ═══════ Tab 3: Manuscript Video ═══════ -->
     <div id="form-manuscript" class="hidden">
+      <!-- 官网引导：示例提示词 -->
+      <div class="flex items-center gap-2 mb-4 text-xs text-gray-500">
+        <span class="text-gray-600">💡</span>
+        <a href="https://video.lichuanyang.top/guides/prompt-examples-manuscript" target="_blank" rel="noopener" class="hover:text-blue-300 transition-colors"><span data-i18n="exampleLinkManuscript">📋 稿件视频示例</span></a>
+      </div>
       <div class="glass-card rounded-2xl p-6 mb-4">
         <h2 class="text-lg font-semibold text-blue-300 mb-4" data-i18n="manuscriptSettings">稿件设置</h2>
 
@@ -1128,6 +1143,11 @@
 
     <!-- ═══════ Tab 4: Anchor Video ═══════ -->
     <div id="form-anchor" class="hidden">
+      <!-- 官网引导：示例提示词 -->
+      <div class="flex items-center gap-2 mb-4 text-xs text-gray-500">
+        <span class="text-gray-600">💡</span>
+        <a href="https://video.lichuanyang.top/guides/prompt-examples-anchor" target="_blank" rel="noopener" class="hover:text-blue-300 transition-colors"><span data-i18n="exampleLinkAnchor">📋 数字人示例</span></a>
+      </div>
       <div class="glass-card rounded-2xl p-6 mb-4">
         <h2 class="text-lg font-semibold text-blue-300 mb-4" data-i18n="anchorSettings">数字人设置</h2>
 
@@ -1804,6 +1824,10 @@ const T = {
         apiKeyDemoLink: '不想配置？在线体验',
         formTipTips: '🎯 提示词技巧',
         formTipModels: '🧠 模型对比',
+        exampleLinkSimple: '📋 简易视频示例提示词',
+        exampleLinkCreative: '📋 创意长视频示例提示词',
+        exampleLinkManuscript: '📋 稿件视频示例',
+        exampleLinkAnchor: '📋 数字人示例',
         waitTip: '💡 等待生成时，看看别人用 Agnes 做了什么',
         doneTipTiktok: '📈 学学社媒玩法',
         doneTipMore: '🎬 更多创作方向',
@@ -1955,6 +1979,10 @@ const T = {
         apiKeyDemoLink: 'Prefer not to configure? Try online',
         formTipTips: '🎯 Prompt tips',
         formTipModels: '🧠 Model comparison',
+        exampleLinkSimple: '📋 Simple video prompt examples',
+        exampleLinkCreative: '📋 Creative video prompt examples',
+        exampleLinkManuscript: '📋 Manuscript video examples',
+        exampleLinkAnchor: '📋 Digital anchor examples',
         waitTip: '💡 While you wait, see what others create with Agnes',
         doneTipTiktok: '📈 Social media playbook',
         doneTipMore: '🎬 More creation ideas',
@@ -2079,6 +2107,10 @@ const T = {
         apiKeyDemoLink: 'Не хотите настраивать? Онлайн-версия',
         formTipTips: '🎯 Советы по промптам',
         formTipModels: '🧠 Сравнение моделей',
+        exampleLinkSimple: '📋 Примеры промптов для простого видео',
+        exampleLinkCreative: '📋 Примеры промптов для креативного видео',
+        exampleLinkManuscript: '📋 Примеры видео из статьи',
+        exampleLinkAnchor: '📋 Примеры цифрового ведущего',
         waitTip: '💡 Пока ждёте - посмотрите, что создают другие с Agnes',
         doneTipTiktok: '📈 Идеи для соцсетей',
         doneTipMore: '🎬 Больше идей для творчества',
@@ -2200,6 +2232,10 @@ const T = {
         apiKeyDemoLink: '設定したくない？オンライン体験',
         formTipTips: '🎯 プロンプトのコツ',
         formTipModels: '🧠 モデル比較',
+        exampleLinkSimple: '📋 シンプル動画のプロンプト例',
+        exampleLinkCreative: '📋 クリエイティブ動画のプロンプト例',
+        exampleLinkManuscript: '📋 記事動画の例',
+        exampleLinkAnchor: '📋 デジタルアンカーの例',
         waitTip: '💡 待っている間に、Agnes で作られた作品を見てみませんか',
         doneTipTiktok: '📈 SNS 活用術',
         doneTipMore: '🎬 もっと創作アイデア',
@@ -2321,6 +2357,10 @@ const T = {
         apiKeyDemoLink: '설정하기 싫으세요? 온라인 체험',
         formTipTips: '🎯 프롬프트 팁',
         formTipModels: '🧠 모델 비교',
+        exampleLinkSimple: '📋 심플 영상 프롬프트 예시',
+        exampleLinkCreative: '📋 크리에이티브 영상 프롬프트 예시',
+        exampleLinkManuscript: '📋 기사 영상 예시',
+        exampleLinkAnchor: '📋 디지털 앵커 예시',
         waitTip: '💡 기다리는 동안 Agnes로 만든 작품을 구경해 보세요',
         doneTipTiktok: '📈 SNS 활용법',
         doneTipMore: '🎬 더 많은 창작 아이디어',
@@ -2442,6 +2482,10 @@ const T = {
         apiKeyDemoLink: 'Tak mahu sediakan? Cuba dalam talian',
         formTipTips: '🎯 Tip prompt',
         formTipModels: '🧠 Perbandingan model',
+        exampleLinkSimple: '📋 Contoh prompt video ringkas',
+        exampleLinkCreative: '📋 Contoh prompt video kreatif',
+        exampleLinkManuscript: '📋 Contoh video artikel',
+        exampleLinkAnchor: '📋 Contoh penyampai digital',
         waitTip: '💡 Sementara menunggu, lihat hasil karya orang lain dengan Agnes',
         doneTipTiktok: '📈 Panduan media sosial',
         doneTipMore: '🎬 Lebih banyak idea kreatif',
@@ -2562,6 +2606,10 @@ const T = {
         apiKeyDemoLink: 'Tidak mau konfigurasi? Coba online',
         formTipTips: '🎯 Tips prompt',
         formTipModels: '🧠 Perbandingan model',
+        exampleLinkSimple: '📋 Contoh prompt video sederhana',
+        exampleLinkCreative: '📋 Contoh prompt video kreatif',
+        exampleLinkManuscript: '📋 Contoh video artikel',
+        exampleLinkAnchor: '📋 Contoh pembawa acara digital',
         waitTip: '💡 Sambil menunggu, lihat karya orang lain dengan Agnes',
         doneTipTiktok: '📈 Panduan media sosial',
         doneTipMore: '🎬 Lebih banyak ide kreatif',
@@ -2688,6 +2736,10 @@ const T = {
         apiKeyDemoLink: 'Keine Lust auf Einrichtung? Online testen',
         formTipTips: '🎯 Prompt-Tipps',
         formTipModels: '🧠 Modellvergleich',
+        exampleLinkSimple: '📋 Einfache Video-Prompt-Beispiele',
+        exampleLinkCreative: '📋 Kreative Video-Prompt-Beispiele',
+        exampleLinkManuscript: '📋 Artikel-Video-Beispiele',
+        exampleLinkAnchor: '📋 Beispiele für digitalen Moderator',
         waitTip: '💡 Schauen Sie während des Wartens, was andere mit Agnes erstellen',
         doneTipTiktok: '📈 Social-Media-Tipps',
         doneTipMore: '🎬 Weitere Ideen',
@@ -2814,6 +2866,10 @@ const T = {
         apiKeyDemoLink: 'Pas envie de configurer ? Essayez en ligne',
         formTipTips: '🎯 Astuces de prompt',
         formTipModels: '🧠 Comparaison des modèles',
+        exampleLinkSimple: '📋 Exemples de prompts vidéo simple',
+        exampleLinkCreative: '📋 Exemples de prompts vidéo créative',
+        exampleLinkManuscript: '📋 Exemples de vidéo article',
+        exampleLinkAnchor: '📋 Exemples de présentateur numérique',
         waitTip: '💡 Pendant l\'attente, découvrez ce que les autres créent avec Agnes',
         doneTipTiktok: '📈 Astuces réseaux sociaux',
         doneTipMore: '🎬 Plus d\'idées de création',
@@ -2940,6 +2996,10 @@ const T = {
         apiKeyDemoLink: 'Geen zin om te configureren? Probeer online',
         formTipTips: '🎯 Prompt-tips',
         formTipModels: '🧠 Modelvergelijking',
+        exampleLinkSimple: '📋 Voorbeelden van eenvoudige video-prompts',
+        exampleLinkCreative: '📋 Voorbeelden van creatieve video-prompts',
+        exampleLinkManuscript: '📋 Voorbeelden van artikelvideo',
+        exampleLinkAnchor: '📋 Voorbeelden van digitale presentator',
         waitTip: '💡 Bekijk ondertussen wat anderen met Agnes maken',
         doneTipTiktok: '📈 Social media tips',
         doneTipMore: '🎬 Meer creatieve ideeën',
@@ -3066,6 +3126,10 @@ const T = {
         apiKeyDemoLink: '¿No quieres configurar? Pruébalo en línea',
         formTipTips: '🎯 Consejos de prompt',
         formTipModels: '🧠 Comparación de modelos',
+        exampleLinkSimple: '📋 Ejemplos de prompts de video simple',
+        exampleLinkCreative: '📋 Ejemplos de prompts de video creativo',
+        exampleLinkManuscript: '📋 Ejemplos de video artículo',
+        exampleLinkAnchor: '📋 Ejemplos de presentador digital',
         waitTip: '💡 Mientras esperas, mira lo que otros crean con Agnes',
         doneTipTiktok: '📈 Ideas para redes sociales',
         doneTipMore: '🎬 Más ideas de creación',
@@ -3192,6 +3256,10 @@ const T = {
         apiKeyDemoLink: 'Não quer configurar? Experimente online',
         formTipTips: '🎯 Dicas de prompt',
         formTipModels: '🧠 Comparação de modelos',
+        exampleLinkSimple: '📋 Exemplos de prompts de vídeo simples',
+        exampleLinkCreative: '📋 Exemplos de prompts de vídeo criativo',
+        exampleLinkManuscript: '📋 Exemplos de vídeo artigo',
+        exampleLinkAnchor: '📋 Exemplos de apresentador digital',
         waitTip: '💡 Enquanto espera, veja o que outras pessoas criam com Agnes',
         doneTipTiktok: '📈 Ideias para redes sociais',
         doneTipMore: '🎬 Mais ideias de criação',
@@ -3318,6 +3386,10 @@ const T = {
         apiKeyDemoLink: 'Non vuoi configurare? Provalo online',
         formTipTips: '🎯 Consigli sui prompt',
         formTipModels: '🧠 Confronto modelli',
+        exampleLinkSimple: '📋 Esempi di prompt video semplice',
+        exampleLinkCreative: '📋 Esempi di prompt video creativo',
+        exampleLinkManuscript: '📋 Esempi di video articolo',
+        exampleLinkAnchor: '📋 Esempi di presentatore digitale',
         waitTip: '💡 Mentre aspetti, guarda cosa creano gli altri con Agnes',
         doneTipTiktok: '📈 Idee per i social',
         doneTipMore: '🎬 Altre idee creative',
