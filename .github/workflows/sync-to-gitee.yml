@@ -19,5 +19,5 @@ jobs:
 
       - name: Push master to Gitee mirror
         run: |
-          git remote add gitee https://${{ secrets.GITEE_TOKEN }}@gitee.com/sandgrid/agnes-video-generator.git
+          git remote add gitee https://sandgrid:${{ secrets.GITEE_TOKEN }}@gitee.com/sandgrid/agnes-video-generator.git
           git push gitee master
