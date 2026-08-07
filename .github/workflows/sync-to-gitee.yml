@@ -1,0 +1,23 @@
+name: Sync to Gitee
+
+on:
+  push:
+    branches: [master]
+  schedule:
+    # 每 6 小时兜底同步一次，防止漏推
+    - cron: "0 */6 * * *"
+  workflow_dispatch:
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    if: github.repository == 'lcy362/agnes-video-generator'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Push master to Gitee mirror
+        run: |
+          git remote add gitee https://${{ secrets.GITEE_TOKEN }}@gitee.com/sandgrid/agnes-video-generator.git
+          git push gitee master
