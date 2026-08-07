@@ -8,6 +8,10 @@
 [![Docker Hub](https://img.shields.io/docker/pulls/lcy362/free-short-video?label=docker%20pulls)](https://hub.docker.com/r/lcy362/free-short-video)
 [![npm](https://img.shields.io/npm/v/free-short-video?label=npm)](https://www.npmjs.com/package/free-short-video)
 
+> **🌏 Mirror Notice / 镜像说明**
+> The GitHub repository is the **single source of truth**. This project is auto-mirrored to [Gitee](https://gitee.com/sandgrid/agnes-video-generator) for faster access in mainland China — please file issues, PRs and stars on GitHub.
+> 本仓库为 GitHub 主仓库的自动镜像站，用于国内访问加速。GitHub 为唯一更新源，Issue / PR / Star 请在 [主仓库](https://github.com/lcy362/agnes-video-generator) 提交。
+
 > **Completely free AI video generator** — Built on Agnes AI's free models, no subscription, no high-end GPU, no usage limits. Type in a text idea and automatically generate multi-scene AI videos with narration and subtitles. Supports text-to-video, image-to-video, keyframes animation, digital anchor, and more. All AI compute runs in the cloud — a regular laptop is all you need. **[Try it online →](https://video.lichuanyang.top)**
 
 > "The solution is not to suppress AI, but to make it a more equitable capability, so that everyone knows how to create more with AI. This is a very important vision for our company — to make world-class AI belong to everyone. What we can do may be insignificant, but this vision is very long-term and enduring."
