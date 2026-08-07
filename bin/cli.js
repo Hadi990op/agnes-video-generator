@@ -204,9 +204,13 @@ process.on('SIGINT', () => shutdown('SIGINT'));
 process.on('SIGTERM', () => shutdown('SIGTERM'));
 
 // ── auto-open browser ─────────────────────────────────────────────────────
+// 轮询等待服务就绪（HTTP 200）后再打开浏览器，避免启动初期闪现"无法访问"
 if (openBrowser) {
+  const http = require('http');
   const url = `http://${host === '0.0.0.0' ? '127.0.0.1' : host}:${port}`;
-  setTimeout(() => {
+  let attempts = 0;
+
+  const openBrowserNow = () => {
     try {
       if (process.platform === 'darwin') execSync(`open "${url}"`);
       else if (process.platform === 'win32') execSync(`start "" "${url}"`);
@@ -214,5 +218,25 @@ if (openBrowser) {
     } catch (_) {
       /* browser open is best-effort */
     }
-  }, 1500);
+  };
+
+  const scheduleNext = () => {
+    if (++attempts > 120) return; // 约 60s 上限，超时不再尝试
+    setTimeout(pollReady, 500);
+  };
+
+  const pollReady = () => {
+    const req = http.get(url, (res) => {
+      res.resume();
+      if (res.statusCode >= 200 && res.statusCode < 500) openBrowserNow();
+      else scheduleNext();
+    });
+    req.setTimeout(2000, () => {
+      req.destroy();
+      scheduleNext();
+    });
+    req.on('error', scheduleNext);
+  };
+
+  pollReady();
 }

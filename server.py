@@ -21,7 +21,8 @@ import logging
 import os
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException
+from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 
 from core.audio.voices import load_voice_catalog
@@ -51,10 +52,24 @@ async def lifespan(app: FastAPI):
     # 初始化工作目录 / uploads / 错误收集根路径，并重置上次异常退出的遗留任务
     init_runtime_state()
 
-    # v4.0: 预加载音色目录（edge_tts.list_voices），失败不阻断启动
+    # v4.0: 预加载音色目录（edge_tts.list_voices）。
+    # edge_tts.list_voices() 是网络调用，若网络慢/不可达会阻塞 lifespan 的 yield，
+    # 导致服务启动后数秒内不可用。这里限时等待 3 秒：
+    # - 正常网络（1~2s）：目录在对外服务前就绪，/api/voices 无回退闪烁
+    # - 慢网络：超过 3s 立即对外服务，剩余加载转入后台，完成后自动切换完整目录
+    async def _load_voice_catalog_bg():
+        try:
+            await load_voice_catalog()
+            logger.info("[Startup] Voice catalog loaded")
+        except Exception as e:
+            logger.warning(f"[Startup] Voice catalog load failed ({e}); will use fallback")
+
     try:
-        await load_voice_catalog()
+        await asyncio.wait_for(load_voice_catalog(), timeout=3.0)
         logger.info("[Startup] Voice catalog loaded")
+    except asyncio.TimeoutError:
+        logger.warning("[Startup] Voice catalog load timed out (>3s); continuing in background")
+        asyncio.create_task(_load_voice_catalog_bg())
     except Exception as e:
         logger.warning(f"[Startup] Voice catalog load failed ({e}); will use fallback")
 
@@ -90,6 +105,27 @@ app = FastAPI(
 static_dir = os.path.join(os.path.dirname(__file__), "static")
 if os.path.exists(static_dir):
     app.mount("/static", StaticFiles(directory=static_dir), name="static")
+
+
+def _serve_static_file(filename: str, media_type: str):
+    """返回 static 目录中的文件；不存在时 404（与挂载目录行为一致）。"""
+    path = os.path.join(static_dir, filename)
+    if os.path.exists(path):
+        return FileResponse(path, media_type=media_type)
+    raise HTTPException(status_code=404, detail=f"{filename} not found")
+
+
+# 根路径图标：HTML 虽声明 /static/favicon.ico，但 Safari 等客户端
+# 仍会额外探测根路径 /favicon.ico（及 /icon.png），无路由时每次打开页面
+# 产生一次短暂 404，这里显式补上。
+@app.get("/favicon.ico", include_in_schema=False)
+async def favicon():
+    return _serve_static_file("favicon.ico", "image/x-icon")
+
+
+@app.get("/icon.png", include_in_schema=False)
+async def icon():
+    return _serve_static_file("icon.png", "image/png")
 
 
 # ═══════════════════════════════════════════════════

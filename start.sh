@@ -101,12 +101,23 @@ echo "  浏览器将自动打开 http://localhost:8765"
 echo "  按 Ctrl+C 停止服务"
 echo ""
 
-sleep 1
+# 轮询等待服务就绪后再打开浏览器，避免启动初期闪现"无法访问"
+_APP_URL="http://localhost:8765"
+wait_ready() {
+    local i
+    for i in $(seq 1 120); do
+        if curl -s -o /dev/null --connect-timeout 1 -m 2 "$_APP_URL/" 2>/dev/null; then
+            return 0
+        fi
+        sleep 0.5
+    done
+    return 1
+}
 
 if command -v open &> /dev/null; then
-    (sleep 1.5 && open http://localhost:8765) &
+    (wait_ready && open "$_APP_URL") &
 elif command -v xdg-open &> /dev/null; then
-    (sleep 1.5 && xdg-open http://localhost:8765) &
+    (wait_ready && xdg-open "$_APP_URL") &
 fi
 
 $VENV_PYTHON server.py
