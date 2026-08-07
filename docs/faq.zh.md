@@ -35,3 +35,11 @@
 ### 如何获取帮助或报告问题？
 
 请访问 [GitHub Issues](https://github.com/lcy362/agnes-video-generator/issues) 页面查看已有报告或提交新 Issue。项目还包含完整的 `AGENTS.md` 部署指引，支持 AI 编程助手辅助调试。
+
+---
+
+## 📚 更多资源
+
+- [🌐 官网](https://video.lichuanyang.top) — 项目主页与最新资讯
+- [🎬 在线体验](https://video.lichuanyang.top/demo) — 免安装直接使用
+- [📋 API 文档](https://video.lichuanyang.top/api-docs) — 完整接口列表

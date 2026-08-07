@@ -70,3 +70,12 @@
 | **keyframes** | 每场景指定首帧+末帧，服务端自动插值过渡 | 追求平滑过渡（推荐） |
 | **ti2vid** | 上一场景末帧 → img2img 过渡图 → 下一场景首帧 | 需要场景间视觉连续性 |
 | **none** | 所有场景共用同一参考图，互不依赖 | 快速出片，场景独立 |
+
+---
+
+## 📚 更多资源
+
+- [🌐 官网](https://video.lichuanyang.top) — 项目主页与最新资讯
+- [🎬 在线体验](https://video.lichuanyang.top/demo) — 免安装直接使用
+- [❓ 常见问题](https://video.lichuanyang.top/faq) — 高频疑问解答
+- [📋 API 文档](https://video.lichuanyang.top/api-docs) — 完整接口列表

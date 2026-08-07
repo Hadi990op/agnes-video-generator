@@ -1,5 +1,7 @@
 # 🚀 快速开始
 
+**[🌐 官网](https://video.lichuanyang.top)** | **[🎬 在线体验（免安装）](https://video.lichuanyang.top/demo)** | **[📚 模型文档](https://video.lichuanyang.top/guides/model-overview)**
+
 ## 环境要求
 
 - Python 3.10+
@@ -154,3 +156,7 @@ Agent 会读取 `AGENTS.md`（一份完整的部署指引），自动完成：�
 > "跑一下部署验证检查。"
 
 Agent 会按 `AGENTS.md` 中的四层验证清单（连通性 → 静态分析 → 端点测试 → 字幕功能）逐项执行并汇报结果。
+
+---
+
+> 💡 想跳过安装？直接打开 [在线体验](https://video.lichuanyang.top/demo) 免安装使用。

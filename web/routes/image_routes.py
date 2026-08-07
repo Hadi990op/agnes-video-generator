@@ -11,7 +11,7 @@ from fastapi import APIRouter, File, Form, HTTPException, UploadFile
 from fastapi.responses import FileResponse
 
 from core.api.agnes_image import AgnesImageAPI
-from core.config import get_api_key
+from core.config import API_KEY_MISSING_MSG, get_api_key
 from core.task_manager import TaskManager
 from models.task import SimpleImageTask, StepStatus
 
@@ -38,7 +38,7 @@ async def generate_image(
     """简单图片生成：创建任务 → 直调 Agnes Image API → 保存到任务目录。"""
     api_key = get_api_key()
     if not api_key:
-        raise HTTPException(status_code=400, detail="请先配置 API Key")
+        raise HTTPException(status_code=400, detail=API_KEY_MISSING_MSG)
 
     if len(prompt) > 5000:
         raise HTTPException(status_code=422, detail="prompt 最多 5000 字符")

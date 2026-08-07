@@ -72,7 +72,15 @@ async def lifespan(app: FastAPI):
     yield
 
 
-app = FastAPI(title="Agnes Video Generator", lifespan=lifespan)
+app = FastAPI(
+    title="Agnes Video Generator",
+    description=(
+        "完全免费的 AI 视频生成服务。官网：https://video.lichuanyang.top ｜ "
+        "API 文档：https://video.lichuanyang.top/api-docs ｜ "
+        "调用指南：https://video.lichuanyang.top/guides/api-call"
+    ),
+    lifespan=lifespan,
+)
 
 
 # ═══════════════════════════════════════════════════

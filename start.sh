@@ -2,8 +2,43 @@
 set -e
 cd "$(dirname "$0")"
 
+# ── 终端超链接（ANSI OSC 8）：支持的终端（macOS 终端/iTerm2/Windows Terminal/VS Code 等）
+#    显示文本可点击跳转；不支持的终端自动降级为纯文本。非 TTY（重定向/管道）时只输出纯文本。
+_IS_TTY=0
+[[ -t 1 ]] && _IS_TTY=1
+link() {
+  if [ "$_IS_TTY" = "1" ]; then
+    printf '\033]8;;%s\033\\%s\033]8;;\033\\' "$1" "$2"
+  else
+    printf '%s' "$2"
+  fi
+}
+
+# ── 启动图案（ASCII art）：TTY 下亮青色显示，非 TTY 纯文本 ──────────
+FSV_LOGO=(
+  '   _____ ______     __'
+  '  |  ___/ ___\ \   / /'
+  '  | |_  \___ \\ \ / /'
+  '  |  _|  ___) |\ V /'
+  '  |_|   |____/  \_/'
+)
+print_logo() {
+  if [ "$_IS_TTY" = "1" ]; then
+    printf '\033[1;36m\n'
+    printf '%s\n' "${FSV_LOGO[@]}"
+    printf '\033[0m'
+  else
+    printf '\n'
+    printf '%s\n' "${FSV_LOGO[@]}"
+  fi
+}
+
 echo "================================================"
-echo "  Agnes Video Generator"
+print_logo
+echo "   free-short-video — 免费 AI 短视频生成"
+echo ""
+echo "   $(link 'https://video.lichuanyang.top' '🌐 官网：https://video.lichuanyang.top')"
+echo "   $(link 'https://video.lichuanyang.top/demo' '⚡ 在线体验（免安装）：https://video.lichuanyang.top/demo')"
 echo "================================================"
 echo ""
 
@@ -14,12 +49,14 @@ if ! command -v python3 &> /dev/null; then
     echo "❌ 未找到 python3，请先安装 Python 3.10+"
     echo "   macOS:   brew install python3"
     echo "   Ubuntu:  sudo apt install python3 python3-venv"
+    echo "   或直接在线体验（免安装）：$(link 'https://video.lichuanyang.top/demo' 'https://video.lichuanyang.top/demo')"
     exit 1
 fi
 
 python3 -c "import sys; sys.exit(0 if sys.version_info >= (3, 10) else 1)" 2>/dev/null || {
     PY_VER=$(python3 --version 2>&1)
     echo "❌ Python 版本过低 ($PY_VER)，需要 3.10+"
+    echo "   或直接在线体验（免安装）：$(link 'https://video.lichuanyang.top/demo' 'https://video.lichuanyang.top/demo')"
     exit 1
 }
 
@@ -28,6 +65,7 @@ if ! command -v ffmpeg &> /dev/null; then
     echo "❌ 未找到 ffmpeg，视频处理依赖 ffmpeg"
     echo "   macOS:   brew install ffmpeg"
     echo "   Ubuntu:  sudo apt install ffmpeg"
+    echo "   或直接在线体验（免安装）：$(link 'https://video.lichuanyang.top/demo' 'https://video.lichuanyang.top/demo')"
     exit 1
 fi
 
@@ -37,6 +75,7 @@ if command -v lsof &> /dev/null; then
     if [ -n "$PID" ]; then
         echo "⚠️  端口 8765 已被 PID $PID 占用"
         echo "   执行: kill $PID 后重试，或修改端口"
+        echo "   或直接在线体验（免安装）：$(link 'https://video.lichuanyang.top/demo' 'https://video.lichuanyang.top/demo')"
         exit 1
     fi
 fi
