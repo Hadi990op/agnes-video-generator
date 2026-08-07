@@ -52,10 +52,24 @@ async def lifespan(app: FastAPI):
     # 初始化工作目录 / uploads / 错误收集根路径，并重置上次异常退出的遗留任务
     init_runtime_state()
 
-    # v4.0: 预加载音色目录（edge_tts.list_voices），失败不阻断启动
+    # v4.0: 预加载音色目录（edge_tts.list_voices）。
+    # edge_tts.list_voices() 是网络调用，若网络慢/不可达会阻塞 lifespan 的 yield，
+    # 导致服务启动后数秒内不可用。这里限时等待 3 秒：
+    # - 正常网络（1~2s）：目录在对外服务前就绪，/api/voices 无回退闪烁
+    # - 慢网络：超过 3s 立即对外服务，剩余加载转入后台，完成后自动切换完整目录
+    async def _load_voice_catalog_bg():
+        try:
+            await load_voice_catalog()
+            logger.info("[Startup] Voice catalog loaded")
+        except Exception as e:
+            logger.warning(f"[Startup] Voice catalog load failed ({e}); will use fallback")
+
     try:
-        await load_voice_catalog()
+        await asyncio.wait_for(load_voice_catalog(), timeout=3.0)
         logger.info("[Startup] Voice catalog loaded")
+    except asyncio.TimeoutError:
+        logger.warning("[Startup] Voice catalog load timed out (>3s); continuing in background")
+        asyncio.create_task(_load_voice_catalog_bg())
     except Exception as e:
         logger.warning(f"[Startup] Voice catalog load failed ({e}); will use fallback")
 
