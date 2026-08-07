@@ -115,3 +115,12 @@ AI 驱动的多场景故事视频：
 └── scene_2/
     └── ...
 ```
+
+---
+
+## 📚 更多资源
+
+- [🌐 官网](https://video.lichuanyang.top) — 项目主页与最新资讯
+- [🎬 在线体验](https://video.lichuanyang.top/demo) — 免安装直接使用
+- [❓ 常见问题](https://video.lichuanyang.top/faq) — 高频疑问解答
+- [📋 API 文档](https://video.lichuanyang.top/api-docs) — 完整接口列表

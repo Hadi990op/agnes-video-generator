@@ -5,7 +5,7 @@ import logging
 
 from fastapi import APIRouter, HTTPException
 
-from core.config import get_api_key
+from core.config import API_KEY_MISSING_MSG, get_api_key
 from core.task_manager import TaskManager
 from models.task import (
     AnchorVideoTask,
@@ -77,7 +77,7 @@ async def get_task(task_id: str):
 async def resume_task(task_id: str):
     api_key = get_api_key()
     if not api_key:
-        raise HTTPException(status_code=400, detail="请先配置 API Key")
+        raise HTTPException(status_code=400, detail=API_KEY_MISSING_MSG)
 
     # 关键段串行化：check 与 insert 之间存在多个 await 让出点，快速重复 resume
     # 会让两次请求都通过 "task not in active_pipelines" 检查并各自启动 pipeline，

@@ -21,6 +21,27 @@ const os = require('os');
 
 const PKG_ROOT = path.resolve(__dirname, '..');
 
+// 终端超链接（ANSI OSC 8）：TTY 下输出可点击链接，非 TTY（管道/重定向）降级为纯文本
+const link = (url, text) =>
+  process.stdout.isTTY ? `\x1b]8;;${url}\x1b\\${text}\x1b]8;;\x1b\\` : text;
+
+// 启动图案（ASCII art）：TTY 下亮青色显示，非 TTY 纯文本
+const FSV_LOGO = String.raw`   _____ ______     __
+  |  ___/ ___\ \   / /
+  | |_  \___ \\ \ / /
+  |  _|  ___) |\ V /
+  |_|   |____/  \_/`.split('\n');
+function printLogo() {
+  if (process.stdout.isTTY) {
+    console.log('\x1b[1;36m');
+    FSV_LOGO.forEach((l) => console.log(l));
+    process.stdout.write('\x1b[0m');
+  } else {
+    console.log('');
+    FSV_LOGO.forEach((l) => console.log(l));
+  }
+}
+
 function printHelp() {
   console.log(`free-short-video — free AI short-video generator
 
@@ -36,6 +57,9 @@ Options:
 
 Environment:
   AGNES_API_KEY  Your Agnes API key (can also be set later in the Web UI)
+
+Website:
+  ${link('https://video.lichuanyang.top', 'https://video.lichuanyang.top')}   (official site & no-install online demo)
 
 First run creates a local venv and installs Python dependencies automatically.
 `);
@@ -96,7 +120,10 @@ function venvBin(name) {
 
 // ── 1. python check ───────────────────────────────────────────────────────
 console.log('================================================');
-console.log('  free-short-video');
+printLogo();
+console.log('   free-short-video — Free AI short-video generator');
+console.log('');
+console.log(`   🌐 官网: ${link('https://video.lichuanyang.top', 'https://video.lichuanyang.top')}  |  ⚡ 在线体验: ${link('https://video.lichuanyang.top/demo', 'https://video.lichuanyang.top/demo')}`);
 console.log('================================================');
 console.log('');
 

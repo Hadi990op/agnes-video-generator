@@ -10,7 +10,7 @@ from typing import List, Optional
 
 from fastapi import APIRouter, File, Form, HTTPException, UploadFile
 
-from core.config import DURATION_FRAME_MAP, get_api_key
+from core.config import API_KEY_MISSING_MSG, DURATION_FRAME_MAP, get_api_key
 from core.pipelines.poetry_video import POETRY_SUBTITLE_STYLE
 from core.screenwriter import build_poetry_scene_prompt
 from core.task_manager import TaskManager
@@ -104,7 +104,7 @@ async def create_simple_task(
     """创建简单视频任务（类型 1）。"""
     api_key = get_api_key()
     if not api_key:
-        raise HTTPException(status_code=400, detail="请先配置 API Key")
+        raise HTTPException(status_code=400, detail=API_KEY_MISSING_MSG)
 
     # P7: 参数校验
     _VALID_MODES = {"t2v", "i2v", "ti2vid", "keyframes"}
@@ -199,7 +199,7 @@ async def create_creative_task(
     """创建创意长视频任务（类型 2）。"""
     api_key = get_api_key()
     if not api_key:
-        raise HTTPException(status_code=400, detail="请先配置 API Key")
+        raise HTTPException(status_code=400, detail=API_KEY_MISSING_MSG)
 
     # v4.0: 音色与目标语言兼容性校验
     if audio_enabled:
@@ -310,7 +310,7 @@ async def create_manuscript_task(
     """创建稿件长视频任务（类型 3）。"""
     api_key = get_api_key()
     if not api_key:
-        raise HTTPException(status_code=400, detail="请先配置 API Key")
+        raise HTTPException(status_code=400, detail=API_KEY_MISSING_MSG)
 
     if not manuscript_text.strip():
         raise HTTPException(status_code=400, detail="稿件内容不能为空")
@@ -385,7 +385,7 @@ async def create_poetry_task(
     """创建诗词视频任务（类型 6）。"""
     api_key = get_api_key()
     if not api_key:
-        raise HTTPException(status_code=400, detail="请先配置 API Key")
+        raise HTTPException(status_code=400, detail=API_KEY_MISSING_MSG)
 
     # v4.0: 音色与目标语言兼容性校验
     if audio_enabled:
@@ -483,7 +483,7 @@ async def create_anchor_task(
     """创建数字人口播任务（类型 4 / Phase 3）。"""
     api_key = get_api_key()
     if not api_key:
-        raise HTTPException(status_code=400, detail="请先配置 API Key")
+        raise HTTPException(status_code=400, detail=API_KEY_MISSING_MSG)
 
     # v4.0: 音色与稿件文本兼容性校验
     # 数字人口播的稿件由用户直接输入，应以「稿件文本的实际文字体系」为准做脚本级

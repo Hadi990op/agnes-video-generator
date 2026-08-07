@@ -11,6 +11,45 @@
 set -euo pipefail
 cd "$(dirname "$0")"
 
+# ── 终端超链接（ANSI OSC 8）：支持的终端可点击跳转，不支持的自动降级为纯文本；
+#    非 TTY（重定向/管道）时只输出纯文本，不混入转义字符。
+_IS_TTY=0
+[[ -t 1 ]] && _IS_TTY=1
+link() {
+  if [ "$_IS_TTY" = "1" ]; then
+    printf '\033]8;;%s\033\\%s\033]8;;\033\\' "$1" "$2"
+  else
+    printf '%s' "$2"
+  fi
+}
+
+# ── 启动图案（ASCII art）：TTY 下亮青色显示，非 TTY 纯文本 ──────────
+FSV_LOGO=(
+  '   _____ ______     __'
+  '  |  ___/ ___\ \   / /'
+  '  | |_  \___ \\ \ / /'
+  '  |  _|  ___) |\ V /'
+  '  |_|   |____/  \_/'
+)
+print_logo() {
+  if [ "$_IS_TTY" = "1" ]; then
+    printf '\033[1;36m\n'
+    printf '%s\n' "${FSV_LOGO[@]}"
+    printf '\033[0m'
+  else
+    printf '\n'
+    printf '%s\n' "${FSV_LOGO[@]}"
+  fi
+}
+
+echo "================================================"
+print_logo
+echo "   free-short-video — 免费 AI 短视频生成"
+echo ""
+echo "   $(link 'https://video.lichuanyang.top' '🌐 官网：https://video.lichuanyang.top')  |  $(link 'https://video.lichuanyang.top/demo' '⚡ 在线体验（免安装）：https://video.lichuanyang.top/demo')"
+echo "================================================"
+echo ""
+
 IMAGE="${AGNES_IMAGE:-ghcr.io/lcy362/agnes-video-generator/free-short-video:4.7.2}"
 NAME="agnes-video"
 PORT="${AGNES_PORT:-8765}"
