@@ -21,7 +21,8 @@ import logging
 import os
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException
+from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 
 from core.audio.voices import load_voice_catalog
@@ -90,6 +91,27 @@ app = FastAPI(
 static_dir = os.path.join(os.path.dirname(__file__), "static")
 if os.path.exists(static_dir):
     app.mount("/static", StaticFiles(directory=static_dir), name="static")
+
+
+def _serve_static_file(filename: str, media_type: str):
+    """返回 static 目录中的文件；不存在时 404（与挂载目录行为一致）。"""
+    path = os.path.join(static_dir, filename)
+    if os.path.exists(path):
+        return FileResponse(path, media_type=media_type)
+    raise HTTPException(status_code=404, detail=f"{filename} not found")
+
+
+# 根路径图标：HTML 虽声明 /static/favicon.ico，但 Safari 等客户端
+# 仍会额外探测根路径 /favicon.ico（及 /icon.png），无路由时每次打开页面
+# 产生一次短暂 404，这里显式补上。
+@app.get("/favicon.ico", include_in_schema=False)
+async def favicon():
+    return _serve_static_file("favicon.ico", "image/x-icon")
+
+
+@app.get("/icon.png", include_in_schema=False)
+async def icon():
+    return _serve_static_file("icon.png", "image/png")
 
 
 # ═══════════════════════════════════════════════════
