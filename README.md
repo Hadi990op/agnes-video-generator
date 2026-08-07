@@ -9,8 +9,8 @@
 [![npm](https://img.shields.io/npm/v/free-short-video?label=npm)](https://www.npmjs.com/package/free-short-video)
 
 > **🌏 Mirror Notice / 镜像说明**
-> The GitHub repository is the **single source of truth**. This project is auto-mirrored to [Gitee](https://gitee.com/sandgrid/agnes-video-generator) for faster access in mainland China — please file issues, PRs and stars on GitHub.
-> 本仓库为 GitHub 主仓库的自动镜像站，用于国内访问加速。GitHub 为唯一更新源，Issue / PR / Star 请在 [主仓库](https://github.com/lcy362/agnes-video-generator) 提交。
+> This project is also mirrored on [Gitee](https://gitee.com/sandgrid/agnes-video-generator) for faster access in mainland China. The **GitHub repository is the primary home** of this project — issues, PRs, and stars are managed there.
+> 本项目在国内 Gitee 设有镜像仓库，便于国内访问加速；**GitHub 为项目主仓库**，Issue / PR / Star 均在 GitHub 提交。
 
 > **Completely free AI video generator** — Built on Agnes AI's free models, no subscription, no high-end GPU, no usage limits. Type in a text idea and automatically generate multi-scene AI videos with narration and subtitles. Supports text-to-video, image-to-video, keyframes animation, digital anchor, and more. All AI compute runs in the cloud — a regular laptop is all you need. **[Try it online →](https://video.lichuanyang.top)**
 

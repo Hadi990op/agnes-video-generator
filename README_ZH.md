@@ -9,8 +9,8 @@
 [![npm](https://img.shields.io/npm/v/free-short-video?label=npm)](https://www.npmjs.com/package/free-short-video)
 
 > **🌏 镜像说明 / Mirror Notice**
-> 本仓库为 GitHub 主仓库的自动镜像站，用于国内访问加速。GitHub 为唯一更新源，Issue / PR / Star 请在 [主仓库](https://github.com/lcy362/agnes-video-generator) 提交。
-> The GitHub repository is the **single source of truth**; this project is auto-mirrored to [Gitee](https://gitee.com/sandgrid/agnes-video-generator) for faster access in mainland China.
+> 本项目在国内 Gitee 设有镜像仓库（[gitee.com/sandgrid/agnes-video-generator](https://gitee.com/sandgrid/agnes-video-generator)），便于国内访问加速；**GitHub 为项目主仓库**，Issue / PR / Star 均在 GitHub 提交。
+> This project is also mirrored on Gitee for faster access in mainland China; the GitHub repository is the primary home for issues, PRs and stars.
 
 > **完全免费的 AI 视频生成工具** — 基于 Agnes AI 免费模型，无需订阅、无需高端显卡、没有用量限制。输入一段文字创意，就能自动生成带旁白配音和字幕的多场景 AI 视频。支持文生视频、图生视频、关键帧动画、数字人口播等多种模式，所有 AI 计算在云端完成，普通笔记本就能跑。**[在线体验 →](https://video.lichuanyang.top)**
 
