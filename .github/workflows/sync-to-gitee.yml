@@ -21,3 +21,10 @@ jobs:
         run: |
           git remote add gitee https://sandgrid:${{ secrets.GITEE_TOKEN }}@gitee.com/sandgrid/agnes-video-generator.git
           git push gitee master
+
+      - name: Sync wiki to Gitee
+        run: |
+          git clone https://github.com/lcy362/agnes-video-generator.wiki.git /tmp/wiki
+          cd /tmp/wiki
+          git remote add gitee https://sandgrid:${{ secrets.GITEE_TOKEN }}@gitee.com/sandgrid/agnes-video-generator.wiki.git
+          git push gitee master
