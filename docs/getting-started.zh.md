@@ -1,6 +1,6 @@
 # 🚀 快速开始
 
-**[🌐 官网](https://video.lichuanyang.top)** | **[🎬 在线体验（免安装）](https://video.lichuanyang.top/demo)** | **[📚 模型文档](https://video.lichuanyang.top/guides/model-overview)**
+**[🌐 官网](https://video.lichuanyang.top)** | **[🎬 在线体验（免安装）](https://video.lichuanyang.top/demo)** | **[📚 模型文档](https://video.lichuanyang.top/api-docs)**
 
 ## 环境要求
 

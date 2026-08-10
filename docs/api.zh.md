@@ -1,6 +1,6 @@
 # 📋 API 接口
 
-**[🌐 官网](https://video.lichuanyang.top)** | **[📚 API 文档](https://video.lichuanyang.top/api-docs)** | **[📖 调用指南](https://video.lichuanyang.top/guides/api-call)**
+**[🌐 官网](https://video.lichuanyang.top)** | **[📚 API 文档](https://video.lichuanyang.top/api-docs)** | **[📖 调用指南](https://video.lichuanyang.top/api-docs)**
 
 | 方法 | 路径 | 说明 |
 |------|------|------|
