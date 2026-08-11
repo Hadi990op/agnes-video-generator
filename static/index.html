@@ -9,90 +9,98 @@
 <link rel="apple-touch-icon" href="/static/icon.png">
 <script src="https://cdn.tailwindcss.com"></script>
 <style>
-  /* ── Base Animations ── */
+  /* ── Hallmark · genre: atmospheric · theme: Midnight (custom) · design-system: design.md ── */
+
+  :root {
+    --color-paper:    oklch(13% 0.012 55);
+    --color-paper-2:  oklch(17% 0.014 55);
+    --color-paper-3:  oklch(22% 0.016 55);
+    --color-ink:      oklch(94% 0.008 65);
+    --color-ink-2:    oklch(78% 0.012 60);
+    --color-muted:    oklch(64% 0.014 60);
+    --color-rule:     oklch(30% 0.014 55);
+    --color-accent:   oklch(80% 0.14 75);
+    --color-accent-ink: oklch(20% 0.05 75);
+    --color-focus:    oklch(82% 0.16 75);
+    --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+    --dur-micro: 120ms; --dur-short: 220ms; --dur-long: 420ms;
+  }
+
+  /* ── Base Animations（fade only，atmospheric）── */
   @keyframes spin { to { transform: rotate(360deg); } }
   .animate-spin { animation: spin 1s linear infinite; }
   @keyframes pulse-dot { 0%,100%{opacity:1} 50%{opacity:0.3} }
   .animate-pulse-dot { animation: pulse-dot 1.5s ease-in-out infinite; }
-  @keyframes glow-pulse { 0%,100%{box-shadow:0 0 15px rgba(59,130,246,0.15)} 50%{box-shadow:0 0 25px rgba(59,130,246,0.3)} }
-  @keyframes gradient-shift { 0%{background-position:0% 50%} 50%{background-position:100% 50%} 100%{background-position:0% 50%} }
-  @keyframes shimmer { 0%{background-position:-200% 0} 100%{background-position:200% 0} }
+  @keyframes fadeIn { from { opacity: 0 } to { opacity: 1 } }
+  .animate-fade-in { animation: fadeIn 0.42s var(--ease-out) forwards; }
 
-  /* ── Glass Card ── */
+  /* ── Card Surface（paper-2 + rule 边框，无玻璃、无 glow）── */
   .glass-card {
-    background: rgba(17,24,39,0.6);
-    backdrop-filter: blur(16px);
-    -webkit-backdrop-filter: blur(16px);
-    border: 1px solid rgba(255,255,255,0.07);
-    transition: border-color 0.3s ease, box-shadow 0.3s ease;
+    background: var(--color-paper-2);
+    border: 1px solid var(--color-rule);
+    transition: border-color var(--dur-short) var(--ease-out), background-color var(--dur-short) var(--ease-out), transform var(--dur-micro) var(--ease-out);
   }
   .glass-card:hover {
-    border-color: rgba(59,130,246,0.2);
-    box-shadow: 0 0 20px rgba(59,130,246,0.06);
+    border-color: color-mix(in oklab, var(--color-accent) 30%, var(--color-rule));
+    background: var(--color-paper-3);
+    transform: translateY(-1px);
   }
 
-  /* ── Glow Button ── */
+  /* ── Primary Button（琥珀金填充，无渐变无 glow）── */
   .glow-btn {
     position: relative;
     overflow: hidden;
-    box-shadow: 0 4px 15px rgba(37,99,235,0.25), 0 0 30px rgba(37,99,235,0.1);
-    transition: all 0.3s ease;
+    background: var(--color-accent);
+    color: var(--color-accent-ink);
+    font-weight: 600;
+    transition: transform var(--dur-micro) var(--ease-out), background-color var(--dur-short) var(--ease-out);
   }
   .glow-btn:hover:not(:disabled) {
-    box-shadow: 0 4px 25px rgba(37,99,235,0.4), 0 0 50px rgba(37,99,235,0.15);
+    background: color-mix(in oklab, var(--color-accent) 90%, white 10%);
     transform: translateY(-1px);
   }
-  .glow-btn::after {
-    content: '';
-    position: absolute;
-    top: 0; left: -100%; width: 200%; height: 100%;
-    background: linear-gradient(90deg, transparent, rgba(255,255,255,0.08), transparent);
-    animation: shimmer 3s ease-in-out infinite;
-  }
+  .glow-btn:disabled { opacity: 0.5; cursor: not-allowed; }
 
-  /* ── Input Glow ── */
+  /* ── Input ── */
   .glass-input {
-    background: rgba(31,41,55,0.5);
-    border: 1px solid rgba(255,255,255,0.08);
-    transition: all 0.3s ease;
+    background: var(--color-paper);
+    border: 1px solid var(--color-rule);
+    transition: border-color var(--dur-short) var(--ease-out), box-shadow var(--dur-short) var(--ease-out), background-color var(--dur-short) var(--ease-out);
   }
   .glass-input:focus {
-    border-color: rgba(59,130,246,0.5);
-    box-shadow: 0 0 12px rgba(59,130,246,0.15);
-    background: rgba(31,41,55,0.7);
+    border-color: var(--color-accent);
+    box-shadow: 0 0 0 1px color-mix(in oklab, var(--color-accent) 30%, transparent);
+    background: var(--color-paper);
   }
 
-  /* ── Tabs ── */
+  /* ── Tabs（选中 = accent 面，非渐变）── */
   .tab-active {
-    background: linear-gradient(135deg, #2563eb, #0ea5e9, #f59e0b);
-    background-size: 200% 200%;
-    animation: gradient-shift 4s ease infinite;
-    color: white;
-    box-shadow: 0 2px 12px rgba(37,99,235,0.3), 0 0 20px rgba(245,158,11,0.1);
+    background: color-mix(in oklab, var(--color-accent) 15%, var(--color-paper-3));
+    border: 1px solid color-mix(in oklab, var(--color-accent) 50%, transparent);
+    color: var(--color-accent);
   }
   .tab-inactive {
-    background: rgba(31,41,55,0.4);
-    backdrop-filter: blur(8px);
-    color: #9ca3af;
-    border: 1px solid rgba(255,255,255,0.05);
+    background: var(--color-paper-2);
+    color: var(--color-muted);
+    border: 1px solid var(--color-rule);
   }
   .tab-inactive:hover {
-    background: rgba(55,65,81,0.5);
-    border-color: rgba(255,255,255,0.1);
-    color: #d1d5db;
+    background: var(--color-paper-3);
+    border-color: var(--color-rule);
+    color: var(--color-ink-2);
   }
 
-  /* ── Progress Bar Glow ── */
+  /* ── Progress Bar（accent 纯色）── */
   .progress-glow {
-    box-shadow: 0 0 10px rgba(59,130,246,0.4), 0 0 20px rgba(245,158,11,0.2);
+    background: var(--color-accent);
   }
 
   /* ── Step Connector ── */
-  .step-line { transition: all 0.5s ease; }
+  .step-line { transition: all var(--dur-long) var(--ease-out); }
 
   /* ── Collapse ── */
   .collapse-header { cursor: pointer; user-select: none; }
-  .collapse-body { overflow: hidden; transition: max-height 0.3s ease; }
+  .collapse-body { overflow: hidden; transition: max-height 0.3s var(--ease-in-out, cubic-bezier(0.65,0,0.35,1)); }
 
   /* ── Misc ── */
   pre { white-space: pre-wrap; word-break: break-all; }
@@ -100,11 +108,11 @@
   /* ── Scrollbar ── */
   ::-webkit-scrollbar { width: 6px; }
   ::-webkit-scrollbar-track { background: transparent; }
-  ::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.1); border-radius: 3px; }
-  ::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,0.2); }
+  ::-webkit-scrollbar-thumb { background: var(--color-rule); border-radius: 3px; }
+  ::-webkit-scrollbar-thumb:hover { background: var(--color-muted); }
 
   /* ── Selection ── */
-  ::selection { background: rgba(59,130,246,0.3); color: white; }
+  ::selection { background: color-mix(in oklab, var(--color-accent) 28%, transparent); color: var(--color-ink); }
 
   /* ── Voice Selector Chip ── */
   .voice-selector {
@@ -114,115 +122,114 @@
     width: 100%;
     padding: 0.625rem 0.75rem;
     border-radius: 0.5rem;
-    background: rgba(31,41,55,0.5);
-    border: 1px solid rgba(255,255,255,0.08);
+    background: var(--color-paper);
+    border: 1px solid var(--color-rule);
     cursor: pointer;
-    transition: all 0.3s ease;
+    transition: all var(--dur-short) var(--ease-out);
     text-align: left;
   }
-  .voice-selector:hover { border-color: rgba(59,130,246,0.5); box-shadow: 0 0 12px rgba(59,130,246,0.15); }
-  .voice-selector:focus { outline: none; border-color: rgba(59,130,246,0.6); }
+  .voice-selector:hover { border-color: color-mix(in oklab, var(--color-accent) 50%, var(--color-rule)); background: var(--color-paper-3); }
+  .voice-selector:focus { outline: none; border-color: var(--color-accent); box-shadow: 0 0 0 1px color-mix(in oklab, var(--color-accent) 30%, transparent); }
   .vs-main { display: flex; flex-direction: column; flex: 1; min-width: 0; }
-  .vs-name { font-size: 0.875rem; color: #f3f4f6; font-weight: 500; line-height: 1.2; }
-  .vs-desc { font-size: 0.72rem; color: #9ca3af; line-height: 1.2; margin-top: 2px;
+  .vs-name { font-size: 0.875rem; color: var(--color-ink-2); font-weight: 500; line-height: 1.2; }
+  .vs-desc { font-size: 0.72rem; color: var(--color-muted); line-height: 1.2; margin-top: 2px;
     white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  .vs-arrow { color: #9ca3af; font-size: 0.7rem; flex-shrink: 0; }
+  .vs-arrow { color: var(--color-muted); font-size: 0.7rem; flex-shrink: 0; }
 
   /* ── Voice Picker Modal ── */
   .vp-overlay {
     position: fixed; inset: 0; z-index: 1000;
     background: rgba(0,0,0,0.7);
-    backdrop-filter: blur(4px);
     display: flex; align-items: center; justify-content: center;
     padding: 1rem;
   }
   .vp-modal {
     width: 100%; max-width: 720px; max-height: 88vh;
     display: flex; flex-direction: column;
-    background: rgba(17,24,39,0.96);
-    border: 1px solid rgba(255,255,255,0.1);
+    background: var(--color-paper-2);
+    border: 1px solid var(--color-rule);
     border-radius: 1rem;
     box-shadow: 0 20px 60px rgba(0,0,0,0.5);
     overflow: hidden;
   }
   .vp-header {
     display: flex; align-items: center; justify-content: space-between;
-    padding: 1rem 1.25rem; border-bottom: 1px solid rgba(255,255,255,0.07);
+    padding: 1rem 1.25rem; border-bottom: 1px solid var(--color-rule);
   }
-  .vp-header h3 { font-size: 1rem; font-weight: 600; color: #f3f4f6; }
-  .vp-close { background: none; border: none; color: #9ca3af; font-size: 1.25rem; cursor: pointer; line-height: 1; }
-  .vp-close:hover { color: #fff; }
+  .vp-header h3 { font-size: 1rem; font-weight: 600; color: var(--color-ink); }
+  .vp-close { background: none; border: none; color: var(--color-muted); font-size: 1.25rem; cursor: pointer; line-height: 1; }
+  .vp-close:hover { color: var(--color-ink); }
   .vp-search { padding: 0.75rem 1.25rem 0.25rem; }
   .vp-search input {
     width: 100%; padding: 0.55rem 0.85rem; border-radius: 0.5rem;
-    background: rgba(31,41,55,0.6); border: 1px solid rgba(255,255,255,0.08);
-    color: #f3f4f6; font-size: 0.85rem;
+    background: var(--color-paper); border: 1px solid var(--color-rule);
+    color: var(--color-ink); font-size: 0.85rem;
   }
-  .vp-search input:focus { outline: none; border-color: rgba(59,130,246,0.5); }
+  .vp-search input:focus { outline: none; border-color: var(--color-accent); box-shadow: 0 0 0 1px color-mix(in oklab, var(--color-accent) 30%, transparent); }
   .vp-tabs {
     display: flex; gap: 0.4rem; padding: 0.6rem 1.25rem; overflow-x: auto;
-    border-bottom: 1px solid rgba(255,255,255,0.06); flex-shrink: 0;
+    border-bottom: 1px solid var(--color-rule); flex-shrink: 0;
   }
   .vp-tab {
     flex-shrink: 0; padding: 0.35rem 0.8rem; border-radius: 999px;
     font-size: 0.78rem; cursor: pointer; white-space: nowrap;
-    background: rgba(31,41,55,0.4); color: #9ca3af;
-    border: 1px solid rgba(255,255,255,0.05); transition: all 0.2s ease;
+    background: var(--color-paper-2); color: var(--color-muted);
+    border: 1px solid var(--color-rule); transition: all var(--dur-short) var(--ease-out);
   }
-  .vp-tab:hover { background: rgba(55,65,81,0.5); color: #e5e7eb; }
-  .vp-tab.active { background: linear-gradient(135deg, #2563eb, #0ea5e9); color: #fff; border-color: transparent; }
-  .vp-count { font-size: 0.72rem; color: #6b7280; margin-left: 4px; }
+  .vp-tab:hover { background: var(--color-paper-3); color: var(--color-ink-2); }
+  .vp-tab.active { background: color-mix(in oklab, var(--color-accent) 15%, var(--color-paper-3)); color: var(--color-accent); border-color: color-mix(in oklab, var(--color-accent) 50%, transparent); }
+  .vp-count { font-size: 0.72rem; color: var(--color-muted); margin-left: 4px; }
   .vp-grid {
     flex: 1; overflow-y: auto; padding: 1rem 1.25rem;
     display: grid; grid-template-columns: repeat(auto-fill, minmax(210px, 1fr)); gap: 0.6rem;
   }
   .vp-card {
     position: relative; padding: 0.7rem 0.8rem; border-radius: 0.6rem;
-    background: rgba(31,41,55,0.45); border: 1px solid rgba(255,255,255,0.07);
-    cursor: pointer; transition: all 0.2s ease;
+    background: var(--color-paper); border: 1px solid var(--color-rule);
+    cursor: pointer; transition: all var(--dur-short) var(--ease-out);
   }
-  .vp-card:hover { border-color: rgba(59,130,246,0.4); background: rgba(55,65,81,0.45); }
-  .vp-card.selected { border-color: #6366f1; box-shadow: 0 0 0 1px #6366f1, 0 0 16px rgba(99,102,241,0.25); }
+  .vp-card:hover { border-color: color-mix(in oklab, var(--color-accent) 40%, var(--color-rule)); background: var(--color-paper-3); }
+  .vp-card.selected { border-color: var(--color-accent); box-shadow: 0 0 0 1px color-mix(in oklab, var(--color-accent) 40%, transparent); }
   .vp-card-top { display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; }
-  .vp-card-name { font-size: 0.85rem; font-weight: 600; color: #f3f4f6; }
-  .vp-card-region { font-size: 0.7rem; color: #9ca3af; }
+  .vp-card-name { font-size: 0.85rem; font-weight: 600; color: var(--color-ink); }
+  .vp-card-region { font-size: 0.7rem; color: var(--color-muted); }
   .vp-tags { display: flex; flex-wrap: wrap; gap: 0.25rem; margin-top: 0.4rem; }
   .vp-tag {
     font-size: 0.65rem; padding: 0.1rem 0.45rem; border-radius: 999px;
-    background: rgba(59,130,246,0.12); color: #93c5fd; border: 1px solid rgba(59,130,246,0.2);
+    background: color-mix(in oklab, var(--color-accent) 12%, transparent); color: var(--color-accent); border: 1px solid color-mix(in oklab, var(--color-accent) 20%, transparent);
   }
   .vp-tag.gender-female { background: rgba(236,72,153,0.12); color: #f9a8d4; border-color: rgba(236,72,153,0.2); }
-  .vp-tag.gender-male { background: rgba(59,130,246,0.12); color: #93c5fd; border-color: rgba(59,130,246,0.2); }
+  .vp-tag.gender-male { background: color-mix(in oklab, var(--color-accent) 12%, transparent); color: var(--color-accent); border-color: color-mix(in oklab, var(--color-accent) 20%, transparent); }
   .vp-preview-btn {
     margin-top: 0.5rem; width: 100%; padding: 0.35rem; border-radius: 0.4rem;
-    background: rgba(17,24,39,0.6); border: 1px solid rgba(255,255,255,0.1);
-    color: #d1d5db; font-size: 0.72rem; cursor: pointer; display: flex;
-    align-items: center; justify-content: center; gap: 0.35rem; transition: all 0.2s ease;
+    background: var(--color-paper-2); border: 1px solid var(--color-rule);
+    color: var(--color-ink-2); font-size: 0.72rem; cursor: pointer; display: flex;
+    align-items: center; justify-content: center; gap: 0.35rem; transition: all var(--dur-short) var(--ease-out);
   }
-  .vp-preview-btn:hover { background: rgba(59,130,246,0.2); color: #fff; }
-  .vp-preview-btn.playing { background: rgba(59,130,246,0.3); color: #fff; border-color: rgba(59,130,246,0.5); }
+  .vp-preview-btn:hover { background: color-mix(in oklab, var(--color-accent) 15%, transparent); color: var(--color-accent); }
+  .vp-preview-btn.playing { background: color-mix(in oklab, var(--color-accent) 25%, transparent); color: var(--color-accent); border-color: color-mix(in oklab, var(--color-accent) 50%, transparent); }
   .vp-preview-btn.loading { opacity: 0.7; cursor: wait; }
   .vp-selection {
     display: flex; align-items: center; justify-content: space-between; gap: 0.75rem;
-    padding: 0.85rem 1.25rem; border-top: 1px solid rgba(255,255,255,0.07);
-    background: rgba(0,0,0,0.2); flex-shrink: 0;
+    padding: 0.85rem 1.25rem; border-top: 1px solid var(--color-rule);
+    background: var(--color-paper); flex-shrink: 0;
   }
-  .vp-current { font-size: 0.8rem; color: #9ca3af; min-width: 0; }
-  .vp-current b { color: #e5e7eb; font-weight: 500; }
+  .vp-current { font-size: 0.8rem; color: var(--color-muted); min-width: 0; }
+  .vp-current b { color: var(--color-ink-2); font-weight: 500; }
   .vp-actions { display: flex; gap: 0.5rem; flex-shrink: 0; }
   .vp-btn {
-    padding: 0.5rem 1rem; border-radius: 0.5rem; font-size: 0.8rem; cursor: pointer; border: none; transition: all 0.2s ease;
+    padding: 0.5rem 1rem; border-radius: 0.5rem; font-size: 0.8rem; cursor: pointer; border: none; transition: all var(--dur-short) var(--ease-out);
   }
-  .vp-btn-cancel { background: rgba(55,65,81,0.5); color: #d1d5db; }
-  .vp-btn-cancel:hover { background: rgba(75,85,99,0.6); }
-  .vp-btn-confirm { background: linear-gradient(135deg, #2563eb, #0ea5e9); color: #fff; }
-  .vp-btn-confirm:hover { box-shadow: 0 0 16px rgba(37,99,235,0.4); }
+  .vp-btn-cancel { background: var(--color-paper-3); color: var(--color-ink-2); border: 1px solid var(--color-rule); }
+  .vp-btn-cancel:hover { background: var(--color-paper-3); color: var(--color-ink); }
+  .vp-btn-confirm { background: var(--color-accent); color: var(--color-accent-ink); font-weight: 600; }
+  .vp-btn-confirm:hover { filter: brightness(1.05); transform: translateY(-1px); }
   .vp-warning {
     margin: 0 1.25rem 0.5rem; padding: 0.6rem 0.8rem; border-radius: 0.5rem;
     background: rgba(245,158,11,0.12); border: 1px solid rgba(245,158,11,0.3);
     color: #fcd34d; font-size: 0.76rem; line-height: 1.4;
   }
-  .vp-empty { grid-column: 1 / -1; text-align: center; color: #6b7280; font-size: 0.85rem; padding: 2rem 0; }
+  .vp-empty { grid-column: 1 / -1; text-align: center; color: var(--color-muted); font-size: 0.85rem; padding: 2rem 0; }
 
   /* ── Mobile: fullscreen modal ── */
   @media (max-width: 640px) {
@@ -232,44 +239,60 @@
 
   /* ── Sidebars (lg+) ── */
   .sidebar-card {
-    background: rgba(17,24,39,0.4);
-    backdrop-filter: blur(10px);
-    -webkit-backdrop-filter: blur(10px);
-    border: 1px solid rgba(255,255,255,0.05);
+    background: var(--color-paper-2);
+    border: 1px solid var(--color-rule);
     border-radius: 0.75rem;
     padding: 0.75rem;
     margin-bottom: 0.5rem;
     font-size: 0.75rem;
   }
-  .sidebar-card:hover { border-color: rgba(59,130,246,0.12); }
+  .sidebar-card:hover { border-color: color-mix(in oklab, var(--color-accent) 20%, var(--color-rule)); }
   .sidebar-card a {
     display: flex;
     align-items: center;
     gap: 0.35rem;
     padding: 0.3rem 0.25rem;
-    color: #9ca3af;
+    color: var(--color-muted);
     text-decoration: none;
-    transition: color 0.2s;
+    transition: color var(--dur-short) var(--ease-out);
     border-radius: 0.25rem;
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
   }
-  .sidebar-card a:hover { color: #e5e7eb; background: rgba(255,255,255,0.03); }
+  .sidebar-card a:hover { color: var(--color-ink-2); background: var(--color-paper-3); }
   .sidebar-card .stitle {
     font-size: 0.7rem;
     font-weight: 600;
-    color: #6b7280;
+    color: var(--color-muted);
     text-transform: uppercase;
     letter-spacing: 0.05em;
     margin-bottom: 0.4rem;
     padding-bottom: 0.4rem;
-    border-bottom: 1px solid rgba(255,255,255,0.04);
+    border-bottom: 1px solid var(--color-rule);
     white-space: nowrap;
   }
+
+  /* ── Design tokens 工具类（Tailwind CDN 不识别自定义 token，手动补齐）── */
+  .text-ink { color: var(--color-ink); }
+  .text-ink-2 { color: var(--color-ink-2); }
+  .text-muted { color: var(--color-muted); }
+  .text-accent { color: var(--color-accent); }
+  .text-accent-ink { color: var(--color-accent-ink); }
+  .text-rule { color: var(--color-rule); }
+  .hover\:text-ink:hover { color: var(--color-ink); }
+  .hover\:text-ink-2:hover { color: var(--color-ink-2); }
+  .hover\:text-accent:hover { color: var(--color-accent); }
+  .bg-paper { background-color: var(--color-paper); }
+  .bg-paper-2 { background-color: var(--color-paper-2); }
+  .bg-paper-3 { background-color: var(--color-paper-3); }
+  .bg-accent { background-color: var(--color-accent); }
+  .hover\:bg-paper-3:hover { background-color: var(--color-paper-3); }
+  .border-rule { border-color: var(--color-rule); }
+  .placeholder-muted::placeholder { color: var(--color-muted); }
 </style>
 </head>
-<body class="text-gray-100 min-h-screen font-sans" style="background: radial-gradient(ellipse at 50% 0%, rgba(30,64,175,0.12) 0%, transparent 60%), radial-gradient(ellipse at 80% 100%, rgba(245,158,11,0.06) 0%, transparent 50%), #030712;">
+<body class="text-ink min-h-screen font-sans" style="background: radial-gradient(ellipse 45% 38% at 50% 0%, color-mix(in oklab, var(--color-accent) 6%, transparent), transparent 70%), var(--color-paper);">
 
 <div class="flex justify-center gap-3 px-4">
 
@@ -277,14 +300,14 @@
 <aside class="hidden lg:block sticky top-[120px] self-start w-[130px] shrink-0 mt-8">
   <div class="sidebar-card">
     <div class="stitle" data-i18n="adSupportTitle">⭐ 支持项目</div>
-    <p class="text-gray-500 text-xs leading-relaxed mb-2" data-i18n="adSupportDesc">完全免费开源，永不收费。支持项目持续发展：</p>
+    <p class="text-muted text-xs leading-relaxed mb-2" data-i18n="adSupportDesc">完全免费开源，永不收费。支持项目持续发展：</p>
     <a href="https://github.com/lcy362/agnes-video-generator" target="_blank" rel="noopener" data-i18n="adStar">⭐ 给个 Star</a>
-    <p class="text-gray-600 text-xs px-1 -mt-0.5 mb-1" data-i18n="adStarDesc">让更多人发现这个工具</p>
+    <p class="text-muted text-xs px-1 -mt-0.5 mb-1" data-i18n="adStarDesc">让更多人发现这个工具</p>
     <a href="https://video.lichuanyang.top" target="_blank" rel="noopener" data-i18n="adAdblock">🔓 关 AdBlock</a>
-    <p class="text-gray-600 text-xs px-1 -mt-0.5 mb-1" data-i18n="adAdblockDesc">在官网关闭去广告插件</p>
+    <p class="text-muted text-xs px-1 -mt-0.5 mb-1" data-i18n="adAdblockDesc">在官网关闭去广告插件</p>
     <a href="https://video.lichuanyang.top" target="_blank" rel="noopener" data-i18n="adClick">👆 点下广告</a>
-    <p class="text-gray-600 text-xs px-1 -mt-0.5 mb-1" data-i18n="adClickDesc">举手之劳，实实在在</p>
-    <p class="text-gray-600 text-xs mt-2 leading-relaxed" data-i18n="adThanks">谢谢你的支持 ❤️</p>
+    <p class="text-muted text-xs px-1 -mt-0.5 mb-1" data-i18n="adClickDesc">举手之劳，实实在在</p>
+    <p class="text-muted text-xs mt-2 leading-relaxed" data-i18n="adThanks">谢谢你的支持 ❤️</p>
   </div>
 </aside>
 
@@ -294,7 +317,7 @@
   <!-- Header -->
   <div class="text-center mb-10 relative">
     <div class="absolute right-0 top-0" style="z-index: 10;">
-      <select id="lang-selector" onchange="switchLang(this.value)" class="glass-input rounded-lg px-3 py-1.5 text-sm cursor-pointer text-gray-100">
+      <select id="lang-selector" onchange="switchLang(this.value)" class="glass-input rounded-lg px-3 py-1.5 text-sm cursor-pointer text-ink">
         <option value="zh">🇨🇳 中文</option>
         <option value="en">🇺🇸 English</option>
         <option value="ru">🇷🇺 Русский</option>
@@ -319,53 +342,53 @@
         <option value="ur">🇵🇰 اردو</option>
       </select>
     </div>
-    <h1 class="text-4xl font-bold bg-gradient-to-r from-blue-400 via-cyan-300 to-amber-400 bg-clip-text text-transparent" style="filter: drop-shadow(0 0 20px rgba(59,130,246,0.2)); position: relative; z-index: 0;">
+    <h1 class="text-4xl font-bold text-ink" style="position: relative; z-index: 0;">
       Agnes Video Generator
     </h1>
-    <p class="text-gray-500 mt-2 text-sm tracking-wide" data-i18n="subtitle">AI 视频，一键生成</p>
+    <p class="text-muted mt-2 text-sm tracking-wide" data-i18n="subtitle">AI 视频，一键生成</p>
   </div>
 
   <!-- Resource links -->
   <nav class="flex justify-center items-center gap-4 mb-8 text-xs tracking-wide">
-    <a href="https://video.lichuanyang.top/demo" target="_blank" rel="noopener" class="flex items-center gap-1 text-amber-400/70 hover:text-amber-300 transition-colors">🎬 Demo</a>
-    <span class="text-white/5 select-none">·</span>
-    <a href="https://video.lichuanyang.top" target="_blank" rel="noopener" class="flex items-center gap-1 text-gray-500 hover:text-gray-300 transition-colors">🏠 Home</a>
-    <span class="text-white/5 select-none">·</span>
-    <a href="https://video.lichuanyang.top/guides/prompt-tips" target="_blank" rel="noopener" class="flex items-center gap-1 text-gray-500 hover:text-gray-300 transition-colors">📖 Guides</a>
-    <span class="text-white/5 select-none">·</span>
-    <a href="https://video.lichuanyang.top/faq" target="_blank" rel="noopener" class="flex items-center gap-1 text-gray-500 hover:text-gray-300 transition-colors">❓ FAQ</a>
-    <span class="text-white/5 select-none">·</span>
-    <a href="https://github.com/lcy362/agnes-video-generator" target="_blank" rel="noopener" class="flex items-center gap-1 text-gray-500 hover:text-gray-300 transition-colors">📖 GitHub</a>
+    <a href="https://video.lichuanyang.top/demo" target="_blank" rel="noopener" class="flex items-center gap-1 text-accent hover:text-ink transition-colors">🎬 Demo</a>
+    <span class="text-ink/5 select-none">·</span>
+    <a href="https://video.lichuanyang.top" target="_blank" rel="noopener" class="flex items-center gap-1 text-muted hover:text-ink-2 transition-colors">🏠 Home</a>
+    <span class="text-ink/5 select-none">·</span>
+    <a href="https://video.lichuanyang.top/guides/prompt-tips" target="_blank" rel="noopener" class="flex items-center gap-1 text-muted hover:text-ink-2 transition-colors">📖 Guides</a>
+    <span class="text-ink/5 select-none">·</span>
+    <a href="https://video.lichuanyang.top/faq" target="_blank" rel="noopener" class="flex items-center gap-1 text-muted hover:text-ink-2 transition-colors">❓ FAQ</a>
+    <span class="text-ink/5 select-none">·</span>
+    <a href="https://github.com/lcy362/agnes-video-generator" target="_blank" rel="noopener" class="flex items-center gap-1 text-muted hover:text-ink-2 transition-colors">📖 GitHub</a>
   </nav>
 
   <!-- API Key -->
   <div id="apikey-section" class="glass-card rounded-2xl mb-6 overflow-hidden transition-all duration-300">
     <!-- Compact bar (shown when collapsed) -->
-    <div id="apikey-compact" class="hidden flex items-center justify-between px-6 py-3 cursor-pointer hover:bg-white/[0.02] transition" onclick="toggleConfigPanel('apikey')" role="button" tabindex="0" aria-expanded="false" data-panel-expand="apikey" onkeydown="if(event.key==='Enter')toggleConfigPanel('apikey')">
+    <div id="apikey-compact" class="hidden flex items-center justify-between px-6 py-3 cursor-pointer hover:bg-paper-3 transition" onclick="toggleConfigPanel('apikey')" role="button" tabindex="0" aria-expanded="false" data-panel-expand="apikey" onkeydown="if(event.key==='Enter')toggleConfigPanel('apikey')">
       <div class="flex items-center gap-3">
         <span class="text-sm">🔑</span>
-        <span id="apikey-compact-text" class="text-sm text-gray-400"></span>
+        <span id="apikey-compact-text" class="text-sm text-muted"></span>
       </div>
-      <span id="apikey-arrow" class="text-gray-600 text-xs transition-transform duration-300">▶</span>
+      <span id="apikey-arrow" class="text-muted text-xs transition-transform duration-300">▶</span>
     </div>
     <!-- Expanded body -->
     <div id="apikey-body" class="p-6 pt-4">
       <div class="flex items-center justify-between mb-3">
-        <h2 class="text-lg font-semibold text-blue-300" data-i18n="apiKeyTitle">API Key 配置</h2>
+        <h2 class="text-lg font-semibold text-accent" data-i18n="apiKeyTitle">API Key 配置</h2>
         <div class="flex items-center gap-2">
-          <span id="apikey-status" class="text-xs px-2 py-1 rounded-full bg-gray-800 text-gray-400" data-i18n="apiKeyNotConfigured">未配置</span>
-          <button onclick="toggleConfigPanel('apikey')" class="text-xs text-gray-500 hover:text-gray-300 transition px-2 py-1 rounded" data-panel-collapse="apikey">▲</button>
+          <span id="apikey-status" class="text-xs px-2 py-1 rounded-full bg-paper-2 text-muted" data-i18n="apiKeyNotConfigured">未配置</span>
+          <button onclick="toggleConfigPanel('apikey')" class="text-xs text-muted hover:text-ink-2 transition px-2 py-1 rounded" data-panel-collapse="apikey">▲</button>
         </div>
       </div>
       <div class="flex gap-3">
-        <input id="apikey-input" type="password" data-i18n-placeholder="apiKeyPlaceholder" placeholder="输入 Agnes API Key" class="flex-1 glass-input rounded-lg px-4 py-2.5 text-sm text-gray-100 placeholder-gray-600">
-        <button id="apikey-save" class="px-5 py-2.5 bg-blue-600 hover:bg-blue-500 rounded-lg text-sm font-medium transition shadow-lg shadow-blue-600/20" data-i18n="save">保存</button>
+        <input id="apikey-input" type="password" data-i18n-placeholder="apiKeyPlaceholder" placeholder="输入 Agnes API Key" class="flex-1 glass-input rounded-lg px-4 py-2.5 text-sm text-ink placeholder-muted">
+        <button id="apikey-save" class="px-5 py-2.5 bg-accent text-accent-ink hover:bg-accent/90 rounded-lg text-sm font-medium transition" data-i18n="save">保存</button>
         <button id="apikey-clear" class="px-5 py-2.5 bg-red-600/80 hover:bg-red-500 rounded-lg text-sm font-medium transition hidden" data-i18n="clear">清除</button>
       </div>
       <div class="flex flex-wrap items-center gap-x-5 gap-y-1.5 mt-3 text-xs">
-        <a href="https://platform.agnes-ai.com" target="_blank" rel="noopener" class="text-amber-400/70 hover:text-amber-300 transition-colors">🚀 <span data-i18n="apiKeyGetLink">免费获取 API Key</span></a>
-        <a href="https://video.lichuanyang.top/guides/api-key" target="_blank" rel="noopener" class="text-gray-500 hover:text-gray-300 transition-colors">📖 <span data-i18n="apiKeyGuideLink">配置教程</span></a>
-        <a href="https://video.lichuanyang.top/demo" target="_blank" rel="noopener" class="text-gray-500 hover:text-gray-300 transition-colors">⚡ <span data-i18n="apiKeyDemoLink">不想配置？在线体验</span></a>
+        <a href="https://platform.agnes-ai.com" target="_blank" rel="noopener" class="text-accent hover:text-ink transition-colors">🚀 <span data-i18n="apiKeyGetLink">免费获取 API Key</span></a>
+        <a href="https://video.lichuanyang.top/guides/api-key" target="_blank" rel="noopener" class="text-muted hover:text-ink-2 transition-colors">📖 <span data-i18n="apiKeyGuideLink">配置教程</span></a>
+        <a href="https://video.lichuanyang.top/demo" target="_blank" rel="noopener" class="text-muted hover:text-ink-2 transition-colors">⚡ <span data-i18n="apiKeyDemoLink">不想配置？在线体验</span></a>
       </div>
     </div>
   </div>
@@ -373,46 +396,46 @@
   <!-- 模型选择（v5.0：文本开放，图像/视频置灰） -->
   <div id="model-section" class="glass-card rounded-2xl mb-6 overflow-hidden transition-all duration-300">
     <!-- Compact bar (shown when collapsed) -->
-    <div id="model-compact" class="hidden flex items-center justify-between px-6 py-3 cursor-pointer hover:bg-white/[0.02] transition" onclick="toggleConfigPanel('model')" role="button" tabindex="0" aria-expanded="false" data-panel-expand="model" onkeydown="if(event.key==='Enter')toggleConfigPanel('model')">
+    <div id="model-compact" class="hidden flex items-center justify-between px-6 py-3 cursor-pointer hover:bg-paper-3 transition" onclick="toggleConfigPanel('model')" role="button" tabindex="0" aria-expanded="false" data-panel-expand="model" onkeydown="if(event.key==='Enter')toggleConfigPanel('model')">
       <div class="flex items-center gap-3">
         <span class="text-sm">🧠</span>
-        <span id="model-compact-text" class="text-sm text-gray-400"></span>
+        <span id="model-compact-text" class="text-sm text-muted"></span>
       </div>
-      <span id="model-arrow" class="text-gray-600 text-xs transition-transform duration-300">▶</span>
+      <span id="model-arrow" class="text-muted text-xs transition-transform duration-300">▶</span>
     </div>
     <!-- Expanded body -->
     <div id="model-body" class="p-6 pt-4">
       <div class="flex items-center justify-between mb-3">
-        <h2 class="text-lg font-semibold text-blue-300" data-i18n="modelTitle">模型选择</h2>
+        <h2 class="text-lg font-semibold text-accent" data-i18n="modelTitle">模型选择</h2>
         <div class="flex items-center gap-2">
-          <span id="model-sync-status" class="text-xs px-2 py-1 rounded-full bg-gray-800 text-gray-400" data-i18n="modelSyncIdle">未同步</span>
-          <button onclick="toggleConfigPanel('model')" class="text-xs text-gray-500 hover:text-gray-300 transition px-2 py-1 rounded" data-panel-collapse="model">▲</button>
+          <span id="model-sync-status" class="text-xs px-2 py-1 rounded-full bg-paper-2 text-muted" data-i18n="modelSyncIdle">未同步</span>
+          <button onclick="toggleConfigPanel('model')" class="text-xs text-muted hover:text-ink-2 transition px-2 py-1 rounded" data-panel-collapse="model">▲</button>
         </div>
       </div>
-      <p class="text-xs text-gray-500 mb-4" data-i18n="modelHint">选择生成时使用的 Agnes 模型。图像与视频模型暂未开放，保留默认配置。</p>
+      <p class="text-xs text-muted mb-4" data-i18n="modelHint">选择生成时使用的 Agnes 模型。图像与视频模型暂未开放，保留默认配置。</p>
       <div class="space-y-3">
         <!-- 文本模型（开放） -->
         <div>
-          <label class="block text-xs text-gray-400 mb-1" data-i18n="modelTextLabel">文本 / 对话模型</label>
+          <label class="block text-xs text-muted mb-1" data-i18n="modelTextLabel">文本 / 对话模型</label>
           <div class="flex gap-3">
-            <select id="model-text" class="flex-1 glass-input rounded-lg px-3 py-2.5 text-sm text-gray-100" onchange="updateBetaHint()"></select>
-            <button id="model-sync" class="px-4 py-2.5 bg-gray-700 hover:bg-gray-600 rounded-lg text-sm font-medium transition whitespace-nowrap" data-i18n="modelSync">刷新列表</button>
+            <select id="model-text" class="flex-1 glass-input rounded-lg px-3 py-2.5 text-sm text-ink" onchange="updateBetaHint()"></select>
+            <button id="model-sync" class="px-4 py-2.5 bg-paper-3 hover:bg-paper-3 rounded-lg text-sm font-medium transition whitespace-nowrap" data-i18n="modelSync">刷新列表</button>
           </div>
-          <p id="model-text-beta-hint" class="text-xs text-amber-400 mt-1.5 hidden" data-i18n="modelBetaHint">agnes-2.5-flash 内测中：需使用已开通内测权限的 API Key，否则调用会失败。</p>
+          <p id="model-text-beta-hint" class="text-xs text-accent mt-1.5 hidden" data-i18n="modelBetaHint">agnes-2.5-flash 内测中：需使用已开通内测权限的 API Key，否则调用会失败。</p>
         </div>
         <!-- 图像模型（置灰） -->
         <div>
-          <label class="block text-xs text-gray-400 mb-1" data-i18n="modelImageLabel">图像模型（暂未开放）</label>
-          <select id="model-image" disabled class="flex-1 glass-input rounded-lg px-3 py-2.5 text-sm text-gray-100 opacity-50 cursor-not-allowed"></select>
+          <label class="block text-xs text-muted mb-1" data-i18n="modelImageLabel">图像模型（暂未开放）</label>
+          <select id="model-image" disabled class="flex-1 glass-input rounded-lg px-3 py-2.5 text-sm text-ink opacity-50 cursor-not-allowed"></select>
         </div>
         <!-- 视频模型（置灰） -->
         <div>
-          <label class="block text-xs text-gray-400 mb-1" data-i18n="modelVideoLabel">视频模型（暂未开放）</label>
-          <select id="model-video" disabled class="flex-1 glass-input rounded-lg px-3 py-2.5 text-sm text-gray-100 opacity-50 cursor-not-allowed"></select>
+          <label class="block text-xs text-muted mb-1" data-i18n="modelVideoLabel">视频模型（暂未开放）</label>
+          <select id="model-video" disabled class="flex-1 glass-input rounded-lg px-3 py-2.5 text-sm text-ink opacity-50 cursor-not-allowed"></select>
         </div>
       </div>
       <div class="flex gap-3 mt-4">
-        <button id="model-save" class="px-5 py-2.5 bg-blue-600 hover:bg-blue-500 rounded-lg text-sm font-medium transition shadow-lg shadow-blue-600/20" data-i18n="save">保存</button>
+        <button id="model-save" class="px-5 py-2.5 bg-accent text-accent-ink hover:bg-accent/90 rounded-lg text-sm font-medium transition" data-i18n="save">保存</button>
         <span id="model-save-status" class="self-center text-xs text-green-400 hidden" data-i18n="modelSaved">已保存</span>
         <span id="model-save-error" class="self-center text-xs text-red-400 hidden"></span>
       </div>
@@ -422,41 +445,41 @@
   <!-- 域名配置（v6.0） -->
   <div id="domain-section" class="glass-card rounded-2xl mb-6 overflow-hidden transition-all duration-300">
     <!-- Compact bar (shown when collapsed) -->
-    <div id="domain-compact" class="hidden flex items-center justify-between px-6 py-3 cursor-pointer hover:bg-white/[0.02] transition" onclick="toggleConfigPanel('domain')" role="button" tabindex="0" aria-expanded="false" data-panel-expand="domain" onkeydown="if(event.key==='Enter')toggleConfigPanel('domain')">
+    <div id="domain-compact" class="hidden flex items-center justify-between px-6 py-3 cursor-pointer hover:bg-paper-3 transition" onclick="toggleConfigPanel('domain')" role="button" tabindex="0" aria-expanded="false" data-panel-expand="domain" onkeydown="if(event.key==='Enter')toggleConfigPanel('domain')">
       <div class="flex items-center gap-3">
         <span class="text-sm">🌐</span>
-        <span id="domain-compact-text" class="text-sm text-gray-400"></span>
+        <span id="domain-compact-text" class="text-sm text-muted"></span>
       </div>
-      <span id="domain-arrow" class="text-gray-600 text-xs transition-transform duration-300">▶</span>
+      <span id="domain-arrow" class="text-muted text-xs transition-transform duration-300">▶</span>
     </div>
     <!-- Expanded body -->
     <div id="domain-body" class="p-6 pt-4">
       <div class="flex items-center justify-between mb-3">
-        <h2 class="text-lg font-semibold text-blue-300" data-i18n="domainTitle">Agnes 域名配置</h2>
+        <h2 class="text-lg font-semibold text-accent" data-i18n="domainTitle">Agnes 域名配置</h2>
         <div class="flex items-center gap-2">
-          <span id="domain-status" class="text-xs px-2 py-1 rounded-full bg-gray-800 text-gray-400">apihub.agnes-ai.com</span>
-          <button onclick="toggleConfigPanel('domain')" class="text-xs text-gray-500 hover:text-gray-300 transition px-2 py-1 rounded" data-panel-collapse="domain">▲</button>
+          <span id="domain-status" class="text-xs px-2 py-1 rounded-full bg-paper-2 text-muted">apihub.agnes-ai.com</span>
+          <button onclick="toggleConfigPanel('domain')" class="text-xs text-muted hover:text-ink-2 transition px-2 py-1 rounded" data-panel-collapse="domain">▲</button>
         </div>
       </div>
-      <p class="text-xs text-gray-500 mb-4" data-i18n="domainHint">选择 Agnes API 的接入域名。在中国大陆推荐使用 .cn 域名，以获得更稳定流畅的访问体验。</p>
+      <p class="text-xs text-muted mb-4" data-i18n="domainHint">选择 Agnes API 的接入域名。在中国大陆推荐使用 .cn 域名，以获得更稳定流畅的访问体验。</p>
       <div class="space-y-3">
         <label class="flex items-center gap-3 glass-input rounded-lg px-4 py-3 cursor-pointer hover:border-blue-500/40 transition">
           <input type="radio" name="agnes-domain" value="com" class="accent-blue-500 w-4 h-4 cursor-pointer">
           <div>
-            <span class="text-sm text-gray-200 font-medium">apihub.agnes-ai.com</span>
-            <span class="text-xs text-gray-500 ml-2" data-i18n="domainComLabel">国际域名</span>
+            <span class="text-sm text-ink-2 font-medium">apihub.agnes-ai.com</span>
+            <span class="text-xs text-muted ml-2" data-i18n="domainComLabel">国际域名</span>
           </div>
         </label>
         <label class="flex items-center gap-3 glass-input rounded-lg px-4 py-3 cursor-pointer hover:border-blue-500/40 transition">
           <input type="radio" name="agnes-domain" value="cn" class="accent-blue-500 w-4 h-4 cursor-pointer">
           <div>
-            <span class="text-sm text-gray-200 font-medium">apihub.agnes-ai.cn</span>
-            <span class="text-xs text-gray-500 ml-2" data-i18n="domainCnLabel">中国大陆推荐</span>
+            <span class="text-sm text-ink-2 font-medium">apihub.agnes-ai.cn</span>
+            <span class="text-xs text-muted ml-2" data-i18n="domainCnLabel">中国大陆推荐</span>
           </div>
         </label>
       </div>
       <div class="flex gap-3 mt-4">
-        <button id="domain-save" class="px-5 py-2.5 bg-blue-600 hover:bg-blue-500 rounded-lg text-sm font-medium transition shadow-lg shadow-blue-600/20" data-i18n="save">保存</button>
+        <button id="domain-save" class="px-5 py-2.5 bg-accent text-accent-ink hover:bg-accent/90 rounded-lg text-sm font-medium transition" data-i18n="save">保存</button>
         <span id="domain-save-status" class="self-center text-xs text-green-400 hidden" data-i18n="domainSaved">已保存</span>
         <span id="domain-save-error" class="self-center text-xs text-red-400 hidden"></span>
       </div>
@@ -466,40 +489,40 @@
   <!-- 工作目录 -->
   <div id="workspace-section" class="glass-card rounded-2xl mb-6 overflow-hidden transition-all duration-300">
     <!-- Compact bar (shown when collapsed) -->
-    <div id="workspace-compact" class="hidden flex items-center justify-between px-6 py-3 cursor-pointer hover:bg-white/[0.02] transition" onclick="toggleConfigPanel('workspace')" role="button" tabindex="0" aria-expanded="false" data-panel-expand="workspace" onkeydown="if(event.key==='Enter')toggleConfigPanel('workspace')">
+    <div id="workspace-compact" class="hidden flex items-center justify-between px-6 py-3 cursor-pointer hover:bg-paper-3 transition" onclick="toggleConfigPanel('workspace')" role="button" tabindex="0" aria-expanded="false" data-panel-expand="workspace" onkeydown="if(event.key==='Enter')toggleConfigPanel('workspace')">
       <div class="flex items-center gap-3">
         <span class="text-sm">📁</span>
-        <span id="workspace-compact-text" class="text-sm text-gray-400"></span>
+        <span id="workspace-compact-text" class="text-sm text-muted"></span>
       </div>
-      <span id="workspace-arrow" class="text-gray-600 text-xs transition-transform duration-300">▶</span>
+      <span id="workspace-arrow" class="text-muted text-xs transition-transform duration-300">▶</span>
     </div>
     <!-- Expanded body -->
     <div id="workspace-body" class="p-6 pt-4">
       <div class="flex items-center justify-between mb-3">
-        <h2 class="text-lg font-semibold text-blue-300" data-i18n="workspaceTitle">工作目录</h2>
+        <h2 class="text-lg font-semibold text-accent" data-i18n="workspaceTitle">工作目录</h2>
         <div class="flex items-center gap-2">
-          <span id="workspace-status" class="text-xs px-2 py-1 rounded-full bg-gray-800 text-gray-400" data-i18n="workspaceNone">未设置</span>
-          <button onclick="toggleConfigPanel('workspace')" class="text-xs text-gray-500 hover:text-gray-300 transition px-2 py-1 rounded" data-panel-collapse="workspace">▲</button>
+          <span id="workspace-status" class="text-xs px-2 py-1 rounded-full bg-paper-2 text-muted" data-i18n="workspaceNone">未设置</span>
+          <button onclick="toggleConfigPanel('workspace')" class="text-xs text-muted hover:text-ink-2 transition px-2 py-1 rounded" data-panel-collapse="workspace">▲</button>
         </div>
       </div>
-      <div id="workspace-regression-hint" class="hidden mb-3 text-xs text-amber-300 bg-amber-900/30 rounded-lg px-3 py-2" data-i18n="workspaceRegressionHint">当前为回归测试专用空间，由环境变量锁定，无法在界面修改。</div>
+      <div id="workspace-regression-hint" class="hidden mb-3 text-xs text-accent bg-accent/15/30 rounded-lg px-3 py-2" data-i18n="workspaceRegressionHint">当前为回归测试专用空间，由环境变量锁定，无法在界面修改。</div>
       <!-- 当前激活空间显示 -->
       <div id="workspace-active-display" class="mb-3 glass-input rounded-lg px-4 py-2.5 hidden">
-        <p class="text-xs text-gray-500 mb-0.5" data-i18n="workspaceCurrentActive">当前激活空间</p>
+        <p class="text-xs text-muted mb-0.5" data-i18n="workspaceCurrentActive">当前激活空间</p>
         <p id="workspace-active-name" class="text-sm text-green-300 font-medium"></p>
-        <p id="workspace-active-path" class="text-xs text-gray-500 font-mono truncate"></p>
+        <p id="workspace-active-path" class="text-xs text-muted font-mono truncate"></p>
       </div>
       <!-- 添加新空间 -->
       <div class="flex gap-3 mb-4">
-        <input id="workspace-path-input" data-i18n-placeholder="workspacePathPlaceholder" placeholder="/path/to/working_dir" class="flex-1 glass-input rounded-lg px-4 py-2.5 text-sm text-gray-100 placeholder-gray-600" readonly>
-        <input id="workspace-name-input" data-i18n-placeholder="workspaceNamePlaceholder" placeholder="名称（可选）" class="w-40 glass-input rounded-lg px-4 py-2.5 text-sm text-gray-100 placeholder-gray-600">
-        <button id="workspace-browse" class="px-4 py-2.5 bg-gray-700 hover:bg-gray-600 rounded-lg text-sm font-medium transition" data-i18n="workspaceBrowse">浏览…</button>
-        <button id="workspace-add" class="px-5 py-2.5 bg-blue-600 hover:bg-blue-500 rounded-lg text-sm font-medium transition shadow-lg shadow-blue-600/20" data-i18n="workspaceAdd">添加</button>
+        <input id="workspace-path-input" data-i18n-placeholder="workspacePathPlaceholder" placeholder="/path/to/working_dir" class="flex-1 glass-input rounded-lg px-4 py-2.5 text-sm text-ink placeholder-muted" readonly>
+        <input id="workspace-name-input" data-i18n-placeholder="workspaceNamePlaceholder" placeholder="名称（可选）" class="w-40 glass-input rounded-lg px-4 py-2.5 text-sm text-ink placeholder-muted">
+        <button id="workspace-browse" class="px-4 py-2.5 bg-paper-3 hover:bg-paper-3 rounded-lg text-sm font-medium transition" data-i18n="workspaceBrowse">浏览…</button>
+        <button id="workspace-add" class="px-5 py-2.5 bg-accent text-accent-ink hover:bg-accent/90 rounded-lg text-sm font-medium transition" data-i18n="workspaceAdd">添加</button>
       </div>
       <!-- 所有空间列表 -->
       <div class="flex items-center gap-2 mb-2">
-        <h3 class="text-sm font-medium text-gray-400" data-i18n="workspaceListTitle">所有空间</h3>
-        <span class="text-xs text-gray-600" data-i18n="workspaceListHint">点击「激活」切换当前使用的工作目录</span>
+        <h3 class="text-sm font-medium text-muted" data-i18n="workspaceListTitle">所有空间</h3>
+        <span class="text-xs text-muted" data-i18n="workspaceListHint">点击「激活」切换当前使用的工作目录</span>
       </div>
       <div id="workspace-list" class="space-y-2"></div>
     </div>
@@ -534,24 +557,24 @@
     </div>
 
     <!-- 官网引导：提示词技巧 + 模型对比（常驻） -->
-    <div class="flex flex-wrap items-center gap-x-4 gap-y-1 mb-4 text-xs text-gray-500">
-      <span class="text-gray-600">💡</span>
-      <a href="https://video.lichuanyang.top/guides/prompt-tips" target="_blank" rel="noopener" class="hover:text-blue-300 transition-colors"><span data-i18n="formTipTips">🎯 提示词技巧</span></a>
-      <span class="text-white/10 select-none">·</span>
-      <a href="https://video.lichuanyang.top/api-docs" target="_blank" rel="noopener" class="hover:text-blue-300 transition-colors"><span data-i18n="formTipModels">🧠 模型对比</span></a>
+    <div class="flex flex-wrap items-center gap-x-4 gap-y-1 mb-4 text-xs text-muted">
+      <span class="text-muted">💡</span>
+      <a href="https://video.lichuanyang.top/guides/prompt-tips" target="_blank" rel="noopener" class="hover:text-accent transition-colors"><span data-i18n="formTipTips">🎯 提示词技巧</span></a>
+      <span class="text-ink/10 select-none">·</span>
+      <a href="https://video.lichuanyang.top/api-docs" target="_blank" rel="noopener" class="hover:text-accent transition-colors"><span data-i18n="formTipModels">🧠 模型对比</span></a>
     </div>
 
     <!-- ═══════ Tab 1: Simple Image & Video ═══════ -->
     <div id="form-simple" class="hidden">
       <!-- 官网引导：示例提示词 -->
-      <div class="flex items-center gap-2 mb-4 text-xs text-gray-500">
-        <span class="text-gray-600">💡</span>
-        <a href="https://video.lichuanyang.top/guides/prompt-examples-simple" target="_blank" rel="noopener" class="hover:text-blue-300 transition-colors"><span data-i18n="exampleLinkSimple">📋 简易视频示例提示词</span></a>
+      <div class="flex items-center gap-2 mb-4 text-xs text-muted">
+        <span class="text-muted">💡</span>
+        <a href="https://video.lichuanyang.top/guides/prompt-examples-simple" target="_blank" rel="noopener" class="hover:text-accent transition-colors"><span data-i18n="exampleLinkSimple">📋 简易视频示例提示词</span></a>
       </div>
       <!-- Sub-mode selector: Video vs Image -->
       <div class="glass-card rounded-xl p-3 mb-4 flex items-center gap-3">
-        <label class="text-sm text-gray-400 whitespace-nowrap" data-i18n="subModeLabel">生成类型</label>
-        <select id="simple_sub_mode" onchange="switchSimpleSubMode()" class="flex-1 glass-input rounded-lg px-3 py-2 text-sm text-gray-100">
+        <label class="text-sm text-muted whitespace-nowrap" data-i18n="subModeLabel">生成类型</label>
+        <select id="simple_sub_mode" onchange="switchSimpleSubMode()" class="flex-1 glass-input rounded-lg px-3 py-2 text-sm text-ink">
           <option value="video" data-i18n="subModeVideo">🎬 视频</option>
           <option value="image" data-i18n="subModeImage">🖼️ 图像</option>
         </select>
@@ -560,25 +583,25 @@
       <!-- ── Video sub-form ── -->
       <div id="form-simple-video">
       <div class="glass-card rounded-2xl p-6 mb-4">
-        <h2 class="text-lg font-semibold text-blue-300 mb-4" data-i18n="simpleSettings">简单视频设置</h2>
+        <h2 class="text-lg font-semibold text-accent mb-4" data-i18n="simpleSettings">简单视频设置</h2>
 
         <div class="mb-4">
-          <label class="block text-sm text-gray-400 mb-1.5"><span data-i18n="promptLabel">视频描述</span> (prompt) <span class="text-red-400">*</span></label>
-          <textarea id="s_prompt" rows="3" data-i18n-placeholder="promptPlaceholder" placeholder="描述你想要的视频画面..." class="w-full glass-input rounded-lg px-4 py-2.5 text-sm resize-y text-gray-100 placeholder-gray-600"></textarea>
+          <label class="block text-sm text-muted mb-1.5"><span data-i18n="promptLabel">视频描述</span> (prompt) <span class="text-red-400">*</span></label>
+          <textarea id="s_prompt" rows="3" data-i18n-placeholder="promptPlaceholder" placeholder="描述你想要的视频画面..." class="w-full glass-input rounded-lg px-4 py-2.5 text-sm resize-y text-ink placeholder-muted"></textarea>
         </div>
 
         <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
           <div>
-            <label class="block text-sm text-gray-400 mb-1.5" data-i18n="genMode">生成模式</label>
-            <select id="s_mode" onchange="onSimpleModeChange()" class="w-full glass-input rounded-lg px-3 py-2.5 text-sm text-gray-100">
+            <label class="block text-sm text-muted mb-1.5" data-i18n="genMode">生成模式</label>
+            <select id="s_mode" onchange="onSimpleModeChange()" class="w-full glass-input rounded-lg px-3 py-2.5 text-sm text-ink">
               <option value="t2v" data-i18n="modeT2v">文生视频</option>
               <option value="i2v" data-i18n="modeI2v">图生视频</option>
               <option value="keyframes" data-i18n="modeKeyframesSimple">关键帧</option>
             </select>
           </div>
           <div>
-            <label class="block text-sm text-gray-400 mb-1.5" data-i18n="duration">时长</label>
-            <select id="s_duration" class="w-full glass-input rounded-lg px-3 py-2.5 text-sm text-gray-100">
+            <label class="block text-sm text-muted mb-1.5" data-i18n="duration">时长</label>
+            <select id="s_duration" class="w-full glass-input rounded-lg px-3 py-2.5 text-sm text-ink">
               <option value="5">5s</option>
               <option value="10">10s</option>
               <option value="15">15s</option>
@@ -587,8 +610,8 @@
             </select>
           </div>
           <div>
-            <label class="block text-sm text-gray-400 mb-1.5" data-i18n="resolution">分辨率</label>
-            <select id="s_resolution" class="w-full glass-input rounded-lg px-3 py-2.5 text-sm text-gray-100">
+            <label class="block text-sm text-muted mb-1.5" data-i18n="resolution">分辨率</label>
+            <select id="s_resolution" class="w-full glass-input rounded-lg px-3 py-2.5 text-sm text-ink">
               <option value="768x1152" data-i18n="resPortrait">竖屏 9:16</option>
               <option value="1152x768" data-i18n="resLandscape">横屏 16:9</option>
               <option value="1024x1024" data-i18n="resSquare">方形 1:1</option>
@@ -598,48 +621,48 @@
 
         <!-- Reference Image (i2v / keyframes) -->
         <div id="s_ref_section" class="hidden mb-4">
-          <label class="block text-sm text-gray-400 mb-1.5" data-i18n="refImageSimple">参考图</label>
+          <label class="block text-sm text-muted mb-1.5" data-i18n="refImageSimple">参考图</label>
           <div class="flex items-center gap-4">
             <label class="cursor-pointer px-4 py-2.5 glass-input rounded-lg text-sm transition inline-block hover:border-blue-500/30">
               <span data-i18n="chooseImage">选择参考图</span>
               <input id="s_ref_image" type="file" accept="image/*" class="hidden" onchange="updateLabel('s_ref_image','s_ref_name')">
             </label>
-            <span id="s_ref_name" class="text-sm text-gray-500" data-i18n="notSelected">未选择</span>
+            <span id="s_ref_name" class="text-sm text-muted" data-i18n="notSelected">未选择</span>
           </div>
         </div>
 
         <!-- End Frame Image (keyframes only) -->
         <div id="s_end_section" class="hidden mb-4">
-          <label class="block text-sm text-gray-400 mb-1.5" data-i18n="endFrameImage">尾帧图</label>
+          <label class="block text-sm text-muted mb-1.5" data-i18n="endFrameImage">尾帧图</label>
           <div class="flex items-center gap-4">
             <label class="cursor-pointer px-4 py-2.5 glass-input rounded-lg text-sm transition inline-block hover:border-blue-500/30">
               <span data-i18n="chooseImage">选择参考图</span>
               <input id="s_end_image" type="file" accept="image/*" class="hidden" onchange="updateLabel('s_end_image','s_end_name')">
             </label>
-            <span id="s_end_name" class="text-sm text-gray-500" data-i18n="notSelected">未选择</span>
+            <span id="s_end_name" class="text-sm text-muted" data-i18n="notSelected">未选择</span>
           </div>
         </div>
 
         <!-- Advanced (collapsible) -->
         <div class="border-t border-white/5 pt-4 mt-4">
           <div class="collapse-header flex items-center justify-between" onclick="toggleCollapse('s_advanced')">
-            <span class="text-sm text-gray-400" data-i18n="advancedSettings">高级设置</span>
-            <span id="s_advanced-arrow" class="text-gray-500 text-xs">▶</span>
+            <span class="text-sm text-muted" data-i18n="advancedSettings">高级设置</span>
+            <span id="s_advanced-arrow" class="text-muted text-xs">▶</span>
           </div>
           <div id="s_advanced" class="collapse-body hidden mt-3">
             <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
-                <label class="block text-sm text-gray-400 mb-1.5">Seed (<span data-i18n="optional">可选</span>)</label>
-                <input id="s_seed" type="number" placeholder="留空随机" data-i18n-placeholder="seedPlaceholder" class="w-full glass-input rounded-lg px-3 py-2.5 text-sm text-gray-100">
+                <label class="block text-sm text-muted mb-1.5">Seed (<span data-i18n="optional">可选</span>)</label>
+                <input id="s_seed" type="number" placeholder="留空随机" data-i18n-placeholder="seedPlaceholder" class="w-full glass-input rounded-lg px-3 py-2.5 text-sm text-ink">
               </div>
               <div>
-                <label class="block text-sm text-gray-400 mb-1.5">Negative Prompt (<span data-i18n="optional">可选</span>)</label>
-                <input id="s_negative" data-i18n-placeholder="negativePlaceholder" placeholder="排除不希望出现的元素" class="w-full glass-input rounded-lg px-3 py-2.5 text-sm text-gray-100">
+                <label class="block text-sm text-muted mb-1.5">Negative Prompt (<span data-i18n="optional">可选</span>)</label>
+                <input id="s_negative" data-i18n-placeholder="negativePlaceholder" placeholder="排除不希望出现的元素" class="w-full glass-input rounded-lg px-3 py-2.5 text-sm text-ink">
               </div>
             </div>
             <div class="mt-4">
-              <label class="block text-sm text-gray-400 mb-1.5"><span data-i18n="systemPrompt">系统提示词</span> (<span data-i18n="optional">可选</span>)</label>
-              <textarea id="s_system" rows="2" data-i18n-placeholder="systemPromptPlaceholder" placeholder="给模型的额外提示指令（如风格、质量要求），不影响生成内容的主体描述" class="w-full glass-input rounded-lg px-4 py-2.5 text-sm resize-y text-gray-100 placeholder-gray-600"></textarea>
+              <label class="block text-sm text-muted mb-1.5"><span data-i18n="systemPrompt">系统提示词</span> (<span data-i18n="optional">可选</span>)</label>
+              <textarea id="s_system" rows="2" data-i18n-placeholder="systemPromptPlaceholder" placeholder="给模型的额外提示指令（如风格、质量要求），不影响生成内容的主体描述" class="w-full glass-input rounded-lg px-4 py-2.5 text-sm resize-y text-ink placeholder-muted"></textarea>
             </div>
           </div>
         </div>
@@ -647,14 +670,14 @@
 
       <!-- Watermark toggle -->
       <div class="flex items-center justify-between px-1 py-2">
-        <p class="text-xs text-gray-500 leading-relaxed mr-3 watermark-promo"></p>
+        <p class="text-xs text-muted leading-relaxed mr-3 watermark-promo"></p>
         <label class="relative inline-flex items-center cursor-pointer flex-shrink-0" title="Video Watermark">
           <input type="checkbox" class="watermark-toggle sr-only peer" onchange="toggleWatermark(this)">
-          <div class="w-10 h-5 bg-gray-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-gray-300 after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-blue-600"></div>
+          <div class="w-10 h-5 bg-paper-3 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-rule after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-accent"></div>
         </label>
       </div>
 
-      <button id="btn-simple" onclick="submitSimple()" class="w-full py-3.5 bg-gradient-to-r from-blue-600 via-blue-500 to-blue-600 hover:from-blue-500 hover:via-blue-400 hover:to-blue-500 rounded-xl text-base font-semibold transition disabled:opacity-50 disabled:cursor-not-allowed glow-btn" data-i18n="startGenerate">
+      <button id="btn-simple" onclick="submitSimple()" class="w-full py-3.5 bg-accent text-accent-ink hover:bg-accent/90 rounded-xl text-base font-semibold transition disabled:opacity-50 disabled:cursor-not-allowed glow-btn" data-i18n="startGenerate">
         开始生成视频
       </button>
       </div><!-- /form-simple-video -->
@@ -662,16 +685,16 @@
       <!-- ── Image sub-form ── -->
       <div id="form-simple-image" class="hidden">
       <div class="glass-card rounded-2xl p-6 mb-4">
-        <h2 class="text-lg font-semibold text-blue-300 mb-4" data-i18n="imageSettings">图片设置</h2>
+        <h2 class="text-lg font-semibold text-accent mb-4" data-i18n="imageSettings">图片设置</h2>
 
         <div class="mb-4">
-          <label class="block text-sm text-gray-400 mb-1.5"><span data-i18n="imagePrompt">图片描述</span> (prompt) <span class="text-red-400">*</span></label>
-          <textarea id="i_prompt" rows="3" data-i18n-placeholder="imagePromptPlaceholder" placeholder="描述你想要的图片画面..." class="w-full glass-input rounded-lg px-4 py-2.5 text-sm resize-y text-gray-100 placeholder-gray-600"></textarea>
+          <label class="block text-sm text-muted mb-1.5"><span data-i18n="imagePrompt">图片描述</span> (prompt) <span class="text-red-400">*</span></label>
+          <textarea id="i_prompt" rows="3" data-i18n-placeholder="imagePromptPlaceholder" placeholder="描述你想要的图片画面..." class="w-full glass-input rounded-lg px-4 py-2.5 text-sm resize-y text-ink placeholder-muted"></textarea>
         </div>
 
         <div class="mb-4">
-          <label class="block text-sm text-gray-400 mb-1.5" data-i18n="imageSize">图片尺寸</label>
-          <select id="i_size" class="w-full glass-input rounded-lg px-3 py-2.5 text-sm text-gray-100">
+          <label class="block text-sm text-muted mb-1.5" data-i18n="imageSize">图片尺寸</label>
+          <select id="i_size" class="w-full glass-input rounded-lg px-3 py-2.5 text-sm text-ink">
             <option value="1024x1024" data-i18n="resSquare">方形 1:1 (1024x1024)</option>
             <option value="768x1152" data-i18n="resPortrait">竖屏 9:16 (768x1152)</option>
             <option value="1152x768" data-i18n="resLandscape">横屏 16:9 (1152x768)</option>
@@ -683,36 +706,36 @@
         </div>
 
         <div class="mb-4">
-          <label class="block text-sm text-gray-400 mb-1.5" data-i18n="refImageSimple">参考图</label>
+          <label class="block text-sm text-muted mb-1.5" data-i18n="refImageSimple">参考图</label>
           <div class="flex items-center gap-4">
             <label class="cursor-pointer px-4 py-2.5 glass-input rounded-lg text-sm transition inline-block hover:border-blue-500/30">
               <span data-i18n="chooseImage">选择参考图</span>
               <input id="i_ref_image" type="file" accept="image/*" class="hidden" onchange="updateLabel('i_ref_image','i_ref_name')">
             </label>
-            <span id="i_ref_name" class="text-sm text-gray-500" data-i18n="notSelected">未选择</span>
+            <span id="i_ref_name" class="text-sm text-muted" data-i18n="notSelected">未选择</span>
           </div>
-          <p class="text-xs text-gray-500 mt-1" data-i18n="refImageHint">可选。上传后以该图为基底生成变体；不上传则纯 AI 生成</p>
+          <p class="text-xs text-muted mt-1" data-i18n="refImageHint">可选。上传后以该图为基底生成变体；不上传则纯 AI 生成</p>
         </div>
 
         <div class="border-t border-white/5 pt-4 mt-4">
           <div class="collapse-header flex items-center justify-between" onclick="toggleCollapse('i_advanced')">
-            <span class="text-sm text-gray-400" data-i18n="advancedSettings">高级设置</span>
-            <span id="i_advanced-arrow" class="text-gray-500 text-xs">▶</span>
+            <span class="text-sm text-muted" data-i18n="advancedSettings">高级设置</span>
+            <span id="i_advanced-arrow" class="text-muted text-xs">▶</span>
           </div>
           <div id="i_advanced" class="collapse-body hidden mt-3">
             <div>
-              <label class="block text-sm text-gray-400 mb-1.5">Negative Prompt (<span data-i18n="optional">可选</span>)</label>
-              <input id="i_negative" data-i18n-placeholder="negativePlaceholder" placeholder="排除不希望出现的元素" class="w-full glass-input rounded-lg px-3 py-2.5 text-sm text-gray-100">
+              <label class="block text-sm text-muted mb-1.5">Negative Prompt (<span data-i18n="optional">可选</span>)</label>
+              <input id="i_negative" data-i18n-placeholder="negativePlaceholder" placeholder="排除不希望出现的元素" class="w-full glass-input rounded-lg px-3 py-2.5 text-sm text-ink">
             </div>
             <div class="mt-4">
-              <label class="block text-sm text-gray-400 mb-1.5"><span data-i18n="systemPrompt">系统提示词</span> (<span data-i18n="optional">可选</span>)</label>
-              <textarea id="i_system" rows="2" data-i18n-placeholder="systemPromptPlaceholder" placeholder="给模型的额外提示指令（如风格、质量要求），不影响生成内容的主体描述" class="w-full glass-input rounded-lg px-4 py-2.5 text-sm resize-y text-gray-100 placeholder-gray-600"></textarea>
+              <label class="block text-sm text-muted mb-1.5"><span data-i18n="systemPrompt">系统提示词</span> (<span data-i18n="optional">可选</span>)</label>
+              <textarea id="i_system" rows="2" data-i18n-placeholder="systemPromptPlaceholder" placeholder="给模型的额外提示指令（如风格、质量要求），不影响生成内容的主体描述" class="w-full glass-input rounded-lg px-4 py-2.5 text-sm resize-y text-ink placeholder-muted"></textarea>
             </div>
           </div>
         </div>
       </div>
 
-      <button id="btn-image" onclick="submitImage()" class="w-full py-3.5 bg-gradient-to-r from-blue-600 via-blue-500 to-blue-600 hover:from-blue-500 hover:via-blue-400 hover:to-blue-500 rounded-xl text-base font-semibold transition disabled:opacity-50 disabled:cursor-not-allowed glow-btn" data-i18n="imgGenerate">
+      <button id="btn-image" onclick="submitImage()" class="w-full py-3.5 bg-accent text-accent-ink hover:bg-accent/90 rounded-xl text-base font-semibold transition disabled:opacity-50 disabled:cursor-not-allowed glow-btn" data-i18n="imgGenerate">
         开始生成图片
       </button>
 
@@ -726,65 +749,65 @@
     <!-- ═══════ Tab 2: Creative Video ═══════ -->
     <div id="form-creative">
       <!-- 官网引导：示例提示词 -->
-      <div class="flex items-center gap-2 mb-4 text-xs text-gray-500">
-        <span class="text-gray-600">💡</span>
-        <a href="https://video.lichuanyang.top/guides/prompt-examples-creative" target="_blank" rel="noopener" class="hover:text-blue-300 transition-colors"><span data-i18n="exampleLinkCreative">📋 创意长视频示例提示词</span></a>
+      <div class="flex items-center gap-2 mb-4 text-xs text-muted">
+        <span class="text-muted">💡</span>
+        <a href="https://video.lichuanyang.top/guides/prompt-examples-creative" target="_blank" rel="noopener" class="hover:text-accent transition-colors"><span data-i18n="exampleLinkCreative">📋 创意长视频示例提示词</span></a>
       </div>
       <div class="glass-card rounded-2xl p-6 mb-4">
-        <h2 class="text-lg font-semibold text-blue-300 mb-4" data-i18n="creativeSettings">创意设置</h2>
+        <h2 class="text-lg font-semibold text-accent mb-4" data-i18n="creativeSettings">创意设置</h2>
 
         <div class="mb-4">
-          <label class="block text-sm text-gray-400 mb-1.5" data-i18n="taskName">任务名称</label>
-          <input id="c_name" data-i18n-placeholder="taskNamePlaceholder" placeholder="可选，留空自动生成" class="w-full glass-input rounded-lg px-4 py-2.5 text-sm text-gray-100 placeholder-gray-600">
+          <label class="block text-sm text-muted mb-1.5" data-i18n="taskName">任务名称</label>
+          <input id="c_name" data-i18n-placeholder="taskNamePlaceholder" placeholder="可选，留空自动生成" class="w-full glass-input rounded-lg px-4 py-2.5 text-sm text-ink placeholder-muted">
         </div>
 
         <div class="mb-4">
-          <label class="block text-sm text-gray-400 mb-1.5"><span data-i18n="ideaLabel">创意描述</span> (idea) <span class="text-red-400">*</span></label>
-          <textarea id="c_idea" rows="4" data-i18n-placeholder="ideaPlaceholder" placeholder="描述你心中的故事、场景和角色..." class="w-full glass-input rounded-lg px-4 py-2.5 text-sm resize-y text-gray-100 placeholder-gray-600"></textarea>
+          <label class="block text-sm text-muted mb-1.5"><span data-i18n="ideaLabel">创意描述</span> (idea) <span class="text-red-400">*</span></label>
+          <textarea id="c_idea" rows="4" data-i18n-placeholder="ideaPlaceholder" placeholder="描述你心中的故事、场景和角色..." class="w-full glass-input rounded-lg px-4 py-2.5 text-sm resize-y text-ink placeholder-muted"></textarea>
         </div>
 
         <!-- Scene Configuration -->
-        <div class="mb-4 p-4 rounded-xl bg-gray-800/30 border border-gray-700/50">
-          <h3 class="text-sm font-medium text-blue-300 mb-3" data-i18n="sceneConfig">场景配置</h3>
+        <div class="mb-4 p-4 rounded-xl bg-paper-2/30 border border-rule/50">
+          <h3 class="text-sm font-medium text-accent mb-3" data-i18n="sceneConfig">场景配置</h3>
 
           <!-- Duration source toggle -->
           <div class="mb-4">
-            <label class="block text-sm text-gray-400 mb-2" data-i18n="durationSource">场景信息获取方式</label>
+            <label class="block text-sm text-muted mb-2" data-i18n="durationSource">场景信息获取方式</label>
             <div class="flex gap-2">
-              <label class="flex-1 flex items-center gap-2 px-3 py-2.5 rounded-lg bg-gray-800/50 border border-gray-700 cursor-pointer hover:border-blue-500/30 transition" id="c_source_manual_label">
-                <input type="radio" name="c_duration_source" value="manual" checked onchange="toggleSceneSource()" class="text-blue-500">
-                <span class="text-sm text-gray-300" data-i18n="sourceManual">手动设置</span>
+              <label class="flex-1 flex items-center gap-2 px-3 py-2.5 rounded-lg bg-paper-2/50 border border-rule cursor-pointer hover:border-blue-500/30 transition" id="c_source_manual_label">
+                <input type="radio" name="c_duration_source" value="manual" checked onchange="toggleSceneSource()" class="text-accent">
+                <span class="text-sm text-ink-2" data-i18n="sourceManual">手动设置</span>
               </label>
-              <label class="flex-1 flex items-center gap-2 px-3 py-2.5 rounded-lg bg-gray-800/50 border border-gray-700 cursor-pointer hover:border-blue-500/30 transition" id="c_source_prompt_label">
-                <input type="radio" name="c_duration_source" value="prompt" onchange="toggleSceneSource()" class="text-blue-500">
-                <span class="text-sm text-gray-300" data-i18n="sourcePrompt">从创意描述中提取</span>
+              <label class="flex-1 flex items-center gap-2 px-3 py-2.5 rounded-lg bg-paper-2/50 border border-rule cursor-pointer hover:border-blue-500/30 transition" id="c_source_prompt_label">
+                <input type="radio" name="c_duration_source" value="prompt" onchange="toggleSceneSource()" class="text-accent">
+                <span class="text-sm text-ink-2" data-i18n="sourcePrompt">从创意描述中提取</span>
               </label>
             </div>
-            <p id="c_source_hint" class="text-xs text-gray-500 mt-1.5" data-i18n="sourceManualHint">手动指定场景数量和每场景时长</p>
+            <p id="c_source_hint" class="text-xs text-muted mt-1.5" data-i18n="sourceManualHint">手动指定场景数量和每场景时长</p>
           </div>
 
           <!-- Manual config (shown when manual is selected) -->
           <div id="c_manual_scene_config">
             <div class="mb-3">
-              <label class="block text-xs text-gray-400 mb-1" data-i18n="sceneCount">场景数量</label>
-              <input id="c_scene_count" type="number" min="1" max="30" value="3" class="w-24 glass-input rounded-lg px-3 py-2 text-sm text-gray-100">
+              <label class="block text-xs text-muted mb-1" data-i18n="sceneCount">场景数量</label>
+              <input id="c_scene_count" type="number" min="1" max="30" value="3" class="w-24 glass-input rounded-lg px-3 py-2 text-sm text-ink">
             </div>
 
             <div class="mb-3">
-              <label class="block text-xs text-gray-400 mb-1.5" data-i18n="durationMode">各场景时长</label>
+              <label class="block text-xs text-muted mb-1.5" data-i18n="durationMode">各场景时长</label>
               <div class="flex gap-2 mb-2">
-                <label class="flex items-center gap-2 text-sm text-gray-400 cursor-pointer">
-                  <input type="radio" name="c_uniform" value="1" checked onchange="toggleDurationMode()" class="text-blue-500">
+                <label class="flex items-center gap-2 text-sm text-muted cursor-pointer">
+                  <input type="radio" name="c_uniform" value="1" checked onchange="toggleDurationMode()" class="text-accent">
                   <span data-i18n="uniformDuration">统一</span>
                 </label>
-                <label class="flex items-center gap-2 text-sm text-gray-400 cursor-pointer">
-                  <input type="radio" name="c_uniform" value="0" onchange="toggleDurationMode()" class="text-blue-500">
+                <label class="flex items-center gap-2 text-sm text-muted cursor-pointer">
+                  <input type="radio" name="c_uniform" value="0" onchange="toggleDurationMode()" class="text-accent">
                   <span data-i18n="independentDuration">独立</span>
                 </label>
               </div>
               <div id="c_uniform_duration_wrap">
-                <input id="c_uniform_duration" type="number" min="2" max="30" value="5" class="w-24 glass-input rounded-lg px-3 py-2 text-sm text-gray-100">
-                <span class="text-xs text-gray-500 ml-1" data-i18n="seconds">秒</span>
+                <input id="c_uniform_duration" type="number" min="2" max="30" value="5" class="w-24 glass-input rounded-lg px-3 py-2 text-sm text-ink">
+                <span class="text-xs text-muted ml-1" data-i18n="seconds">秒</span>
               </div>
               <div id="c_independent_durations_wrap" class="hidden space-y-2">
                 <div id="c_duration_inputs">
@@ -796,27 +819,27 @@
         </div>
 
         <div class="mb-4">
-          <label class="block text-sm text-gray-400 mb-1.5" data-i18n="visualStyle">视觉风格</label>
-          <input id="c_style" value="电影质感写实风格" class="w-full glass-input rounded-lg px-4 py-2.5 text-sm text-gray-100 placeholder-gray-600">
+          <label class="block text-sm text-muted mb-1.5" data-i18n="visualStyle">视觉风格</label>
+          <input id="c_style" value="电影质感写实风格" class="w-full glass-input rounded-lg px-4 py-2.5 text-sm text-ink placeholder-muted">
         </div>
       </div>
 
       <!-- Advanced Config -->
       <div class="glass-card rounded-2xl p-6 mb-4">
-        <h2 class="text-lg font-semibold text-blue-300 mb-4" data-i18n="advancedSettings">高级设置</h2>
+        <h2 class="text-lg font-semibold text-accent mb-4" data-i18n="advancedSettings">高级设置</h2>
 
         <div class="grid grid-cols-2 md:grid-cols-3 gap-4 mb-4">
           <div>
-            <label class="block text-sm text-gray-400 mb-1.5" data-i18n="chainingMode">串联模式</label>
-            <select id="c_chaining" class="w-full glass-input rounded-lg px-3 py-2.5 text-sm text-gray-100">
+            <label class="block text-sm text-muted mb-1.5" data-i18n="chainingMode">串联模式</label>
+            <select id="c_chaining" class="w-full glass-input rounded-lg px-3 py-2.5 text-sm text-ink">
               <option value="keyframes" data-i18n="modeKeyframes">keyframes (推荐)</option>
               <option value="ti2vid" data-i18n="modeTi2vid">ti2vid (过渡帧)</option>
               <option value="none" data-i18n="modeNone">none (独立场景)</option>
             </select>
           </div>
           <div>
-            <label class="block text-sm text-gray-400 mb-1.5" data-i18n="resolution">分辨率</label>
-            <select id="c_resolution" class="w-full glass-input rounded-lg px-3 py-2.5 text-sm text-gray-100">
+            <label class="block text-sm text-muted mb-1.5" data-i18n="resolution">分辨率</label>
+            <select id="c_resolution" class="w-full glass-input rounded-lg px-3 py-2.5 text-sm text-ink">
               <option value="768x1152" data-i18n="resPortrait">竖屏 9:16</option>
               <option value="1152x768" data-i18n="resLandscape">横屏 16:9</option>
               <option value="1024x1024" data-i18n="resSquare">方形 1:1</option>
@@ -826,41 +849,41 @@
 
         <!-- Reference Image -->
         <div class="mb-4">
-          <label class="block text-sm text-gray-400 mb-1.5" data-i18n="referenceImage">参考图 (可选)</label>
+          <label class="block text-sm text-muted mb-1.5" data-i18n="referenceImage">参考图 (可选)</label>
           <div class="flex items-center gap-4">
             <label class="cursor-pointer px-4 py-2.5 glass-input rounded-lg text-sm transition inline-block hover:border-blue-500/30">
               <span data-i18n="chooseImage">选择参考图</span>
               <input id="c_ref_image" type="file" accept="image/*" class="hidden" onchange="updateLabel('c_ref_image','c_ref_name')">
             </label>
-            <span id="c_ref_name" class="text-sm text-gray-500" data-i18n="notSelected">未选择</span>
+            <span id="c_ref_name" class="text-sm text-muted" data-i18n="notSelected">未选择</span>
           </div>
-          <p class="text-xs text-gray-500 mt-2" data-i18n="refDescription">可选。提供后所有场景将以该图为视觉锚点；不提供则自动从故事中生成角色参考图</p>
+          <p class="text-xs text-muted mt-2" data-i18n="refDescription">可选。提供后所有场景将以该图为视觉锚点；不提供则自动从故事中生成角色参考图</p>
         </div>
 
         <!-- End Frames -->
         <div class="mb-4">
           <div class="flex items-center justify-between mb-3">
-            <label class="text-sm text-gray-400" data-i18n="customEndFrames">自定义尾帧 (可选)</label>
+            <label class="text-sm text-muted" data-i18n="customEndFrames">自定义尾帧 (可选)</label>
             <div class="flex gap-3">
-              <label class="flex items-center gap-2 text-sm text-gray-400 cursor-pointer">
-                <input type="checkbox" id="c_use_end_frames" onchange="toggleCEndFrames()" class="rounded bg-gray-800 border-gray-600">
+              <label class="flex items-center gap-2 text-sm text-muted cursor-pointer">
+                <input type="checkbox" id="c_use_end_frames" onchange="toggleCEndFrames()" class="rounded bg-paper-2 border-rule">
                 <span data-i18n="enableCustomEndFrames">启用自定义尾帧</span>
               </label>
-              <label class="flex items-center gap-2 text-sm text-gray-400 cursor-pointer">
-                <input type="checkbox" id="c_gen_end_from_ref" checked onchange="toggleCEndFrameMode()" class="rounded bg-gray-800 border-gray-600">
+              <label class="flex items-center gap-2 text-sm text-muted cursor-pointer">
+                <input type="checkbox" id="c_gen_end_from_ref" checked onchange="toggleCEndFrameMode()" class="rounded bg-paper-2 border-rule">
                 <span data-i18n="genEndFramesFromRef">基于参考图生成尾帧 (i2i)</span>
               </label>
             </div>
           </div>
           <div id="c-end-frames-container" class="hidden space-y-2">
-            <p class="text-xs text-gray-500 mb-2" data-i18n="endFrameDesc">每个场景一张尾帧图，按顺序对应。多余场景自动生成尾帧。</p>
+            <p class="text-xs text-muted mb-2" data-i18n="endFrameDesc">每个场景一张尾帧图，按顺序对应。多余场景自动生成尾帧。</p>
             <div id="c-end-frame-inputs">
               <div class="flex items-center gap-3 mb-2">
-                <span class="text-xs text-gray-500 w-16" data-i18n="scene_">场景</span>
-                <input type="file" accept="image/*" class="end-frame-file flex-1 text-sm text-gray-400 file:mr-3 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-sm file:bg-gray-700 file:text-gray-200 hover:file:bg-gray-600">
+                <span class="text-xs text-muted w-16" data-i18n="scene_">场景</span>
+                <input type="file" accept="image/*" class="end-frame-file flex-1 text-sm text-muted file:mr-3 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-sm file:bg-paper-3 file:text-ink-2 hover:file:bg-paper-3">
               </div>
             </div>
-            <button onclick="addCEndFrameInput()" class="text-xs text-amber-400 hover:text-blue-300 mt-2" data-i18n="addEndFrame">+ 添加尾帧</button>
+            <button onclick="addCEndFrameInput()" class="text-xs text-accent hover:text-accent mt-2" data-i18n="addEndFrame">+ 添加尾帧</button>
           </div>
         </div>
       </div>
@@ -868,19 +891,19 @@
       <!-- Audio Config (Creative) — v3.0 audio only -->
       <div class="glass-card rounded-2xl p-6 mb-4">
         <div class="collapse-header flex items-center justify-between" onclick="toggleCollapse('c_audio_body')">
-          <h2 class="text-lg font-semibold text-blue-300" data-i18n="audioConfig">音频配置</h2>
-          <span id="c_audio_body-arrow" class="text-gray-500 text-xs">▶</span>
+          <h2 class="text-lg font-semibold text-accent" data-i18n="audioConfig">音频配置</h2>
+          <span id="c_audio_body-arrow" class="text-muted text-xs">▶</span>
         </div>
         <div id="c_audio_body" class="collapse-body hidden mt-4">
           <div class="flex items-center gap-3 mb-4">
-            <label class="flex items-center gap-2 text-sm text-gray-300 cursor-pointer">
-              <input type="checkbox" id="c_audio_enabled" class="rounded bg-gray-800 border-gray-600">
+            <label class="flex items-center gap-2 text-sm text-ink-2 cursor-pointer">
+              <input type="checkbox" id="c_audio_enabled" class="rounded bg-paper-2 border-rule">
               <span data-i18n="enableNarration">启用旁白配音</span>
             </label>
           </div>
           <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
             <div>
-              <label class="block text-sm text-gray-400 mb-1.5" data-i18n="voiceRole">语音角色</label>
+              <label class="block text-sm text-muted mb-1.5" data-i18n="voiceRole">语音角色</label>
               <div class="voice-selector" id="c_voice_selector" role="button" tabindex="0"
                    onclick="openVoicePicker('c')"
                    onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();openVoicePicker('c');}">
@@ -893,8 +916,8 @@
               </div>
             </div>
             <div>
-              <label class="block text-sm text-gray-400 mb-1.5" data-i18n="speechRate">语速</label>
-              <select id="c_rate" class="w-full glass-input rounded-lg px-3 py-2.5 text-sm text-gray-100">
+              <label class="block text-sm text-muted mb-1.5" data-i18n="speechRate">语速</label>
+              <select id="c_rate" class="w-full glass-input rounded-lg px-3 py-2.5 text-sm text-ink">
                 <option value="-30%" data-i18n="rateSlow">-30% (慢)</option>
                 <option value="-15%">-15%</option>
                 <option value="+0%" selected data-i18n="rateNormal">正常</option>
@@ -909,20 +932,20 @@
       <!-- Subtitle Config (Creative) — v3.0 independent -->
       <div class="glass-card rounded-2xl p-6 mb-4">
         <div class="collapse-header flex items-center justify-between" onclick="toggleCollapse('c_subtitle_body')">
-          <h2 class="text-lg font-semibold text-blue-300" data-i18n="subtitleConfig">字幕配置</h2>
-          <span id="c_subtitle_body-arrow" class="text-gray-500 text-xs">▶</span>
+          <h2 class="text-lg font-semibold text-accent" data-i18n="subtitleConfig">字幕配置</h2>
+          <span id="c_subtitle_body-arrow" class="text-muted text-xs">▶</span>
         </div>
         <div id="c_subtitle_body" class="collapse-body hidden mt-4">
           <div class="flex items-center gap-3 mb-4">
-            <label class="flex items-center gap-2 text-sm text-gray-300 cursor-pointer">
-              <input type="checkbox" id="c_subtitle_enabled" checked class="rounded bg-gray-800 border-gray-600">
+            <label class="flex items-center gap-2 text-sm text-ink-2 cursor-pointer">
+              <input type="checkbox" id="c_subtitle_enabled" checked class="rounded bg-paper-2 border-rule">
               <span data-i18n="enableSubtitle">启用字幕</span>
             </label>
           </div>
           <div class="border-t border-white/5 pt-4">
             <div class="mb-4">
-              <label class="block text-sm text-gray-400 mb-1.5" data-i18n="subStyleMode">样式模式</label>
-              <select id="c_sub_style_mode" onchange="toggleSubStyleMode('c')" class="w-full glass-input rounded-lg px-3 py-2 text-sm text-gray-100">
+              <label class="block text-sm text-muted mb-1.5" data-i18n="subStyleMode">样式模式</label>
+              <select id="c_sub_style_mode" onchange="toggleSubStyleMode('c')" class="w-full glass-input rounded-lg px-3 py-2 text-sm text-ink">
                 <option value="fixed" data-i18n="subStyleFixed">固定样式</option>
                 <option value="llm" data-i18n="subStyleLLM">AI 智能样式</option>
               </select>
@@ -930,23 +953,23 @@
 
             <!-- Fixed style controls -->
             <div id="c_sub_fixed_controls">
-              <p class="text-sm text-gray-400 mb-3" data-i18n="subtitleStyle">字幕样式</p>
+              <p class="text-sm text-muted mb-3" data-i18n="subtitleStyle">字幕样式</p>
               <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
                 <div>
-                  <label class="block text-xs text-gray-500 mb-1" data-i18n="subFont">字体</label>
-                  <input id="c_sub_font" value="STHeitiMedium.ttc" class="w-full glass-input rounded px-2 py-1.5 text-xs text-gray-100">
+                  <label class="block text-xs text-muted mb-1" data-i18n="subFont">字体</label>
+                  <input id="c_sub_font" value="STHeitiMedium.ttc" class="w-full glass-input rounded px-2 py-1.5 text-xs text-ink">
                 </div>
                 <div>
-                  <label class="block text-xs text-gray-500 mb-1" data-i18n="subColor">颜色</label>
-                  <input id="c_sub_color" value="white" class="w-full glass-input rounded px-2 py-1.5 text-xs text-gray-100">
+                  <label class="block text-xs text-muted mb-1" data-i18n="subColor">颜色</label>
+                  <input id="c_sub_color" value="white" class="w-full glass-input rounded px-2 py-1.5 text-xs text-ink">
                 </div>
                 <div>
-                  <label class="block text-xs text-gray-500 mb-1" data-i18n="subSize">字号</label>
-                  <input id="c_sub_fontsize" type="number" value="48" class="w-full glass-input rounded px-2 py-1.5 text-xs text-gray-100">
+                  <label class="block text-xs text-muted mb-1" data-i18n="subSize">字号</label>
+                  <input id="c_sub_fontsize" type="number" value="48" class="w-full glass-input rounded px-2 py-1.5 text-xs text-ink">
                 </div>
                 <div>
-                  <label class="block text-xs text-gray-500 mb-1" data-i18n="subPosition">位置</label>
-                  <select id="c_sub_position" class="w-full glass-input rounded px-2 py-1.5 text-xs text-gray-100">
+                  <label class="block text-xs text-muted mb-1" data-i18n="subPosition">位置</label>
+                  <select id="c_sub_position" class="w-full glass-input rounded px-2 py-1.5 text-xs text-ink">
                     <option value="bottom" data-i18n="posBottom">底部</option>
                     <option value="top" data-i18n="posTop">顶部</option>
                   </select>
@@ -954,25 +977,25 @@
               </div>
               <div class="grid grid-cols-2 md:grid-cols-4 gap-3 mt-3">
                 <div>
-                  <label class="block text-xs text-gray-500 mb-1" data-i18n="subStrokeColor">描边色</label>
-                  <input id="c_sub_stroke_color" value="black" class="w-full glass-input rounded px-2 py-1.5 text-xs text-gray-100">
+                  <label class="block text-xs text-muted mb-1" data-i18n="subStrokeColor">描边色</label>
+                  <input id="c_sub_stroke_color" value="black" class="w-full glass-input rounded px-2 py-1.5 text-xs text-ink">
                 </div>
                 <div>
-                  <label class="block text-xs text-gray-500 mb-1" data-i18n="subStrokeWidth">描边宽</label>
-                  <input id="c_sub_stroke_width" type="number" value="2" class="w-full glass-input rounded px-2 py-1.5 text-xs text-gray-100">
+                  <label class="block text-xs text-muted mb-1" data-i18n="subStrokeWidth">描边宽</label>
+                  <input id="c_sub_stroke_width" type="number" value="2" class="w-full glass-input rounded px-2 py-1.5 text-xs text-ink">
                 </div>
                 <div>
-                  <label class="block text-xs text-gray-500 mb-1" data-i18n="subBgColor">背景色</label>
-                  <input id="c_sub_bg_color" value="black@0.5" class="w-full glass-input rounded px-2 py-1.5 text-xs text-gray-100">
+                  <label class="block text-xs text-muted mb-1" data-i18n="subBgColor">背景色</label>
+                  <input id="c_sub_bg_color" value="black@0.5" class="w-full glass-input rounded px-2 py-1.5 text-xs text-ink">
                 </div>
               </div>
             </div>
 
             <!-- LLM style controls -->
             <div id="c_sub_llm_controls" class="hidden">
-              <label class="block text-sm text-gray-400 mb-1.5" data-i18n="subStyleHints">样式偏好描述</label>
-              <textarea id="c_sub_style_hints" rows="3" class="w-full glass-input rounded-lg px-3 py-2 text-sm text-gray-100 placeholder-gray-500" data-i18n-placeholder="subStyleHintsPlaceholder" placeholder='强调词用红色大号字，普通叙述白色小字放底部'></textarea>
-              <p class="text-xs text-gray-500 mt-1" data-i18n="subStyleHintsHint">描述你期望的字幕样式变化规律，AI 会据此为每条字幕分配不同位置、颜色和字号</p>
+              <label class="block text-sm text-muted mb-1.5" data-i18n="subStyleHints">样式偏好描述</label>
+              <textarea id="c_sub_style_hints" rows="3" class="w-full glass-input rounded-lg px-3 py-2 text-sm text-ink placeholder-muted" data-i18n-placeholder="subStyleHintsPlaceholder" placeholder='强调词用红色大号字，普通叙述白色小字放底部'></textarea>
+              <p class="text-xs text-muted mt-1" data-i18n="subStyleHintsHint">描述你期望的字幕样式变化规律，AI 会据此为每条字幕分配不同位置、颜色和字号</p>
             </div>
           </div>
         </div>
@@ -980,14 +1003,14 @@
 
       <!-- Watermark toggle -->
       <div class="flex items-center justify-between px-1 py-2 mb-4">
-        <p class="text-xs text-gray-500 leading-relaxed mr-3 watermark-promo"></p>
+        <p class="text-xs text-muted leading-relaxed mr-3 watermark-promo"></p>
         <label class="relative inline-flex items-center cursor-pointer flex-shrink-0" title="Video Watermark">
           <input type="checkbox" class="watermark-toggle sr-only peer" onchange="toggleWatermark(this)">
-          <div class="w-10 h-5 bg-gray-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-gray-300 after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-blue-600"></div>
+          <div class="w-10 h-5 bg-paper-3 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-rule after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-accent"></div>
         </label>
       </div>
 
-      <button id="btn-creative" onclick="submitCreative()" class="w-full py-3.5 bg-gradient-to-r from-blue-600 via-blue-500 to-blue-600 hover:from-blue-500 hover:via-blue-400 hover:to-blue-500 rounded-xl text-base font-semibold transition disabled:opacity-50 disabled:cursor-not-allowed glow-btn" data-i18n="startGenerate">
+      <button id="btn-creative" onclick="submitCreative()" class="w-full py-3.5 bg-accent text-accent-ink hover:bg-accent/90 rounded-xl text-base font-semibold transition disabled:opacity-50 disabled:cursor-not-allowed glow-btn" data-i18n="startGenerate">
         开始生成视频
       </button>
     </div>
@@ -995,27 +1018,27 @@
     <!-- ═══════ Tab 3: Manuscript Video ═══════ -->
     <div id="form-manuscript" class="hidden">
       <!-- 官网引导：示例提示词 -->
-      <div class="flex items-center gap-2 mb-4 text-xs text-gray-500">
-        <span class="text-gray-600">💡</span>
-        <a href="https://video.lichuanyang.top/guides/prompt-examples-manuscript" target="_blank" rel="noopener" class="hover:text-blue-300 transition-colors"><span data-i18n="exampleLinkManuscript">📋 稿件视频示例</span></a>
+      <div class="flex items-center gap-2 mb-4 text-xs text-muted">
+        <span class="text-muted">💡</span>
+        <a href="https://video.lichuanyang.top/guides/prompt-examples-manuscript" target="_blank" rel="noopener" class="hover:text-accent transition-colors"><span data-i18n="exampleLinkManuscript">📋 稿件视频示例</span></a>
       </div>
       <div class="glass-card rounded-2xl p-6 mb-4">
-        <h2 class="text-lg font-semibold text-blue-300 mb-4" data-i18n="manuscriptSettings">稿件设置</h2>
+        <h2 class="text-lg font-semibold text-accent mb-4" data-i18n="manuscriptSettings">稿件设置</h2>
 
         <div class="mb-4">
-          <label class="block text-sm text-gray-400 mb-1.5" data-i18n="taskName">任务名称</label>
-          <input id="m_name" data-i18n-placeholder="taskNamePlaceholder" placeholder="可选，留空自动生成" class="w-full glass-input rounded-lg px-4 py-2.5 text-sm text-gray-100 placeholder-gray-600">
+          <label class="block text-sm text-muted mb-1.5" data-i18n="taskName">任务名称</label>
+          <input id="m_name" data-i18n-placeholder="taskNamePlaceholder" placeholder="可选，留空自动生成" class="w-full glass-input rounded-lg px-4 py-2.5 text-sm text-ink placeholder-muted">
         </div>
 
         <div class="mb-4">
-          <label class="block text-sm text-gray-400 mb-1.5"><span data-i18n="manuscriptText">稿件正文</span> <span class="text-red-400">*</span></label>
-          <textarea id="m_text" rows="10" data-i18n-placeholder="manuscriptPlaceholder" placeholder="粘贴你的文章、新闻稿、公众号文章等..." class="w-full glass-input rounded-lg px-4 py-2.5 text-sm resize-y text-gray-100 placeholder-gray-600 font-mono"></textarea>
-          <p class="text-xs text-gray-500 mt-1"><span data-i18n="charCount">字数</span>: <span id="m_char_count">0</span></p>
+          <label class="block text-sm text-muted mb-1.5"><span data-i18n="manuscriptText">稿件正文</span> <span class="text-red-400">*</span></label>
+          <textarea id="m_text" rows="10" data-i18n-placeholder="manuscriptPlaceholder" placeholder="粘贴你的文章、新闻稿、公众号文章等..." class="w-full glass-input rounded-lg px-4 py-2.5 text-sm resize-y text-ink placeholder-muted font-mono"></textarea>
+          <p class="text-xs text-muted mt-1"><span data-i18n="charCount">字数</span>: <span id="m_char_count">0</span></p>
         </div>
 
         <div class="mb-4">
-          <label class="block text-sm text-gray-400 mb-1.5" data-i18n="resolution">分辨率</label>
-          <select id="m_resolution" class="w-full glass-input rounded-lg px-3 py-2.5 text-sm text-gray-100">
+          <label class="block text-sm text-muted mb-1.5" data-i18n="resolution">分辨率</label>
+          <select id="m_resolution" class="w-full glass-input rounded-lg px-3 py-2.5 text-sm text-ink">
             <option value="768x1152" data-i18n="resPortrait">竖屏 9:16</option>
             <option value="1152x768" data-i18n="resLandscape">横屏 16:9</option>
             <option value="1024x1024" data-i18n="resSquare">方形 1:1</option>
@@ -1026,19 +1049,19 @@
       <!-- Audio Config (Manuscript) — v3.0 audio only -->
       <div class="glass-card rounded-2xl p-6 mb-4">
         <div class="collapse-header flex items-center justify-between" onclick="toggleCollapse('m_audio_body')">
-          <h2 class="text-lg font-semibold text-blue-300" data-i18n="audioConfig">音频配置</h2>
-          <span id="m_audio_body-arrow" class="text-gray-500 text-xs">▶</span>
+          <h2 class="text-lg font-semibold text-accent" data-i18n="audioConfig">音频配置</h2>
+          <span id="m_audio_body-arrow" class="text-muted text-xs">▶</span>
         </div>
         <div id="m_audio_body" class="collapse-body hidden mt-4">
           <div class="flex items-center gap-3 mb-4">
-            <label class="flex items-center gap-2 text-sm text-gray-300 cursor-pointer">
-              <input type="checkbox" id="m_audio_enabled" checked class="rounded bg-gray-800 border-gray-600">
+            <label class="flex items-center gap-2 text-sm text-ink-2 cursor-pointer">
+              <input type="checkbox" id="m_audio_enabled" checked class="rounded bg-paper-2 border-rule">
               <span data-i18n="enableNarration">启用旁白配音</span>
             </label>
           </div>
           <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
             <div>
-              <label class="block text-sm text-gray-400 mb-1.5" data-i18n="voiceRole">语音角色</label>
+              <label class="block text-sm text-muted mb-1.5" data-i18n="voiceRole">语音角色</label>
               <div class="voice-selector" id="m_voice_selector" role="button" tabindex="0"
                    onclick="openVoicePicker('m')"
                    onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();openVoicePicker('m');}">
@@ -1051,8 +1074,8 @@
               </div>
             </div>
             <div>
-              <label class="block text-sm text-gray-400 mb-1.5" data-i18n="speechRate">语速</label>
-              <select id="m_rate" class="w-full glass-input rounded-lg px-3 py-2.5 text-sm text-gray-100">
+              <label class="block text-sm text-muted mb-1.5" data-i18n="speechRate">语速</label>
+              <select id="m_rate" class="w-full glass-input rounded-lg px-3 py-2.5 text-sm text-ink">
                 <option value="-30%" data-i18n="rateSlow">-30% (慢)</option>
                 <option value="-15%">-15%</option>
                 <option value="+0%" selected data-i18n="rateNormal">正常</option>
@@ -1067,20 +1090,20 @@
       <!-- Subtitle Config (Manuscript) — v3.0 independent -->
       <div class="glass-card rounded-2xl p-6 mb-4">
         <div class="collapse-header flex items-center justify-between" onclick="toggleCollapse('m_subtitle_body')">
-          <h2 class="text-lg font-semibold text-blue-300" data-i18n="subtitleConfig">字幕配置</h2>
-          <span id="m_subtitle_body-arrow" class="text-gray-500 text-xs">▶</span>
+          <h2 class="text-lg font-semibold text-accent" data-i18n="subtitleConfig">字幕配置</h2>
+          <span id="m_subtitle_body-arrow" class="text-muted text-xs">▶</span>
         </div>
         <div id="m_subtitle_body" class="collapse-body hidden mt-4">
           <div class="flex items-center gap-3 mb-4">
-            <label class="flex items-center gap-2 text-sm text-gray-300 cursor-pointer">
-              <input type="checkbox" id="m_subtitle_enabled" checked class="rounded bg-gray-800 border-gray-600">
+            <label class="flex items-center gap-2 text-sm text-ink-2 cursor-pointer">
+              <input type="checkbox" id="m_subtitle_enabled" checked class="rounded bg-paper-2 border-rule">
               <span data-i18n="enableSubtitle">启用字幕</span>
             </label>
           </div>
           <div class="border-t border-white/5 pt-4">
             <div class="mb-4">
-              <label class="block text-sm text-gray-400 mb-1.5" data-i18n="subStyleMode">样式模式</label>
-              <select id="m_sub_style_mode" onchange="toggleSubStyleMode('m')" class="w-full glass-input rounded-lg px-3 py-2 text-sm text-gray-100">
+              <label class="block text-sm text-muted mb-1.5" data-i18n="subStyleMode">样式模式</label>
+              <select id="m_sub_style_mode" onchange="toggleSubStyleMode('m')" class="w-full glass-input rounded-lg px-3 py-2 text-sm text-ink">
                 <option value="fixed" data-i18n="subStyleFixed">固定样式</option>
                 <option value="llm" data-i18n="subStyleLLM">AI 智能样式</option>
               </select>
@@ -1088,23 +1111,23 @@
 
             <!-- Fixed style controls -->
             <div id="m_sub_fixed_controls">
-              <p class="text-sm text-gray-400 mb-3" data-i18n="subtitleStyle">字幕样式</p>
+              <p class="text-sm text-muted mb-3" data-i18n="subtitleStyle">字幕样式</p>
               <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
                 <div>
-                  <label class="block text-xs text-gray-500 mb-1" data-i18n="subFont">字体</label>
-                  <input id="m_sub_font" value="STHeitiMedium.ttc" class="w-full glass-input rounded px-2 py-1.5 text-xs text-gray-100">
+                  <label class="block text-xs text-muted mb-1" data-i18n="subFont">字体</label>
+                  <input id="m_sub_font" value="STHeitiMedium.ttc" class="w-full glass-input rounded px-2 py-1.5 text-xs text-ink">
                 </div>
                 <div>
-                  <label class="block text-xs text-gray-500 mb-1" data-i18n="subColor">颜色</label>
-                  <input id="m_sub_color" value="white" class="w-full glass-input rounded px-2 py-1.5 text-xs text-gray-100">
+                  <label class="block text-xs text-muted mb-1" data-i18n="subColor">颜色</label>
+                  <input id="m_sub_color" value="white" class="w-full glass-input rounded px-2 py-1.5 text-xs text-ink">
                 </div>
                 <div>
-                  <label class="block text-xs text-gray-500 mb-1" data-i18n="subSize">字号</label>
-                  <input id="m_sub_fontsize" type="number" value="48" class="w-full glass-input rounded px-2 py-1.5 text-xs text-gray-100">
+                  <label class="block text-xs text-muted mb-1" data-i18n="subSize">字号</label>
+                  <input id="m_sub_fontsize" type="number" value="48" class="w-full glass-input rounded px-2 py-1.5 text-xs text-ink">
                 </div>
                 <div>
-                  <label class="block text-xs text-gray-500 mb-1" data-i18n="subPosition">位置</label>
-                  <select id="m_sub_position" class="w-full glass-input rounded px-2 py-1.5 text-xs text-gray-100">
+                  <label class="block text-xs text-muted mb-1" data-i18n="subPosition">位置</label>
+                  <select id="m_sub_position" class="w-full glass-input rounded px-2 py-1.5 text-xs text-ink">
                     <option value="bottom" data-i18n="posBottom">底部</option>
                     <option value="top" data-i18n="posTop">顶部</option>
                   </select>
@@ -1112,25 +1135,25 @@
               </div>
               <div class="grid grid-cols-2 md:grid-cols-4 gap-3 mt-3">
                 <div>
-                  <label class="block text-xs text-gray-500 mb-1" data-i18n="subStrokeColor">描边色</label>
-                  <input id="m_sub_stroke_color" value="black" class="w-full glass-input rounded px-2 py-1.5 text-xs text-gray-100">
+                  <label class="block text-xs text-muted mb-1" data-i18n="subStrokeColor">描边色</label>
+                  <input id="m_sub_stroke_color" value="black" class="w-full glass-input rounded px-2 py-1.5 text-xs text-ink">
                 </div>
                 <div>
-                  <label class="block text-xs text-gray-500 mb-1" data-i18n="subStrokeWidth">描边宽</label>
-                  <input id="m_sub_stroke_width" type="number" value="2" class="w-full glass-input rounded px-2 py-1.5 text-xs text-gray-100">
+                  <label class="block text-xs text-muted mb-1" data-i18n="subStrokeWidth">描边宽</label>
+                  <input id="m_sub_stroke_width" type="number" value="2" class="w-full glass-input rounded px-2 py-1.5 text-xs text-ink">
                 </div>
                 <div>
-                  <label class="block text-xs text-gray-500 mb-1" data-i18n="subBgColor">背景色</label>
-                  <input id="m_sub_bg_color" value="black@0.5" class="w-full glass-input rounded px-2 py-1.5 text-xs text-gray-100">
+                  <label class="block text-xs text-muted mb-1" data-i18n="subBgColor">背景色</label>
+                  <input id="m_sub_bg_color" value="black@0.5" class="w-full glass-input rounded px-2 py-1.5 text-xs text-ink">
                 </div>
               </div>
             </div>
 
             <!-- LLM style controls -->
             <div id="m_sub_llm_controls" class="hidden">
-              <label class="block text-sm text-gray-400 mb-1.5" data-i18n="subStyleHints">样式偏好描述</label>
-              <textarea id="m_sub_style_hints" rows="3" class="w-full glass-input rounded-lg px-3 py-2 text-sm text-gray-100 placeholder-gray-500" data-i18n-placeholder="subStyleHintsPlaceholder" placeholder='强调词用红色大号字，普通叙述白色小字放底部'></textarea>
-              <p class="text-xs text-gray-500 mt-1" data-i18n="subStyleHintsHint">描述你期望的字幕样式变化规律，AI 会据此为每条字幕分配不同位置、颜色和字号</p>
+              <label class="block text-sm text-muted mb-1.5" data-i18n="subStyleHints">样式偏好描述</label>
+              <textarea id="m_sub_style_hints" rows="3" class="w-full glass-input rounded-lg px-3 py-2 text-sm text-ink placeholder-muted" data-i18n-placeholder="subStyleHintsPlaceholder" placeholder='强调词用红色大号字，普通叙述白色小字放底部'></textarea>
+              <p class="text-xs text-muted mt-1" data-i18n="subStyleHintsHint">描述你期望的字幕样式变化规律，AI 会据此为每条字幕分配不同位置、颜色和字号</p>
             </div>
           </div>
         </div>
@@ -1138,14 +1161,14 @@
 
       <!-- Watermark toggle -->
       <div class="flex items-center justify-between px-1 py-2 mb-4">
-        <p class="text-xs text-gray-500 leading-relaxed mr-3 watermark-promo"></p>
+        <p class="text-xs text-muted leading-relaxed mr-3 watermark-promo"></p>
         <label class="relative inline-flex items-center cursor-pointer flex-shrink-0" title="Video Watermark">
           <input type="checkbox" class="watermark-toggle sr-only peer" onchange="toggleWatermark(this)">
-          <div class="w-10 h-5 bg-gray-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-gray-300 after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-blue-600"></div>
+          <div class="w-10 h-5 bg-paper-3 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-rule after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-accent"></div>
         </label>
       </div>
 
-      <button id="btn-manuscript" onclick="submitManuscript()" class="w-full py-3.5 bg-gradient-to-r from-blue-600 via-blue-500 to-blue-600 hover:from-blue-500 hover:via-blue-400 hover:to-blue-500 rounded-xl text-base font-semibold transition disabled:opacity-50 disabled:cursor-not-allowed glow-btn" data-i18n="startGenerate">
+      <button id="btn-manuscript" onclick="submitManuscript()" class="w-full py-3.5 bg-accent text-accent-ink hover:bg-accent/90 rounded-xl text-base font-semibold transition disabled:opacity-50 disabled:cursor-not-allowed glow-btn" data-i18n="startGenerate">
         开始生成视频
       </button>
     </div>
@@ -1153,39 +1176,39 @@
     <!-- ═══════ Tab 4: Anchor Video ═══════ -->
     <div id="form-anchor" class="hidden">
       <!-- 官网引导：示例提示词 -->
-      <div class="flex items-center gap-2 mb-4 text-xs text-gray-500">
-        <span class="text-gray-600">💡</span>
-        <a href="https://video.lichuanyang.top/guides/prompt-examples-anchor" target="_blank" rel="noopener" class="hover:text-blue-300 transition-colors"><span data-i18n="exampleLinkAnchor">📋 数字人示例</span></a>
+      <div class="flex items-center gap-2 mb-4 text-xs text-muted">
+        <span class="text-muted">💡</span>
+        <a href="https://video.lichuanyang.top/guides/prompt-examples-anchor" target="_blank" rel="noopener" class="hover:text-accent transition-colors"><span data-i18n="exampleLinkAnchor">📋 数字人示例</span></a>
       </div>
       <div class="glass-card rounded-2xl p-6 mb-4">
-        <h2 class="text-lg font-semibold text-blue-300 mb-4" data-i18n="anchorSettings">数字人设置</h2>
+        <h2 class="text-lg font-semibold text-accent mb-4" data-i18n="anchorSettings">数字人设置</h2>
 
         <div class="mb-4">
-          <label class="block text-sm text-gray-400 mb-1.5" data-i18n="anchorPrompt">主播形象描述</label>
-          <textarea id="a_prompt" rows="3" data-i18n-placeholder="anchorPromptPlaceholder" placeholder="一位专业的新闻主播，穿着正式西装，坐在现代化的新闻演播室中..." class="w-full glass-input rounded-lg px-4 py-2.5 text-sm resize-y text-gray-100 placeholder-gray-600"></textarea>
+          <label class="block text-sm text-muted mb-1.5" data-i18n="anchorPrompt">主播形象描述</label>
+          <textarea id="a_prompt" rows="3" data-i18n-placeholder="anchorPromptPlaceholder" placeholder="一位专业的新闻主播，穿着正式西装，坐在现代化的新闻演播室中..." class="w-full glass-input rounded-lg px-4 py-2.5 text-sm resize-y text-ink placeholder-muted"></textarea>
         </div>
 
         <div class="mb-4">
-          <label class="block text-sm text-gray-400 mb-1.5" data-i18n="anchorRefImage">参考图 (可选)</label>
+          <label class="block text-sm text-muted mb-1.5" data-i18n="anchorRefImage">参考图 (可选)</label>
           <div class="flex items-center gap-4">
             <label class="cursor-pointer px-4 py-2.5 glass-input rounded-lg text-sm transition inline-block hover:border-blue-500/30">
               <span data-i18n="chooseImage">选择参考图</span>
               <input id="a_ref_image" type="file" accept="image/*" class="hidden" onchange="updateLabel('a_ref_image','a_ref_name')">
             </label>
-            <span id="a_ref_name" class="text-sm text-gray-500" data-i18n="notSelected">未选择</span>
+            <span id="a_ref_name" class="text-sm text-muted" data-i18n="notSelected">未选择</span>
           </div>
-          <p class="text-xs text-gray-500 mt-1" data-i18n="anchorRefImageHint">可选。上传后以该图为基底微调主播形象；不上传则纯 AI 生成</p>
+          <p class="text-xs text-muted mt-1" data-i18n="anchorRefImageHint">可选。上传后以该图为基底微调主播形象；不上传则纯 AI 生成</p>
         </div>
 
         <div class="mb-4">
-          <label class="block text-sm text-gray-400 mb-1.5"><span data-i18n="scriptText">口播稿件</span> <span class="text-red-400">*</span></label>
-          <textarea id="a_script" rows="8" data-i18n-placeholder="scriptTextPlaceholder" placeholder="输入主播要朗读的口播稿件..." class="w-full glass-input rounded-lg px-4 py-2.5 text-sm resize-y text-gray-100 placeholder-gray-600 font-mono"></textarea>
-          <p class="text-xs text-gray-500 mt-1"><span data-i18n="charCount">字数</span>: <span id="a_char_count">0</span></p>
+          <label class="block text-sm text-muted mb-1.5"><span data-i18n="scriptText">口播稿件</span> <span class="text-red-400">*</span></label>
+          <textarea id="a_script" rows="8" data-i18n-placeholder="scriptTextPlaceholder" placeholder="输入主播要朗读的口播稿件..." class="w-full glass-input rounded-lg px-4 py-2.5 text-sm resize-y text-ink placeholder-muted font-mono"></textarea>
+          <p class="text-xs text-muted mt-1"><span data-i18n="charCount">字数</span>: <span id="a_char_count">0</span></p>
         </div>
 
         <div class="mb-4">
-          <label class="block text-sm text-gray-400 mb-1.5" data-i18n="resolution">分辨率</label>
-          <select id="a_resolution" class="w-full glass-input rounded-lg px-3 py-2.5 text-sm text-gray-100">
+          <label class="block text-sm text-muted mb-1.5" data-i18n="resolution">分辨率</label>
+          <select id="a_resolution" class="w-full glass-input rounded-lg px-3 py-2.5 text-sm text-ink">
             <option value="768x1344" data-i18n="resPortraitHD">竖屏 9:16 (HD)</option>
             <option value="1152x768" data-i18n="resLandscape">横屏 16:9</option>
             <option value="1024x1024" data-i18n="resSquare">方形 1:1</option>
@@ -1196,40 +1219,40 @@
       <!-- Audio Config (Anchor) -->
       <div class="glass-card rounded-2xl p-6 mb-4">
         <div class="collapse-header flex items-center justify-between" onclick="toggleCollapse('a_audio_body')">
-          <h2 class="text-lg font-semibold text-blue-300" data-i18n="audioConfig">音频配置</h2>
-          <span id="a_audio_body-arrow" class="text-gray-500 text-xs">▶</span>
+          <h2 class="text-lg font-semibold text-accent" data-i18n="audioConfig">音频配置</h2>
+          <span id="a_audio_body-arrow" class="text-muted text-xs">▶</span>
         </div>
         <div id="a_audio_body" class="collapse-body hidden mt-4">
           <!-- Audio Source Selector (Anchor only) -->
-          <div class="mb-4 p-3 bg-gray-800/50 rounded-lg border border-gray-700">
-            <label class="block text-sm text-gray-400 mb-2" data-i18n="audioSource">音频来源</label>
+          <div class="mb-4 p-3 bg-paper-2/50 rounded-lg border border-rule">
+            <label class="block text-sm text-muted mb-2" data-i18n="audioSource">音频来源</label>
             <div class="flex flex-col gap-2">
               <label class="flex items-start gap-3 cursor-pointer group">
                 <input type="radio" name="a_audio_source" value="post_stitch" checked class="mt-0.5 accent-blue-500">
                 <div>
-                  <span class="text-sm text-gray-200 group-hover:text-white transition" data-i18n="audioPostStitch">后拼接音频</span>
-                  <p class="text-xs text-gray-500 mt-0.5" data-i18n="audioPostStitchDesc">音频效果可控（可选语音、语速），但嘴型较难匹配</p>
+                  <span class="text-sm text-ink-2 group-hover:text-ink transition" data-i18n="audioPostStitch">后拼接音频</span>
+                  <p class="text-xs text-muted mt-0.5" data-i18n="audioPostStitchDesc">音频效果可控（可选语音、语速），但嘴型较难匹配</p>
                 </div>
               </label>
               <label class="flex items-start gap-3 cursor-pointer group">
                 <input type="radio" name="a_audio_source" value="model" class="mt-0.5 accent-blue-500">
                 <div>
-                  <span class="text-sm text-gray-200 group-hover:text-white transition" data-i18n="audioModel">模型音频</span>
-                  <p class="text-xs text-gray-500 mt-0.5" data-i18n="audioModelDesc">音频由模型控制，效果不可控；无语音角色/语速选项</p>
+                  <span class="text-sm text-ink-2 group-hover:text-ink transition" data-i18n="audioModel">模型音频</span>
+                  <p class="text-xs text-muted mt-0.5" data-i18n="audioModelDesc">音频由模型控制，效果不可控；无语音角色/语速选项</p>
                 </div>
               </label>
             </div>
           </div>
           <div id="a_audio_controls">
             <div class="flex items-center gap-3 mb-4">
-              <label class="flex items-center gap-2 text-sm text-gray-300 cursor-pointer">
-                <input type="checkbox" id="a_audio_enabled" checked class="rounded bg-gray-800 border-gray-600">
+              <label class="flex items-center gap-2 text-sm text-ink-2 cursor-pointer">
+                <input type="checkbox" id="a_audio_enabled" checked class="rounded bg-paper-2 border-rule">
                 <span data-i18n="enableNarration">启用旁白配音</span>
               </label>
             </div>
             <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
               <div>
-                <label class="block text-sm text-gray-400 mb-1.5" data-i18n="voiceRole">语音角色</label>
+                <label class="block text-sm text-muted mb-1.5" data-i18n="voiceRole">语音角色</label>
                   <div class="voice-selector" id="a_voice_selector" role="button" tabindex="0"
                        onclick="openVoicePicker('a')"
                        onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();openVoicePicker('a');}">
@@ -1242,8 +1265,8 @@
                   </div>
               </div>
               <div>
-                <label class="block text-sm text-gray-400 mb-1.5" data-i18n="speechRate">语速</label>
-                <select id="a_rate" class="w-full glass-input rounded-lg px-3 py-2.5 text-sm text-gray-100">
+                <label class="block text-sm text-muted mb-1.5" data-i18n="speechRate">语速</label>
+                <select id="a_rate" class="w-full glass-input rounded-lg px-3 py-2.5 text-sm text-ink">
                   <option value="-30%" data-i18n="rateSlow">-30% (慢)</option>
                   <option value="-15%">-15%</option>
                   <option value="+0%" selected data-i18n="rateNormal">正常</option>
@@ -1274,42 +1297,42 @@
       <!-- Subtitle Config (Anchor) -->
       <div class="glass-card rounded-2xl p-6 mb-4">
         <div class="collapse-header flex items-center justify-between" onclick="toggleCollapse('a_subtitle_body')">
-          <h2 class="text-lg font-semibold text-blue-300" data-i18n="subtitleConfig">字幕配置</h2>
-          <span id="a_subtitle_body-arrow" class="text-gray-500 text-xs">▶</span>
+          <h2 class="text-lg font-semibold text-accent" data-i18n="subtitleConfig">字幕配置</h2>
+          <span id="a_subtitle_body-arrow" class="text-muted text-xs">▶</span>
         </div>
         <div id="a_subtitle_body" class="collapse-body hidden mt-4">
           <div class="flex items-center gap-3 mb-4">
-            <label class="flex items-center gap-2 text-sm text-gray-300 cursor-pointer">
-              <input type="checkbox" id="a_subtitle_enabled" checked class="rounded bg-gray-800 border-gray-600">
+            <label class="flex items-center gap-2 text-sm text-ink-2 cursor-pointer">
+              <input type="checkbox" id="a_subtitle_enabled" checked class="rounded bg-paper-2 border-rule">
               <span data-i18n="enableSubtitle">启用字幕</span>
             </label>
           </div>
           <div class="border-t border-white/5 pt-4">
             <div class="mb-4">
-              <label class="block text-sm text-gray-400 mb-1.5" data-i18n="subStyleMode">样式模式</label>
-              <select id="a_sub_style_mode" onchange="toggleSubStyleMode('a')" class="w-full glass-input rounded-lg px-3 py-2 text-sm text-gray-100">
+              <label class="block text-sm text-muted mb-1.5" data-i18n="subStyleMode">样式模式</label>
+              <select id="a_sub_style_mode" onchange="toggleSubStyleMode('a')" class="w-full glass-input rounded-lg px-3 py-2 text-sm text-ink">
                 <option value="fixed" data-i18n="subStyleFixed">固定样式</option>
                 <option value="llm" data-i18n="subStyleLLM">AI 智能样式</option>
               </select>
             </div>
             <div id="a_sub_fixed_controls">
-              <p class="text-sm text-gray-400 mb-3" data-i18n="subtitleStyle">字幕样式</p>
+              <p class="text-sm text-muted mb-3" data-i18n="subtitleStyle">字幕样式</p>
               <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
                 <div>
-                  <label class="block text-xs text-gray-500 mb-1" data-i18n="subFont">字体</label>
-                  <input id="a_sub_font" value="STHeitiMedium.ttc" class="w-full glass-input rounded px-2 py-1.5 text-xs text-gray-100">
+                  <label class="block text-xs text-muted mb-1" data-i18n="subFont">字体</label>
+                  <input id="a_sub_font" value="STHeitiMedium.ttc" class="w-full glass-input rounded px-2 py-1.5 text-xs text-ink">
                 </div>
                 <div>
-                  <label class="block text-xs text-gray-500 mb-1" data-i18n="subColor">颜色</label>
-                  <input id="a_sub_color" value="white" class="w-full glass-input rounded px-2 py-1.5 text-xs text-gray-100">
+                  <label class="block text-xs text-muted mb-1" data-i18n="subColor">颜色</label>
+                  <input id="a_sub_color" value="white" class="w-full glass-input rounded px-2 py-1.5 text-xs text-ink">
                 </div>
                 <div>
-                  <label class="block text-xs text-gray-500 mb-1" data-i18n="subSize">字号</label>
-                  <input id="a_sub_fontsize" type="number" value="42" class="w-full glass-input rounded px-2 py-1.5 text-xs text-gray-100">
+                  <label class="block text-xs text-muted mb-1" data-i18n="subSize">字号</label>
+                  <input id="a_sub_fontsize" type="number" value="42" class="w-full glass-input rounded px-2 py-1.5 text-xs text-ink">
                 </div>
                 <div>
-                  <label class="block text-xs text-gray-500 mb-1" data-i18n="subPosition">位置</label>
-                  <select id="a_sub_position" class="w-full glass-input rounded px-2 py-1.5 text-xs text-gray-100">
+                  <label class="block text-xs text-muted mb-1" data-i18n="subPosition">位置</label>
+                  <select id="a_sub_position" class="w-full glass-input rounded px-2 py-1.5 text-xs text-ink">
                     <option value="bottom" data-i18n="posBottom">底部</option>
                     <option value="top" data-i18n="posTop">顶部</option>
                   </select>
@@ -1317,23 +1340,23 @@
               </div>
               <div class="grid grid-cols-2 md:grid-cols-4 gap-3 mt-3">
                 <div>
-                  <label class="block text-xs text-gray-500 mb-1" data-i18n="subStrokeColor">描边色</label>
-                  <input id="a_sub_stroke_color" value="black" class="w-full glass-input rounded px-2 py-1.5 text-xs text-gray-100">
+                  <label class="block text-xs text-muted mb-1" data-i18n="subStrokeColor">描边色</label>
+                  <input id="a_sub_stroke_color" value="black" class="w-full glass-input rounded px-2 py-1.5 text-xs text-ink">
                 </div>
                 <div>
-                  <label class="block text-xs text-gray-500 mb-1" data-i18n="subStrokeWidth">描边宽</label>
-                  <input id="a_sub_stroke_width" type="number" value="2" class="w-full glass-input rounded px-2 py-1.5 text-xs text-gray-100">
+                  <label class="block text-xs text-muted mb-1" data-i18n="subStrokeWidth">描边宽</label>
+                  <input id="a_sub_stroke_width" type="number" value="2" class="w-full glass-input rounded px-2 py-1.5 text-xs text-ink">
                 </div>
                 <div>
-                  <label class="block text-xs text-gray-500 mb-1" data-i18n="subBgColor">背景色</label>
-                  <input id="a_sub_bg_color" value="black@0.5" class="w-full glass-input rounded px-2 py-1.5 text-xs text-gray-100">
+                  <label class="block text-xs text-muted mb-1" data-i18n="subBgColor">背景色</label>
+                  <input id="a_sub_bg_color" value="black@0.5" class="w-full glass-input rounded px-2 py-1.5 text-xs text-ink">
                 </div>
               </div>
             </div>
             <div id="a_sub_llm_controls" class="hidden">
-              <label class="block text-sm text-gray-400 mb-1.5" data-i18n="subStyleHints">样式偏好描述</label>
-              <textarea id="a_sub_style_hints" rows="3" class="w-full glass-input rounded-lg px-3 py-2 text-sm text-gray-100 placeholder-gray-500" data-i18n-placeholder="subPositionHintsPlaceholder" placeholder='字幕放在画面下方三分之一区域，不要遮挡主播面部'></textarea>
-              <p class="text-xs text-gray-500 mt-1" data-i18n="subStyleHintsHint">描述期望的字幕样式变化规律，AI 会据此为每条字幕分配不同位置、颜色和字号</p>
+              <label class="block text-sm text-muted mb-1.5" data-i18n="subStyleHints">样式偏好描述</label>
+              <textarea id="a_sub_style_hints" rows="3" class="w-full glass-input rounded-lg px-3 py-2 text-sm text-ink placeholder-muted" data-i18n-placeholder="subPositionHintsPlaceholder" placeholder='字幕放在画面下方三分之一区域，不要遮挡主播面部'></textarea>
+              <p class="text-xs text-muted mt-1" data-i18n="subStyleHintsHint">描述期望的字幕样式变化规律，AI 会据此为每条字幕分配不同位置、颜色和字号</p>
             </div>
           </div>
         </div>
@@ -1341,14 +1364,14 @@
 
       <!-- Watermark toggle -->
       <div class="flex items-center justify-between px-1 py-2 mb-4">
-        <p class="text-xs text-gray-500 leading-relaxed mr-3 watermark-promo"></p>
+        <p class="text-xs text-muted leading-relaxed mr-3 watermark-promo"></p>
         <label class="relative inline-flex items-center cursor-pointer flex-shrink-0" title="Video Watermark">
           <input type="checkbox" class="watermark-toggle sr-only peer" onchange="toggleWatermark(this)">
-          <div class="w-10 h-5 bg-gray-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-gray-300 after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-blue-600"></div>
+          <div class="w-10 h-5 bg-paper-3 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-rule after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-accent"></div>
         </label>
       </div>
 
-      <button id="btn-anchor" onclick="submitAnchor()" class="w-full py-3.5 bg-gradient-to-r from-blue-600 via-blue-500 to-blue-600 hover:from-blue-500 hover:via-blue-400 hover:to-blue-500 rounded-xl text-base font-semibold transition disabled:opacity-50 disabled:cursor-not-allowed glow-btn" data-i18n="startGenerate">
+      <button id="btn-anchor" onclick="submitAnchor()" class="w-full py-3.5 bg-accent text-accent-ink hover:bg-accent/90 rounded-xl text-base font-semibold transition disabled:opacity-50 disabled:cursor-not-allowed glow-btn" data-i18n="startGenerate">
         开始生成
       </button>
     </div>
@@ -1356,47 +1379,47 @@
     <!-- ═══════ Tab 5: Poetry Video ═══════ -->
     <div id="form-poetry" class="hidden">
       <div class="glass-card rounded-2xl p-6 mb-4">
-        <h2 class="text-lg font-semibold text-blue-300 mb-4" data-i18n="poetrySettings">诗词设置</h2>
+        <h2 class="text-lg font-semibold text-accent mb-4" data-i18n="poetrySettings">诗词设置</h2>
 
         <div class="mb-4">
-          <label class="block text-sm text-gray-400 mb-1.5" data-i18n="taskName">任务名称</label>
-          <input id="p_name" data-i18n-placeholder="taskNamePlaceholder" placeholder="可选，留空自动生成" class="w-full glass-input rounded-lg px-4 py-2.5 text-sm text-gray-100 placeholder-gray-600">
+          <label class="block text-sm text-muted mb-1.5" data-i18n="taskName">任务名称</label>
+          <input id="p_name" data-i18n-placeholder="taskNamePlaceholder" placeholder="可选，留空自动生成" class="w-full glass-input rounded-lg px-4 py-2.5 text-sm text-ink placeholder-muted">
         </div>
 
         <div class="mb-4">
-          <label class="block text-sm text-gray-400 mb-1.5"><span data-i18n="poemLabel">古诗原文</span> <span class="text-red-400">*</span></label>
-          <textarea id="p_poem" rows="5" data-i18n-placeholder="poemPlaceholder" placeholder="输入完整古诗原文，例如：春眠不觉晓，处处闻啼鸟..." class="w-full glass-input rounded-lg px-4 py-2.5 text-sm resize-y text-gray-100 placeholder-gray-600"></textarea>
-          <p class="text-xs text-gray-500 mt-1.5" data-i18n="poemHint">可多段；诗句间用换行或标点自然分隔。AI 会按诗意拆分为若干场景。</p>
+          <label class="block text-sm text-muted mb-1.5"><span data-i18n="poemLabel">古诗原文</span> <span class="text-red-400">*</span></label>
+          <textarea id="p_poem" rows="5" data-i18n-placeholder="poemPlaceholder" placeholder="输入完整古诗原文，例如：春眠不觉晓，处处闻啼鸟..." class="w-full glass-input rounded-lg px-4 py-2.5 text-sm resize-y text-ink placeholder-muted"></textarea>
+          <p class="text-xs text-muted mt-1.5" data-i18n="poemHint">可多段；诗句间用换行或标点自然分隔。AI 会按诗意拆分为若干场景。</p>
         </div>
 
         <!-- Scene config（与创意视频「场景配置」完全一致） -->
-        <div class="mb-4 p-4 rounded-xl bg-gray-800/30 border border-gray-700/50">
-          <h3 class="text-sm font-medium text-blue-300 mb-3" data-i18n="sceneConfig">场景配置</h3>
+        <div class="mb-4 p-4 rounded-xl bg-paper-2/30 border border-rule/50">
+          <h3 class="text-sm font-medium text-accent mb-3" data-i18n="sceneConfig">场景配置</h3>
 
-          <p class="text-xs text-gray-500 mb-3" data-i18n="sourceManualHint">手动指定场景数量和每场景时长</p>
+          <p class="text-xs text-muted mb-3" data-i18n="sourceManualHint">手动指定场景数量和每场景时长</p>
 
           <!-- 手动配置 -->
           <div id="p_manual_scene_config">
             <div class="mb-3">
-              <label class="block text-xs text-gray-400 mb-1" data-i18n="sceneCount">场景数量</label>
-              <input id="p_scene_count" type="number" min="1" max="30" value="3" class="w-24 glass-input rounded-lg px-3 py-2 text-sm text-gray-100">
+              <label class="block text-xs text-muted mb-1" data-i18n="sceneCount">场景数量</label>
+              <input id="p_scene_count" type="number" min="1" max="30" value="3" class="w-24 glass-input rounded-lg px-3 py-2 text-sm text-ink">
             </div>
 
             <div class="mb-3">
-              <label class="block text-xs text-gray-400 mb-1.5" data-i18n="durationMode">各场景时长</label>
+              <label class="block text-xs text-muted mb-1.5" data-i18n="durationMode">各场景时长</label>
               <div class="flex gap-2 mb-2">
-                <label class="flex items-center gap-2 text-sm text-gray-400 cursor-pointer">
-                  <input type="radio" name="p_uniform" value="1" checked onchange="togglePoetryDurationMode()" class="text-blue-500">
+                <label class="flex items-center gap-2 text-sm text-muted cursor-pointer">
+                  <input type="radio" name="p_uniform" value="1" checked onchange="togglePoetryDurationMode()" class="text-accent">
                   <span data-i18n="uniformDuration">统一</span>
                 </label>
-                <label class="flex items-center gap-2 text-sm text-gray-400 cursor-pointer">
-                  <input type="radio" name="p_uniform" value="0" onchange="togglePoetryDurationMode()" class="text-blue-500">
+                <label class="flex items-center gap-2 text-sm text-muted cursor-pointer">
+                  <input type="radio" name="p_uniform" value="0" onchange="togglePoetryDurationMode()" class="text-accent">
                   <span data-i18n="independentDuration">独立</span>
                 </label>
               </div>
               <div id="p_uniform_duration_wrap">
-                <input id="p_uniform_duration" type="number" min="2" max="30" value="5" class="w-24 glass-input rounded-lg px-3 py-2 text-sm text-gray-100">
-                <span class="text-xs text-gray-500 ml-1" data-i18n="seconds">秒</span>
+                <input id="p_uniform_duration" type="number" min="2" max="30" value="5" class="w-24 glass-input rounded-lg px-3 py-2 text-sm text-ink">
+                <span class="text-xs text-muted ml-1" data-i18n="seconds">秒</span>
               </div>
               <div id="p_independent_durations_wrap" class="hidden space-y-2">
                 <div id="p_duration_inputs">
@@ -1408,37 +1431,37 @@
         </div>
 
         <div class="mb-4">
-          <label class="block text-sm text-gray-400 mb-1.5" data-i18n="scenePromptsOptional">分镜描述（可选）</label>
-          <textarea id="p_scene_prompts" rows="3" data-i18n-placeholder="scenePromptsPlaceholder" placeholder="格式：原诗句 | 画面描述（每行一个场景）" class="w-full glass-input rounded-lg px-4 py-2.5 text-sm resize-y text-gray-100 placeholder-gray-600"></textarea>
-          <p class="text-xs text-gray-500 mt-1.5" data-i18n="scenePromptsHint">可选。每行一个场景，格式固定为「原诗句 | 画面描述」。两种用法结果完全一致：①留空，由系统自动生成（提示词已含上方场景数与每场景时长）；②把下方提示词交给任意 AI 生成后，把结果贴回此处。</p>
-          <p class="text-xs text-gray-400 mt-1.5 font-mono bg-gray-800/40 rounded px-2 py-1" data-i18n="scenePromptsExample">例：春眠不觉晓，处处闻啼鸟。 | 春日清晨薄雾，枝头鸟鸣</p>
-          <div class="mt-3 p-3 rounded-lg bg-gray-800/40 border border-gray-700/50">
+          <label class="block text-sm text-muted mb-1.5" data-i18n="scenePromptsOptional">分镜描述（可选）</label>
+          <textarea id="p_scene_prompts" rows="3" data-i18n-placeholder="scenePromptsPlaceholder" placeholder="格式：原诗句 | 画面描述（每行一个场景）" class="w-full glass-input rounded-lg px-4 py-2.5 text-sm resize-y text-ink placeholder-muted"></textarea>
+          <p class="text-xs text-muted mt-1.5" data-i18n="scenePromptsHint">可选。每行一个场景，格式固定为「原诗句 | 画面描述」。两种用法结果完全一致：①留空，由系统自动生成（提示词已含上方场景数与每场景时长）；②把下方提示词交给任意 AI 生成后，把结果贴回此处。</p>
+          <p class="text-xs text-muted mt-1.5 font-mono bg-paper-2/40 rounded px-2 py-1" data-i18n="scenePromptsExample">例：春眠不觉晓，处处闻啼鸟。 | 春日清晨薄雾，枝头鸟鸣</p>
+          <div class="mt-3 p-3 rounded-lg bg-paper-2/40 border border-rule/50">
             <div class="flex items-center justify-between">
-              <span class="text-xs text-gray-300 font-medium" data-i18n="scenePromptTool">自己用其它 AI 生成分镜</span>
-              <button type="button" onclick="togglePoetryPrompt()" class="text-xs text-blue-300 hover:text-blue-200" data-i18n="showPrompt">查看提示词</button>
+              <span class="text-xs text-ink-2 font-medium" data-i18n="scenePromptTool">自己用其它 AI 生成分镜</span>
+              <button type="button" onclick="togglePoetryPrompt()" class="text-xs text-accent hover:text-accent" data-i18n="showPrompt">查看提示词</button>
             </div>
             <div id="p_prompt_panel" class="hidden mt-2">
-              <p class="text-xs text-gray-500 mb-1.5" data-i18n="scenePromptToolHint">提示词已包含上方设置的场景数与每场景时长，与系统自动生成完全一致。复制到任意 AI，填入你的诗句，让它生成分镜，再把返回结果（每行「原诗句 | 画面描述」）贴回上方文本框即可。</p>
-              <pre id="p_prompt_system" class="text-[11px] text-gray-300 whitespace-pre-wrap bg-gray-900/60 rounded p-2 max-h-40 overflow-auto"></pre>
-              <pre id="p_prompt_user" class="text-[11px] text-gray-400 whitespace-pre-wrap bg-gray-900/60 rounded p-2 mt-1 max-h-40 overflow-auto"></pre>
-              <button type="button" onclick="copyPoetryPromptWithPoem(this)" class="mt-2 w-full text-xs text-blue-200 bg-blue-500/20 hover:bg-blue-500/30 rounded px-3 py-1.5 transition" data-i18n="copyPromptWithPoem">填入诗句并复制提示词</button>
+              <p class="text-xs text-muted mb-1.5" data-i18n="scenePromptToolHint">提示词已包含上方设置的场景数与每场景时长，与系统自动生成完全一致。复制到任意 AI，填入你的诗句，让它生成分镜，再把返回结果（每行「原诗句 | 画面描述」）贴回上方文本框即可。</p>
+              <pre id="p_prompt_system" class="text-[11px] text-ink-2 whitespace-pre-wrap bg-paper/60 rounded p-2 max-h-40 overflow-auto"></pre>
+              <pre id="p_prompt_user" class="text-[11px] text-muted whitespace-pre-wrap bg-paper/60 rounded p-2 mt-1 max-h-40 overflow-auto"></pre>
+              <button type="button" onclick="copyPoetryPromptWithPoem(this)" class="mt-2 w-full text-xs text-accent bg-accent/15 hover:bg-accent/25 rounded px-3 py-1.5 transition" data-i18n="copyPromptWithPoem">填入诗句并复制提示词</button>
             </div>
           </div>
         </div>
 
         <div class="mb-4">
-          <label class="block text-sm text-gray-400 mb-1.5" data-i18n="visualStyle">视觉风格</label>
-          <input id="p_style" value="电影质感写实风格" class="w-full glass-input rounded-lg px-4 py-2.5 text-sm text-gray-100 placeholder-gray-600">
+          <label class="block text-sm text-muted mb-1.5" data-i18n="visualStyle">视觉风格</label>
+          <input id="p_style" value="电影质感写实风格" class="w-full glass-input rounded-lg px-4 py-2.5 text-sm text-ink placeholder-muted">
         </div>
       </div>
 
       <!-- Advanced Config -->
       <div class="glass-card rounded-2xl p-6 mb-4">
-        <h2 class="text-lg font-semibold text-blue-300 mb-4" data-i18n="advancedSettings">高级设置</h2>
+        <h2 class="text-lg font-semibold text-accent mb-4" data-i18n="advancedSettings">高级设置</h2>
         <div class="grid grid-cols-2 md:grid-cols-3 gap-4 mb-4">
           <div>
-            <label class="block text-sm text-gray-400 mb-1.5" data-i18n="resolution">分辨率</label>
-            <select id="p_resolution" class="w-full glass-input rounded-lg px-3 py-2.5 text-sm text-gray-100">
+            <label class="block text-sm text-muted mb-1.5" data-i18n="resolution">分辨率</label>
+            <select id="p_resolution" class="w-full glass-input rounded-lg px-3 py-2.5 text-sm text-ink">
               <option value="768x1152" data-i18n="resPortrait">竖屏 9:16</option>
               <option value="1152x768" data-i18n="resLandscape">横屏 16:9</option>
               <option value="1024x1024" data-i18n="resSquare">方形 1:1</option>
@@ -1450,19 +1473,19 @@
       <!-- Audio Config (Poetry) -->
       <div class="glass-card rounded-2xl p-6 mb-4">
         <div class="collapse-header flex items-center justify-between" onclick="toggleCollapse('p_audio_body')">
-          <h2 class="text-lg font-semibold text-blue-300" data-i18n="audioConfig">音频配置</h2>
-          <span id="p_audio_body-arrow" class="text-gray-500 text-xs">▶</span>
+          <h2 class="text-lg font-semibold text-accent" data-i18n="audioConfig">音频配置</h2>
+          <span id="p_audio_body-arrow" class="text-muted text-xs">▶</span>
         </div>
         <div id="p_audio_body" class="collapse-body hidden mt-4">
           <div class="flex items-center gap-3 mb-4">
-            <label class="flex items-center gap-2 text-sm text-gray-300 cursor-pointer">
-              <input type="checkbox" id="p_audio_enabled" checked class="rounded bg-gray-800 border-gray-600">
+            <label class="flex items-center gap-2 text-sm text-ink-2 cursor-pointer">
+              <input type="checkbox" id="p_audio_enabled" checked class="rounded bg-paper-2 border-rule">
               <span data-i18n="enableNarration">启用旁白配音</span>
             </label>
           </div>
           <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
             <div>
-              <label class="block text-sm text-gray-400 mb-1.5" data-i18n="voiceRole">语音角色</label>
+              <label class="block text-sm text-muted mb-1.5" data-i18n="voiceRole">语音角色</label>
               <div class="voice-selector" id="p_voice_selector" role="button" tabindex="0"
                    onclick="openVoicePicker('p')"
                    onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();openVoicePicker('p');}">
@@ -1475,8 +1498,8 @@
               </div>
             </div>
             <div>
-              <label class="block text-sm text-gray-400 mb-1.5" data-i18n="speechRate">语速</label>
-              <select id="p_rate" class="w-full glass-input rounded-lg px-3 py-2.5 text-sm text-gray-100">
+              <label class="block text-sm text-muted mb-1.5" data-i18n="speechRate">语速</label>
+              <select id="p_rate" class="w-full glass-input rounded-lg px-3 py-2.5 text-sm text-ink">
                 <option value="-30%" data-i18n="rateSlow">-30% (慢)</option>
                 <option value="-15%" selected data-i18n="ratePoem">-15% (诗词朗诵偏慢)</option>
                 <option value="+0%" data-i18n="rateNormal">正常</option>
@@ -1491,30 +1514,30 @@
       <!-- Subtitle Config (Poetry) — 仅开关，固定诗歌样式 -->
       <div class="glass-card rounded-2xl p-6 mb-4">
         <div class="collapse-header flex items-center justify-between" onclick="toggleCollapse('p_subtitle_body')">
-          <h2 class="text-lg font-semibold text-blue-300" data-i18n="subtitleConfig">字幕配置</h2>
-          <span id="p_subtitle_body-arrow" class="text-gray-500 text-xs">▶</span>
+          <h2 class="text-lg font-semibold text-accent" data-i18n="subtitleConfig">字幕配置</h2>
+          <span id="p_subtitle_body-arrow" class="text-muted text-xs">▶</span>
         </div>
         <div id="p_subtitle_body" class="collapse-body hidden mt-4">
           <div class="flex items-center gap-3 mb-4">
-            <label class="flex items-center gap-2 text-sm text-gray-300 cursor-pointer">
-              <input type="checkbox" id="p_subtitle_enabled" checked class="rounded bg-gray-800 border-gray-600">
+            <label class="flex items-center gap-2 text-sm text-ink-2 cursor-pointer">
+              <input type="checkbox" id="p_subtitle_enabled" checked class="rounded bg-paper-2 border-rule">
               <span data-i18n="enableSubtitle">启用字幕</span>
             </label>
           </div>
-          <p class="text-xs text-gray-500" data-i18n="poetrySubtitleFixed">诗词字幕采用固定通用样式（居中偏下、白字黑描边），仅可开关，不可自定义。</p>
+          <p class="text-xs text-muted" data-i18n="poetrySubtitleFixed">诗词字幕采用固定通用样式（居中偏下、白字黑描边），仅可开关，不可自定义。</p>
         </div>
       </div>
 
       <!-- Watermark toggle -->
       <div class="flex items-center justify-between px-1 py-2 mb-4">
-        <p class="text-xs text-gray-500 leading-relaxed mr-3 watermark-promo"></p>
+        <p class="text-xs text-muted leading-relaxed mr-3 watermark-promo"></p>
         <label class="relative inline-flex items-center cursor-pointer flex-shrink-0" title="Video Watermark">
           <input type="checkbox" class="watermark-toggle sr-only peer" onchange="toggleWatermark(this)">
-          <div class="w-10 h-5 bg-gray-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-gray-300 after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-blue-600"></div>
+          <div class="w-10 h-5 bg-paper-3 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-rule after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-accent"></div>
         </label>
       </div>
 
-      <button id="btn-poetry" onclick="submitPoetry()" class="w-full py-3.5 bg-gradient-to-r from-blue-600 via-blue-500 to-blue-600 hover:from-blue-500 hover:via-blue-400 hover:to-blue-500 rounded-xl text-base font-semibold transition disabled:opacity-50 disabled:cursor-not-allowed glow-btn" data-i18n="startGenerate">
+      <button id="btn-poetry" onclick="submitPoetry()" class="w-full py-3.5 bg-accent text-accent-ink hover:bg-accent/90 rounded-xl text-base font-semibold transition disabled:opacity-50 disabled:cursor-not-allowed glow-btn" data-i18n="startGenerate">
         开始生成视频
       </button>
     </div>
@@ -1524,35 +1547,35 @@
   <!-- ═══════════ List Panel ═══════════ -->
   <div id="panel-list" class="hidden">
     <div id="task-list-container" class="space-y-3">
-      <p class="text-gray-500 text-sm" data-i18n="loading">加载中...</p>
+      <p class="text-muted text-sm" data-i18n="loading">加载中...</p>
     </div>
   </div>
 
   <!-- ═══════════ Progress Panel ═══════════ -->
   <div id="progress-panel" class="hidden glass-card rounded-2xl p-6 mt-6">
     <div class="flex items-center justify-between mb-4">
-      <h2 class="text-lg font-semibold text-blue-300" data-i18n="progress">生成进度</h2>
+      <h2 class="text-lg font-semibold text-accent" data-i18n="progress">生成进度</h2>
       <div class="flex items-center gap-3">
-        <span id="progress-pct" class="text-sm text-gray-400">0%</span>
+        <span id="progress-pct" class="text-sm text-muted">0%</span>
         <button id="btn-stop" onclick="stopTask()" class="hidden text-xs px-3 py-1.5 bg-red-700/80 hover:bg-red-600 text-red-100 rounded-lg transition" data-i18n="stopTask">中断任务</button>
       </div>
     </div>
 
-    <div class="w-full bg-gray-800/50 rounded-full h-2.5 mb-6 overflow-hidden">
-      <div id="progress-bar" class="bg-gradient-to-r from-blue-500 via-sky-400 to-amber-400 h-2.5 rounded-full transition-all duration-500 progress-glow" style="width:0%"></div>
+    <div class="w-full bg-paper-2/50 rounded-full h-2.5 mb-6 overflow-hidden">
+      <div id="progress-bar" class="bg-accent h-2.5 rounded-full transition-all duration-500" style="width:0%"></div>
     </div>
 
     <div class="space-y-2" id="steps-container"></div>
 
-    <p class="mt-4 text-xs text-gray-500"><a href="https://video.lichuanyang.top/learn" target="_blank" rel="noopener" class="hover:text-blue-300 transition-colors" data-i18n="waitTip">💡 等待生成时，看看别人用 Agnes 做了什么</a></p>
+    <p class="mt-4 text-xs text-muted"><a href="https://video.lichuanyang.top/learn" target="_blank" rel="noopener" class="hover:text-accent transition-colors" data-i18n="waitTip">💡 等待生成时，看看别人用 Agnes 做了什么</a></p>
 
-    <div id="progress-message" class="mt-4 text-sm text-gray-400"></div>
+    <div id="progress-message" class="mt-4 text-sm text-muted"></div>
 
     <!-- 中间产物面板 -->
-    <div id="artifacts-area" class="hidden mt-4 p-4 bg-gray-900/30 rounded-lg border border-gray-700/50">
+    <div id="artifacts-area" class="hidden mt-4 p-4 bg-paper/30 rounded-lg border border-rule/50">
       <div class="flex items-center justify-between mb-3">
-        <h3 class="text-sm font-medium text-blue-300" data-i18n="artTitle">中间产物</h3>
-        <button onclick="loadArtifacts()" class="text-xs text-gray-500 hover:text-gray-300 transition" data-i18n-title="refresh">↻</button>
+        <h3 class="text-sm font-medium text-accent" data-i18n="artTitle">中间产物</h3>
+        <button onclick="loadArtifacts()" class="text-xs text-muted hover:text-ink-2 transition" data-i18n-title="refresh">↻</button>
       </div>
       <div id="artifacts-container" class="space-y-2 max-h-96 overflow-y-auto"></div>
     </div>
@@ -1562,24 +1585,24 @@
       <video id="result-video" controls class="w-full rounded-lg max-h-96"></video>
       <div class="flex flex-wrap items-center gap-x-4 gap-y-1 mt-3 text-xs">
         <span>🎉</span>
-        <a href="https://video.lichuanyang.top/learn" target="_blank" rel="noopener" class="text-amber-400/70 hover:text-amber-300 transition-colors" data-i18n="doneTipTiktok">📈 学学社媒玩法</a>
-        <span class="text-white/10 select-none">·</span>
-        <a href="https://video.lichuanyang.top/learn" target="_blank" rel="noopener" class="text-gray-500 hover:text-gray-300 transition-colors" data-i18n="doneTipMore">🎬 更多创作方向</a>
+        <a href="https://video.lichuanyang.top/learn" target="_blank" rel="noopener" class="text-accent hover:text-ink transition-colors" data-i18n="doneTipTiktok">📈 学学社媒玩法</a>
+        <span class="text-ink/10 select-none">·</span>
+        <a href="https://video.lichuanyang.top/learn" target="_blank" rel="noopener" class="text-muted hover:text-ink-2 transition-colors" data-i18n="doneTipMore">🎬 更多创作方向</a>
       </div>
     </div>
   </div>
 
 <footer class="text-center pb-8">
   <div class="border-t border-white/[0.04] pt-8 mt-4">
-    <p class="text-xs text-gray-600 mb-3" data-i18n="moreResources">更多资源</p>
+    <p class="text-xs text-muted mb-3" data-i18n="moreResources">更多资源</p>
     <div class="flex justify-center flex-wrap gap-x-5 gap-y-2 text-xs">
-      <a href="https://video.lichuanyang.top" target="_blank" rel="noopener" class="text-gray-500 hover:text-gray-300 transition-colors" data-i18n="projectHome">🏠 项目主页</a>
-      <a href="https://video.lichuanyang.top/demo" target="_blank" rel="noopener" class="text-amber-400/70 hover:text-amber-300 transition-colors" data-i18n="onlineDemo">🎬 在线体验</a>
-      <a href="https://video.lichuanyang.top/guides/prompt-tips" target="_blank" rel="noopener" class="text-gray-500 hover:text-gray-300 transition-colors" data-i18n="usageGuide">📖 使用指南</a>
-      <a href="https://video.lichuanyang.top/faq" target="_blank" rel="noopener" class="text-gray-500 hover:text-gray-300 transition-colors" data-i18n="faqTitle">❓ 常见问题</a>
-      <a href="https://video.lichuanyang.top/api-docs" target="_blank" rel="noopener" class="text-gray-500 hover:text-gray-300 transition-colors" data-i18n="apiDocs">📋 API 文档</a>
-      <a href="https://video.lichuanyang.top/learn" target="_blank" rel="noopener" class="text-gray-500 hover:text-gray-300 transition-colors" data-i18n="appScenarios">🎯 应用场景</a>
-      <a href="https://github.com/lcy362/agnes-video-generator" target="_blank" rel="noopener" class="text-gray-500 hover:text-gray-300 transition-colors">📖 GitHub</a>
+      <a href="https://video.lichuanyang.top" target="_blank" rel="noopener" class="text-muted hover:text-ink-2 transition-colors" data-i18n="projectHome">🏠 项目主页</a>
+      <a href="https://video.lichuanyang.top/demo" target="_blank" rel="noopener" class="text-accent hover:text-ink transition-colors" data-i18n="onlineDemo">🎬 在线体验</a>
+      <a href="https://video.lichuanyang.top/guides/prompt-tips" target="_blank" rel="noopener" class="text-muted hover:text-ink-2 transition-colors" data-i18n="usageGuide">📖 使用指南</a>
+      <a href="https://video.lichuanyang.top/faq" target="_blank" rel="noopener" class="text-muted hover:text-ink-2 transition-colors" data-i18n="faqTitle">❓ 常见问题</a>
+      <a href="https://video.lichuanyang.top/api-docs" target="_blank" rel="noopener" class="text-muted hover:text-ink-2 transition-colors" data-i18n="apiDocs">📋 API 文档</a>
+      <a href="https://video.lichuanyang.top/learn" target="_blank" rel="noopener" class="text-muted hover:text-ink-2 transition-colors" data-i18n="appScenarios">🎯 应用场景</a>
+      <a href="https://github.com/lcy362/agnes-video-generator" target="_blank" rel="noopener" class="text-muted hover:text-ink-2 transition-colors">📖 GitHub</a>
     </div>
   </div>
 </footer>
@@ -6665,13 +6688,13 @@ function showToast(msg, duration = 2500) {
   if (!el) {
     el = document.createElement('div');
     el.id = 'toast';
-    el.className = 'fixed bottom-6 left-1/2 -translate-x-1/2 px-5 py-2.5 rounded-xl text-sm font-medium shadow-lg transition-all duration-300 opacity-0 translate-y-4 z-50';
+    el.className = 'fixed bottom-6 left-1/2 -translate-x-1/2 px-5 py-2.5 rounded-xl text-sm font-medium bg-paper-3 border border-rule transition-all duration-300 opacity-0 translate-y-4 z-50';
     document.body.appendChild(el);
   }
   el.textContent = msg;
   el.className = el.className.replace(/opacity-0 translate-y-4/, 'opacity-100 translate-y-0');
   el.className = el.className.replace(/bg-\S+ text-\S+/, '');
-  el.className += ' bg-yellow-600 text-white';
+  el.className += ' bg-yellow-600 text-ink';
   clearTimeout(el._timeout);
   el._timeout = setTimeout(() => {
     el.className = el.className.replace(/opacity-100 translate-y-0/, 'opacity-0 translate-y-4');
@@ -6779,7 +6802,7 @@ function addCEndFrameInput() {
   const idx = container.children.length + 1;
   const div = document.createElement('div');
   div.className = 'flex items-center gap-3 mb-2';
-  div.innerHTML = `<span class="text-xs text-gray-500 w-16">${t('scene_')} ${idx}</span><input type="file" accept="image/*" class="end-frame-file flex-1 text-sm text-gray-400 file:mr-3 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-sm file:bg-gray-700 file:text-gray-200 hover:file:bg-gray-600">`;
+  div.innerHTML = `<span class="text-xs text-muted w-16">${t('scene_')} ${idx}</span><input type="file" accept="image/*" class="end-frame-file flex-1 text-sm text-muted file:mr-3 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-sm file:bg-paper-3 file:text-ink-2 hover:file:bg-paper-3">`;
   container.appendChild(div);
 }
 
@@ -6875,9 +6898,9 @@ function buildDurationInputs() {
   let html = '';
   for (let i = 0; i < count; i++) {
     html += '<div class="flex items-center gap-2 mb-1.5 dur-input">'
-      + '<span class="text-xs text-gray-500 w-12">' + t('scene_') + (i+1) + '</span>'
-      + '<input type="number" min="2" max="30" value="5" class="w-20 glass-input rounded-lg px-3 py-1.5 text-sm text-gray-100 scene-dur-val">'
-      + '<span class="text-xs text-gray-500">' + t('seconds') + '</span></div>';
+      + '<span class="text-xs text-muted w-12">' + t('scene_') + (i+1) + '</span>'
+      + '<input type="number" min="2" max="30" value="5" class="w-20 glass-input rounded-lg px-3 py-1.5 text-sm text-ink scene-dur-val">'
+      + '<span class="text-xs text-muted">' + t('seconds') + '</span></div>';
   }
   container.innerHTML = html;
 }
@@ -7185,9 +7208,9 @@ function buildPoetryDurationInputs() {
   let html = '';
   for (let i = 0; i < count; i++) {
     html += '<div class="flex items-center gap-2 mb-1.5 dur-input">'
-      + '<span class="text-xs text-gray-500 w-12">' + t('scene_') + (i+1) + '</span>'
-      + '<input type="number" min="2" max="30" value="5" class="w-20 glass-input rounded-lg px-3 py-1.5 text-sm text-gray-100 scene-dur-val">'
-      + '<span class="text-xs text-gray-500">' + t('seconds') + '</span></div>';
+      + '<span class="text-xs text-muted w-12">' + t('scene_') + (i+1) + '</span>'
+      + '<input type="number" min="2" max="30" value="5" class="w-20 glass-input rounded-lg px-3 py-1.5 text-sm text-ink scene-dur-val">'
+      + '<span class="text-xs text-muted">' + t('seconds') + '</span></div>';
   }
   container.innerHTML = html;
 }
@@ -7353,8 +7376,8 @@ async function showProgress(taskId, dirName) {
   document.getElementById('steps-container').innerHTML = steps.map(s => {
     const isDone = state ? isStepDoneInState(state, s.key, currentTaskType) : false;
     const icon = isDone ? '✓' : '○';
-    const iconClass = isDone ? 'w-5 h-5 flex items-center justify-center rounded-full bg-green-900 text-green-300 text-xs' : 'w-5 h-5 flex items-center justify-center rounded-full bg-gray-800 text-xs';
-    const labelClass = isDone ? 'step-label text-green-400' : 'step-label text-gray-500';
+    const iconClass = isDone ? 'w-5 h-5 flex items-center justify-center rounded-full bg-green-900 text-green-300 text-xs' : 'w-5 h-5 flex items-center justify-center rounded-full bg-paper-2 text-xs';
+    const labelClass = isDone ? 'step-label text-green-400' : 'step-label text-muted';
     return `
     <div class="step-item flex items-center gap-3 text-sm" data-step="${s.key}">
       <span class="step-icon ${iconClass}">${icon}</span>
@@ -7373,14 +7396,14 @@ async function showProgress(taskId, dirName) {
         const icon = stepEl.querySelector('.step-icon');
         const label = stepEl.querySelector('.step-label');
         icon.textContent = '◉';
-        icon.className = 'step-icon w-5 h-5 flex items-center justify-center rounded-full bg-blue-900 text-blue-300 text-xs animate-pulse-dot';
-        label.className = 'step-label text-blue-300';
+        icon.className = 'step-icon w-5 h-5 flex items-center justify-center rounded-full bg-paper-3 text-accent text-xs animate-pulse-dot';
+        label.className = 'step-label text-accent';
       }
     }
   }
 
-  const dirInfo = dirName ? `<br><span class="text-gray-600 text-xs">${t('dir')}: <span class="font-mono">${dirName}</span></span>` : '';
-  document.getElementById('progress-message').innerHTML = `<span class="text-blue-400 animate-pulse">${t('taskStarting')}</span><br><span class="text-gray-500">${t('task_')}: ${taskId}</span>${dirInfo}`;
+  const dirInfo = dirName ? `<br><span class="text-muted text-xs">${t('dir')}: <span class="font-mono">${dirName}</span></span>` : '';
+  document.getElementById('progress-message').innerHTML = `<span class="text-accent animate-pulse">${t('taskStarting')}</span><br><span class="text-muted">${t('task_')}: ${taskId}</span>${dirInfo}`;
 
   // 加载已有中间产物（任务运行中也可查看）
   currentArtifactsTaskId = taskId;
@@ -7432,8 +7455,8 @@ async function pollTaskProgress(taskId) {
         const label = stepEl.querySelector('.step-label');
         if (status === 'running') {
           icon.textContent = '◉';
-          icon.className = 'step-icon w-5 h-5 flex items-center justify-center rounded-full bg-blue-900 text-blue-300 text-xs animate-pulse-dot';
-          label.className = 'step-label text-blue-300';
+          icon.className = 'step-icon w-5 h-5 flex items-center justify-center rounded-full bg-paper-3 text-accent text-xs animate-pulse-dot';
+          label.className = 'step-label text-accent';
         }
       }
     }
@@ -7466,7 +7489,7 @@ async function pollTaskProgress(taskId) {
       document.getElementById('progress-message').innerHTML = `
         <div class="p-4 bg-red-950 border border-red-800 rounded-lg space-y-2">
           <p class="text-red-400 font-medium">${t('genFailed')}</p>
-          <p class="text-gray-400 text-xs">${state.current_message || t('genFailedMsg')}</p>
+          <p class="text-muted text-xs">${state.current_message || t('genFailedMsg')}</p>
           <button onclick="switchMainTab('list')" class="mt-1 text-xs px-3 py-1.5 bg-red-800 hover:bg-red-700 text-red-100 rounded-lg transition">${t('gotoResume')}</button>
         </div>`;
     }
@@ -7579,8 +7602,8 @@ async function restoreProgressFromTask(taskId) {
     document.getElementById('steps-container').innerHTML = steps.map(s => {
       const isDone = isStepDoneInState(state, s.key, currentTaskType);
       const icon = isDone ? '✓' : '○';
-      const iconClass = isDone ? 'w-5 h-5 flex items-center justify-center rounded-full bg-green-900 text-green-300 text-xs' : 'w-5 h-5 flex items-center justify-center rounded-full bg-gray-800 text-xs';
-      const labelClass = isDone ? 'step-label text-green-400' : 'step-label text-gray-500';
+      const iconClass = isDone ? 'w-5 h-5 flex items-center justify-center rounded-full bg-green-900 text-green-300 text-xs' : 'w-5 h-5 flex items-center justify-center rounded-full bg-paper-2 text-xs';
+      const labelClass = isDone ? 'step-label text-green-400' : 'step-label text-muted';
       return `
       <div class="step-item flex items-center gap-3 text-sm" data-step="${s.key}">
         <span class="step-icon ${iconClass}">${icon}</span>
@@ -7617,14 +7640,14 @@ async function loadTaskList() {
     const d = await r.json();
     const tasks = d.tasks || [];
     if (!tasks.length) {
-      container.innerHTML = '<p class="text-gray-500 text-sm">' + t('noTasks') + '</p>';
+      container.innerHTML = '<p class="text-muted text-sm">' + t('noTasks') + '</p>';
       return;
     }
     container.innerHTML = tasks.map(task => {
-      const statusColors = { completed: 'text-green-400', running: 'text-yellow-400', failed: 'text-red-400', pending: 'text-gray-400', queued: 'text-cyan-400' };
+      const statusColors = { completed: 'text-emerald-400', running: 'text-yellow-400', failed: 'text-red-400', pending: 'text-muted', queued: 'text-accent' };
       const statusLabels = { completed: t('statusCompleted'), running: t('statusRunning'), failed: t('statusFailed'), pending: t('statusPending'), queued: t('statusQueued') };
       const typeLabels = { simple: t('typeSimple'), creative: t('typeCreative'), manuscript: t('typeManuscript'), anchor: t('typeAnchor'), poetry: t('typePoetry'), image: t('typeImage') };
-      const typeColors = { simple: 'bg-blue-900 text-blue-300', creative: 'bg-blue-900 text-blue-300', manuscript: 'bg-orange-900 text-orange-300', anchor: 'bg-amber-900 text-amber-300', poetry: 'bg-purple-900 text-purple-300' };
+      const typeColors = { simple: 'bg-accent/15 text-accent', creative: 'bg-accent/15 text-accent', manuscript: 'bg-accent/15 text-accent', anchor: 'bg-accent/15 text-accent', poetry: 'bg-accent/15 text-accent' };
       const isCompleted = task.status === 'completed';
       const isRunning = task.status === 'running' || task.status === 'queued';
       const btnLabel = isCompleted ? t('btnView') : (isRunning ? t('btnViewProgress') : t('btnResume'));
@@ -7632,20 +7655,20 @@ async function loadTaskList() {
       const btnAction = isCompleted ? `viewTask('${tidAttr}')` : (isRunning ? `viewRunningTask('${tidAttr}')` : `resumeTask('${tidAttr}')`);
       const stopBtn = isRunning ? `<button onclick="stopTaskById('${tidAttr}')" class="text-xs px-3 py-1.5 bg-red-700 hover:bg-red-600 text-red-100 rounded-lg transition">${t('btnStop')}</button>` : '';
       // pending/failed 状态额外添加"查看"按钮（查看产物）
-      const viewBtn = (!isCompleted && !isRunning) ? `<button onclick="viewTask('${tidAttr}')" class="text-xs px-3 py-1.5 bg-gray-700 hover:bg-gray-600 rounded-lg transition">${t('btnView')}</button>` : '';
-      const typeBadge = `<span class="text-xs px-2 py-0.5 rounded-full ${typeColors[task.task_type] || 'bg-gray-800 text-gray-400'}">${escapeHtml(typeLabels[task.task_type] || task.task_type)}</span>`;
+      const viewBtn = (!isCompleted && !isRunning) ? `<button onclick="viewTask('${tidAttr}')" class="text-xs px-3 py-1.5 bg-paper-3 hover:bg-paper-3 rounded-lg transition">${t('btnView')}</button>` : '';
+      const typeBadge = `<span class="text-xs px-2 py-0.5 rounded-full ${typeColors[task.task_type] || 'bg-paper-2 text-muted'}">${escapeHtml(typeLabels[task.task_type] || task.task_type)}</span>`;
       const desc = task.idea || task.prompt || (task.manuscript_text || '').substring(0, 80) || (task.script_text || '').substring(0, 80);
       const extra = task.scene_count ? ` · ${task.scene_count}${t('sceneUnit')}` : (task.paragraph_count ? ` · ${task.paragraph_count}${t('paraUnit')}` : '');
       return `<div class="glass-card rounded-xl p-4 flex items-center justify-between">
         <div class="flex-1 min-w-0">
           <div class="flex items-center gap-2 mb-1">${typeBadge}<p class="text-sm font-medium truncate">${escapeHtml(task.creative_name || task.task_id)}</p></div>
-          <p class="text-xs text-gray-500 mt-0.5">${escapeHtml(task.task_id)}${extra}</p>
-          ${desc ? `<p class="text-xs text-gray-600 mt-1 truncate max-w-xs">${escapeHtml(desc)}</p>` : ''}
+          <p class="text-xs text-muted mt-0.5">${escapeHtml(task.task_id)}${extra}</p>
+          ${desc ? `<p class="text-xs text-muted mt-1 truncate max-w-xs">${escapeHtml(desc)}</p>` : ''}
         </div>
         <div class="flex items-center gap-3 ml-3">
-          <span class="text-xs ${statusColors[task.status] || 'text-gray-400'}">${statusLabels[task.status] || task.status}</span>
+          <span class="text-xs ${statusColors[task.status] || 'text-muted'}">${statusLabels[task.status] || task.status}</span>
           ${viewBtn}
-          <button onclick="${btnAction}" class="text-xs px-3 py-1.5 bg-blue-600 hover:bg-blue-500 rounded-lg transition">${btnLabel}</button>
+          <button onclick="${btnAction}" class="text-xs px-3 py-1.5 bg-accent text-accent-ink hover:bg-accent/90 rounded-lg transition">${btnLabel}</button>
           ${stopBtn}
         </div>
       </div>`;
@@ -7772,8 +7795,8 @@ function showTaskDetail(taskId, state) {
     else if (taskType === 'poetry') stateField = poetryStepMap[s.key];
     const isDone = stateField ? state[stateField] === 'completed' : (s.key === 'init' || s.key === 'submit');
     const icon = isDone ? '✓' : '○';
-    const iconClass = isDone ? 'bg-green-900 text-green-300' : 'bg-gray-800 text-xs';
-    const labelClass = isDone ? 'text-green-400' : 'text-gray-500';
+    const iconClass = isDone ? 'bg-green-900 text-green-300' : 'bg-paper-2 text-xs';
+    const labelClass = isDone ? 'text-green-400' : 'text-muted';
     return `<div class="step-item flex items-center gap-3 text-sm" data-step="${s.key}">
       <span class="step-icon w-5 h-5 flex items-center justify-center rounded-full ${iconClass} text-xs">${icon}</span>
       <span class="step-label ${labelClass}">${t(s.labelKey)}</span>
@@ -7787,23 +7810,23 @@ function showTaskDetail(taskId, state) {
   const typeLabel = { simple: t('typeSimple'), creative: t('typeCreative'), manuscript: t('typeManuscript'), anchor: t('typeAnchor'), poetry: t('typePoetry'), image: t('typeImage') };
   let extraInfo = '';
   if (taskType === 'creative') {
-    extraInfo = `<p class="text-gray-500">${t('idea_')}: ${escapeHtml((state.idea || '').substring(0, 100))}</p>
-      <p class="text-gray-500">${t('sceneCount')}: ${state.scene_count || 0}</p>`;
+    extraInfo = `<p class="text-muted">${t('idea_')}: ${escapeHtml((state.idea || '').substring(0, 100))}</p>
+      <p class="text-muted">${t('sceneCount')}: ${state.scene_count || 0}</p>`;
   } else if (taskType === 'manuscript') {
-    extraInfo = `<p class="text-gray-500">${t('paragraphCount')}: ${(state.paragraphs || []).length}</p>`;
+    extraInfo = `<p class="text-muted">${t('paragraphCount')}: ${(state.paragraphs || []).length}</p>`;
   } else if (taskType === 'anchor') {
-    extraInfo = `<p class="text-gray-500">Script: ${escapeHtml((state.script_text || '').substring(0, 100))}</p>`;
+    extraInfo = `<p class="text-muted">Script: ${escapeHtml((state.script_text || '').substring(0, 100))}</p>`;
   } else {
-    extraInfo = `<p class="text-gray-500">Prompt: ${escapeHtml((state.prompt || '').substring(0, 100))}</p>`;
+    extraInfo = `<p class="text-muted">Prompt: ${escapeHtml((state.prompt || '').substring(0, 100))}</p>`;
   }
 
   document.getElementById('progress-message').innerHTML = `
     <div class="space-y-2">
       <p class="text-green-400 font-medium">${t('taskComplete')}</p>
-      <p class="text-gray-500">${t('taskId')}: ${escapeHtml(taskId)} · ${escapeHtml(typeLabel[taskType] || taskType)}</p>
-      <p class="text-gray-500">${t('dir')}: <code class="text-xs bg-gray-800 px-1 py-0.5 rounded font-mono">${escapeHtml(state.dir_name || taskId)}</code></p>
+      <p class="text-muted">${t('taskId')}: ${escapeHtml(taskId)} · ${escapeHtml(typeLabel[taskType] || taskType)}</p>
+      <p class="text-muted">${t('dir')}: <code class="text-xs bg-paper-2 px-1 py-0.5 rounded font-mono">${escapeHtml(state.dir_name || taskId)}</code></p>
       ${extraInfo}
-      ${state.final_video_file ? `<p class="text-gray-500">${t('artifact')}: <code class="text-xs bg-gray-800 px-1 py-0.5 rounded">${escapeHtml(state.final_video_file)}</code></p>` : ''}
+      ${state.final_video_file ? `<p class="text-muted">${t('artifact')}: <code class="text-xs bg-paper-2 px-1 py-0.5 rounded">${escapeHtml(state.final_video_file)}</code></p>` : ''}
     </div>`;
 
   if (state.final_video_file) {
@@ -7876,7 +7899,7 @@ async function loadArtifacts() {
     for (const [stepKey, arts] of Object.entries(groups)) {
       const stepLabel = t(stepLabelMap[stepKey] || stepKey);
       html += '<div class="mb-3">';
-      html += '<div class="text-xs text-gray-500 mb-1">' + escapeHtml(stepLabel) + '</div>';
+      html += '<div class="text-xs text-muted mb-1">' + escapeHtml(stepLabel) + '</div>';
       html += '<div class="space-y-1.5">';
       for (const art of arts) {
         html += renderArtifactCard(art, taskId, isRunning);
@@ -7904,26 +7927,26 @@ function renderArtifactCard(art, taskId, isRunning) {
   // 预览
   let preview = '';
   if (art.category === 'image') {
-    preview = '<img src="' + escapeAttr(fileUrl) + '" class="max-h-32 rounded cursor-pointer border border-gray-700/50" onclick="openImageModal(\'' + escapeAttr(fileUrl) + '\')" loading="lazy">';
+    preview = '<img src="' + escapeAttr(fileUrl) + '" class="max-h-32 rounded cursor-pointer border border-rule/50" onclick="openImageModal(\'' + escapeAttr(fileUrl) + '\')" loading="lazy">';
   } else if (art.category === 'video') {
-    preview = '<div style="position:relative;z-index:1;pointer-events:auto;transform:translateZ(0)"><video src="' + escapeAttr(fileUrl) + '" controls playsinline preload="metadata" class="w-full rounded border border-gray-700/50 bg-black" style="max-height:360px;min-height:200px;pointer-events:auto"></video></div>';
+    preview = '<div style="position:relative;z-index:1;pointer-events:auto;transform:translateZ(0)"><video src="' + escapeAttr(fileUrl) + '" controls playsinline preload="metadata" class="w-full rounded border border-rule/50 bg-black" style="max-height:360px;min-height:200px;pointer-events:auto"></video></div>';
   } else if (art.category === 'audio') {
     preview = '<audio src="' + escapeAttr(fileUrl) + '" controls class="w-full" preload="metadata"></audio>';
   } else {
     // text/json/subtitle — 延迟加载预览
     const previewId = 'art-preview-' + art.artifact_id.replace(/[:.]/g, '-');
-    preview = '<pre id="' + previewId + '" class="text-xs text-gray-400 max-h-24 overflow-auto bg-gray-900/70 p-2 rounded border border-gray-800 cursor-pointer" onclick="toggleArtifactPreview(\'' + escapeAttr(previewId) + '\', \'' + escapeAttr(fileUrl) + '\')">' + escapeHtml(t('clickToPreview')) + '</pre>';
+    preview = '<pre id="' + previewId + '" class="text-xs text-muted max-h-24 overflow-auto bg-paper/70 p-2 rounded border border-rule cursor-pointer" onclick="toggleArtifactPreview(\'' + escapeAttr(previewId) + '\', \'' + escapeAttr(fileUrl) + '\')">' + escapeHtml(t('clickToPreview')) + '</pre>';
   }
 
   // 文件大小
   const sizeStr = art.size > 1048576 ? (art.size / 1048576).toFixed(1) + ' MB' : (art.size / 1024).toFixed(0) + ' KB';
 
-  return '<div class="artifact-card flex items-start gap-2 p-2 bg-gray-800/30 rounded">'
+  return '<div class="artifact-card flex items-start gap-2 p-2 bg-paper-2/30 rounded">'
     + '<span class="text-sm mt-0.5">' + icon + '</span>'
     + '<div class="flex-1 min-w-0">'
     +   '<div class="flex items-center gap-2 mb-1">'
-    +     '<span class="text-xs text-gray-300">' + escapeHtml(label) + '</span>'
-    +     '<span class="text-xs text-gray-600">' + sizeStr + '</span>'
+    +     '<span class="text-xs text-ink-2">' + escapeHtml(label) + '</span>'
+    +     '<span class="text-xs text-muted">' + sizeStr + '</span>'
     +   '</div>'
     +   preview
     + '</div>'
@@ -8072,11 +8095,11 @@ function updateApiKeyCompact() {
     cls = 'text-green-400';
   } else {
     label = t('apiKeyNotConfigured');
-    cls = 'text-gray-400';
+    cls = 'text-muted';
   }
   textEl.innerHTML =
-    '<span class="text-gray-300 font-medium">' + t('apiKeyTitle') + '</span>' +
-    '<span class="text-gray-600 mx-2">·</span>' +
+    '<span class="text-ink-2 font-medium">' + t('apiKeyTitle') + '</span>' +
+    '<span class="text-muted mx-2">·</span>' +
     '<span class="' + cls + '">' + escapeHtml(label) + '</span>';
 
   // Auto-manage collapse: configured → auto-collapse, not configured → expand
@@ -8101,21 +8124,21 @@ function updateWorkspaceCompact() {
     const pathEl = document.getElementById('workspace-active-path');
     label = (nameEl.textContent || '') + (pathEl.textContent ? ' — ' + pathEl.textContent : '');
     cls = 'text-green-400';
-  } else if (statusEl.classList.contains('bg-amber-900')) {
+  } else if (statusEl.classList.contains('bg-accent/15')) {
     label = t('workspaceActive');
-    cls = 'text-amber-300';
+    cls = 'text-accent';
   } else {
     label = t('workspaceNone');
-    cls = 'text-gray-400';
+    cls = 'text-muted';
   }
   textEl.innerHTML =
-    '<span class="text-gray-300 font-medium">' + t('workspaceTitle') + '</span>' +
-    '<span class="text-gray-600 mx-2">·</span>' +
+    '<span class="text-ink-2 font-medium">' + t('workspaceTitle') + '</span>' +
+    '<span class="text-muted mx-2">·</span>' +
     '<span class="' + cls + '">' + escapeHtml(label) + '</span>';
   document.getElementById('workspace-compact').style.display = 'flex';
 
   const prefs = getCollapsePrefs();
-  const isConfigured = statusEl.classList.contains('bg-green-900') || statusEl.classList.contains('bg-amber-900');
+  const isConfigured = statusEl.classList.contains('bg-green-900') || statusEl.classList.contains('bg-accent/15');
   if (prefs.workspace_manual !== undefined) {
     applyCollapseState('workspace', prefs.workspace_manual);
   } else {
@@ -8185,7 +8208,7 @@ function resetApiKeyUI() {
 
   statusEl.dataset.i18n = 'apiKeyNotConfigured';
   statusEl.textContent = t('apiKeyNotConfigured');
-  statusEl.className = 'text-xs px-2 py-1 rounded-full bg-gray-800 text-gray-400';
+  statusEl.className = 'text-xs px-2 py-1 rounded-full bg-paper-2 text-muted';
 
   clearBtn.classList.add('hidden');
   updateApiKeyCompact();
@@ -8293,16 +8316,16 @@ function updateModelCompact(sel) {
   const t_ = cur.text || '';
   const i_ = cur.image || '';
   const v_ = cur.video || '';
-  const titlePrefix = '<span class="text-gray-300 font-medium">' + t('modelTitle') + '</span>' +
-                      '<span class="text-gray-600 mx-2">·</span>';
+  const titlePrefix = '<span class="text-ink-2 font-medium">' + t('modelTitle') + '</span>' +
+                      '<span class="text-muted mx-2">·</span>';
   if (t_ || i_ || v_) {
     // 折叠态展示全部三个已选模型（文字/图像/视频，随语言切换）
     textEl.innerHTML = titlePrefix +
-      '<span class="text-gray-500">' + t('modelTagText') + '</span> ' + escapeHtml(t_) +
-      ' &nbsp;<span class="text-gray-500">' + t('modelTagImage') + '</span> ' + escapeHtml(i_) +
-      ' &nbsp;<span class="text-gray-500">' + t('modelTagVideo') + '</span> ' + escapeHtml(v_);
+      '<span class="text-muted">' + t('modelTagText') + '</span> ' + escapeHtml(t_) +
+      ' &nbsp;<span class="text-muted">' + t('modelTagImage') + '</span> ' + escapeHtml(i_) +
+      ' &nbsp;<span class="text-muted">' + t('modelTagVideo') + '</span> ' + escapeHtml(v_);
   } else {
-    textEl.innerHTML = titlePrefix + '<span class="text-gray-400">—</span>';
+    textEl.innerHTML = titlePrefix + '<span class="text-muted">—</span>';
   }
   const prefs = getCollapsePrefs();
   if (prefs.model_manual !== undefined) {
@@ -8316,7 +8339,7 @@ function updateModelCompact(sel) {
 document.getElementById('model-sync').onclick = async () => {
   const statusEl = document.getElementById('model-sync-status');
   statusEl.textContent = '…';
-  statusEl.className = 'text-xs px-2 py-1 rounded-full bg-gray-800 text-gray-400';
+  statusEl.className = 'text-xs px-2 py-1 rounded-full bg-paper-2 text-muted';
   try {
     const r = await fetch('/api/models?refresh=1');
     if (r.ok) {
@@ -8331,7 +8354,7 @@ document.getElementById('model-sync').onclick = async () => {
       updateBetaHint();
       statusEl.textContent = t('modelSyncIdle');
       statusEl.className = 'text-xs px-2 py-1 rounded-full bg-green-900 text-green-300';
-      setTimeout(() => { statusEl.className = 'text-xs px-2 py-1 rounded-full bg-gray-800 text-gray-400'; }, 1500);
+      setTimeout(() => { statusEl.className = 'text-xs px-2 py-1 rounded-full bg-paper-2 text-muted'; }, 1500);
     } else {
       const d = await r.json().catch(() => ({}));
       statusEl.textContent = d.detail || t('modelSyncFailed') || '拉取失败';
@@ -8387,9 +8410,9 @@ function updateDomainCompact(domain) {
   const textEl = document.getElementById('domain-compact-text');
   const isCn = domain === 'cn';
   textEl.innerHTML =
-    '<span class="text-gray-300 font-medium">' + t('domainTitle') + '</span>' +
-    '<span class="text-gray-600 mx-2">·</span>' +
-    '<span class="' + (isCn ? 'text-green-400' : 'text-gray-400') + '">' +
+    '<span class="text-ink-2 font-medium">' + t('domainTitle') + '</span>' +
+    '<span class="text-muted mx-2">·</span>' +
+    '<span class="' + (isCn ? 'text-green-400' : 'text-muted') + '">' +
     'apihub.agnes-ai.' + escapeHtml(domain) +
     '</span>';
 }
@@ -8400,7 +8423,7 @@ function updateDomainStatus(domain) {
   if (domain === 'cn') {
     statusEl.className = 'text-xs px-2 py-1 rounded-full bg-green-900/40 text-green-300';
   } else {
-    statusEl.className = 'text-xs px-2 py-1 rounded-full bg-gray-800 text-gray-400';
+    statusEl.className = 'text-xs px-2 py-1 rounded-full bg-paper-2 text-muted';
   }
 }
 
@@ -8496,7 +8519,7 @@ function renderWorkspaces(workspaces, activePath, source) {
   } else {
     statusEl.dataset.i18n = 'workspaceNone';
     statusEl.textContent = t('workspaceNone');
-    statusEl.className = 'text-xs px-2 py-1 rounded-full bg-gray-800 text-gray-400';
+    statusEl.className = 'text-xs px-2 py-1 rounded-full bg-paper-2 text-muted';
     activeDisplay.classList.add('hidden');
   }
 
@@ -8506,9 +8529,9 @@ function renderWorkspaces(workspaces, activePath, source) {
     row.className = 'flex items-center justify-between glass-input rounded-lg px-4 py-2.5';
     row.innerHTML = `
       <div class="flex-1 min-w-0">
-        <p class="text-sm text-gray-100 font-mono truncate">${escapeHtml(activePath)}</p>
+        <p class="text-sm text-ink font-mono truncate">${escapeHtml(activePath)}</p>
       </div>
-      <span class="text-xs px-2 py-1 rounded-full bg-amber-900 text-amber-300 ml-3" data-i18n="workspaceActiveBadge">${t('workspaceActiveBadge')}</span>`;
+      <span class="text-xs px-2 py-1 rounded-full bg-accent/15 text-accent border border-accent/25 ml-3" data-i18n="workspaceActiveBadge">${t('workspaceActiveBadge')}</span>`;
     listEl.appendChild(row);
     return;
   }
@@ -8520,8 +8543,8 @@ function renderWorkspaces(workspaces, activePath, source) {
     const info = document.createElement('div');
     info.className = 'flex-1 min-w-0';
     info.innerHTML = `
-      <p class="text-sm text-gray-100 truncate">${escapeHtml(wsDisplayName(ws))}</p>
-      <p class="text-xs text-gray-500 font-mono truncate">${escapeHtml(ws.path)}</p>`;
+      <p class="text-sm text-ink truncate">${escapeHtml(wsDisplayName(ws))}</p>
+      <p class="text-xs text-muted font-mono truncate">${escapeHtml(ws.path)}</p>`;
     row.appendChild(info);
 
     const btns = document.createElement('div');
