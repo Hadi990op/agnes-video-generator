@@ -8,8 +8,23 @@
 <link rel="icon" type="image/png" sizes="1024x1024" href="/static/icon.png">
 <link rel="apple-touch-icon" href="/static/icon.png">
 <script src="https://cdn.tailwindcss.com"></script>
+<script>
+  /* ── 主题防闪烁：hydration/DOM 前同步设置 <html data-theme>（与官网一致）── */
+  (function () {
+    try {
+      var m = localStorage.getItem('theme');
+      var mode = (m === 'light' || m === 'dark' || m === 'system') ? m : 'system';
+      var dark = mode === 'dark' || (mode === 'system' && window.matchMedia('(prefers-color-scheme: dark)').matches);
+      document.documentElement.setAttribute('data-theme', dark ? 'dark' : 'light');
+    } catch (e) {
+      document.documentElement.setAttribute('data-theme', 'dark');
+    }
+  })();
+</script>
 <style>
-  /* ── Hallmark · genre: atmospheric · theme: Midnight (custom) · design-system: design.md ── */
+  /* ── Hallmark · genre: atmospheric · theme: Midnight (custom) · design-system: design.md ──
+   * theme-modes: dark (:root 默认) / light ([data-theme='light'] 同族反转) · toggle: system/light/dark
+   * 与官网 video-website token 体系完全一致，双主题共用 */
 
   :root {
     --color-paper:    oklch(13% 0.012 55);
@@ -22,8 +37,28 @@
     --color-accent:   oklch(80% 0.14 75);
     --color-accent-ink: oklch(20% 0.05 75);
     --color-focus:    oklch(82% 0.16 75);
+    --color-danger:   oklch(66% 0.19 27);
+    --color-success:  oklch(80% 0.13 152);
+    --color-warning:  oklch(80% 0.13 75);
     --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
     --dur-micro: 120ms; --dur-short: 220ms; --dur-long: 420ms;
+  }
+
+  /* 亮色——同族反转：hue 55 暖灰家族 + accent 加深保证对比度（与官网一致） */
+  [data-theme='light'] {
+    --color-paper:    oklch(97% 0.008 60);
+    --color-paper-2:  oklch(100% 0.004 60);
+    --color-paper-3:  oklch(93% 0.01 60);
+    --color-ink:      oklch(22% 0.016 55);
+    --color-ink-2:    oklch(43% 0.016 55);
+    --color-muted:    oklch(55% 0.016 55);
+    --color-rule:     oklch(87% 0.012 60);
+    --color-accent:   oklch(52% 0.13 75);
+    --color-accent-ink: oklch(98% 0.008 75);
+    --color-focus:    oklch(48% 0.15 75);
+    --color-danger:   oklch(50% 0.19 27);
+    --color-success:  oklch(50% 0.13 152);
+    --color-warning:  oklch(52% 0.13 75);
   }
 
   /* ── Base Animations（fade only，atmospheric）── */
@@ -198,7 +233,7 @@
     font-size: 0.65rem; padding: 0.1rem 0.45rem; border-radius: 999px;
     background: color-mix(in oklab, var(--color-accent) 12%, transparent); color: var(--color-accent); border: 1px solid color-mix(in oklab, var(--color-accent) 20%, transparent);
   }
-  .vp-tag.gender-female { background: rgba(236,72,153,0.12); color: #f9a8d4; border-color: rgba(236,72,153,0.2); }
+  .vp-tag.gender-female { background: color-mix(in oklab, var(--color-danger) 12%, transparent); color: var(--color-danger); border-color: color-mix(in oklab, var(--color-danger) 20%, transparent); }
   .vp-tag.gender-male { background: color-mix(in oklab, var(--color-accent) 12%, transparent); color: var(--color-accent); border-color: color-mix(in oklab, var(--color-accent) 20%, transparent); }
   .vp-preview-btn {
     margin-top: 0.5rem; width: 100%; padding: 0.35rem; border-radius: 0.4rem;
@@ -226,8 +261,8 @@
   .vp-btn-confirm:hover { filter: brightness(1.05); transform: translateY(-1px); }
   .vp-warning {
     margin: 0 1.25rem 0.5rem; padding: 0.6rem 0.8rem; border-radius: 0.5rem;
-    background: rgba(245,158,11,0.12); border: 1px solid rgba(245,158,11,0.3);
-    color: #fcd34d; font-size: 0.76rem; line-height: 1.4;
+    background: color-mix(in oklab, var(--color-warning) 12%, transparent); border: 1px solid color-mix(in oklab, var(--color-warning) 30%, transparent);
+    color: var(--color-warning); font-size: 0.76rem; line-height: 1.4;
   }
   .vp-empty { grid-column: 1 / -1; text-align: center; color: var(--color-muted); font-size: 0.85rem; padding: 2rem 0; }
 
@@ -270,7 +305,8 @@
     margin-bottom: 0.4rem;
     padding-bottom: 0.4rem;
     border-bottom: 1px solid var(--color-rule);
-    white-space: nowrap;
+    /* 长标题（英文/俄文等）允许换行，避免溢出卡片；emoji 与文字间可断行 */
+    overflow-wrap: anywhere;
   }
 
   /* ── Design tokens 工具类（Tailwind CDN 不识别自定义 token，手动补齐）── */
@@ -289,7 +325,21 @@
   .bg-accent { background-color: var(--color-accent); }
   .hover\:bg-paper-3:hover { background-color: var(--color-paper-3); }
   .border-rule { border-color: var(--color-rule); }
+  .border-rule\/30 { border-color: color-mix(in oklab, var(--color-rule) 30%, transparent); }
+  .border-rule\/40 { border-color: color-mix(in oklab, var(--color-rule) 40%, transparent); }
+  .text-danger { color: var(--color-danger); }
+  .text-success { color: var(--color-success); }
+  .text-warning { color: var(--color-warning); }
   .placeholder-muted::placeholder { color: var(--color-muted); }
+
+  /* 亮色下：Tailwind 语义浅色文字在浅底上对比度不足，加深为语义 token */
+  [data-theme='light'] .text-green-400,
+  [data-theme='light'] .text-green-300,
+  [data-theme='light'] .text-emerald-400 { color: var(--color-success); }
+  [data-theme='light'] .text-red-400,
+  [data-theme='light'] .text-red-500 { color: var(--color-danger); }
+  [data-theme='light'] .text-yellow-400,
+  [data-theme='light'] .text-amber-400 { color: var(--color-warning); }
 </style>
 </head>
 <body class="text-ink min-h-screen font-sans" style="background: radial-gradient(ellipse 45% 38% at 50% 0%, color-mix(in oklab, var(--color-accent) 6%, transparent), transparent 70%), var(--color-paper);">
@@ -315,8 +365,15 @@
 <div class="max-w-4xl flex-1 min-w-0 py-8">
 
   <!-- Header -->
-  <div class="text-center mb-10 relative">
-    <div class="absolute right-0 top-0" style="z-index: 10;">
+  <div class="text-center mb-10">
+    <!-- 工具行：主题切换 + 语言选择（文档流，不遮挡标题） -->
+    <div class="flex items-center justify-end gap-2 mb-5">
+      <button id="theme-toggle" onclick="cycleTheme()" class="glass-input rounded-lg px-3 py-1.5 text-sm cursor-pointer text-ink flex items-center gap-1.5 hover:border-accent/40 transition">
+        <svg id="theme-icon" class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+          <path id="theme-icon-path" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M21 12.8A9 9 0 1 1 11.2 3 7 7 0 0 0 21 12.8Z"></path>
+        </svg>
+        <span id="theme-label" class="text-xs whitespace-nowrap">主题：跟随系统</span>
+      </button>
       <select id="lang-selector" onchange="switchLang(this.value)" class="glass-input rounded-lg px-3 py-1.5 text-sm cursor-pointer text-ink">
         <option value="zh">🇨🇳 中文</option>
         <option value="en">🇺🇸 English</option>
@@ -644,7 +701,7 @@
         </div>
 
         <!-- Advanced (collapsible) -->
-        <div class="border-t border-white/5 pt-4 mt-4">
+        <div class="border-t border-rule/40 pt-4 mt-4">
           <div class="collapse-header flex items-center justify-between" onclick="toggleCollapse('s_advanced')">
             <span class="text-sm text-muted" data-i18n="advancedSettings">高级设置</span>
             <span id="s_advanced-arrow" class="text-muted text-xs">▶</span>
@@ -717,7 +774,7 @@
           <p class="text-xs text-muted mt-1" data-i18n="refImageHint">可选。上传后以该图为基底生成变体；不上传则纯 AI 生成</p>
         </div>
 
-        <div class="border-t border-white/5 pt-4 mt-4">
+        <div class="border-t border-rule/40 pt-4 mt-4">
           <div class="collapse-header flex items-center justify-between" onclick="toggleCollapse('i_advanced')">
             <span class="text-sm text-muted" data-i18n="advancedSettings">高级设置</span>
             <span id="i_advanced-arrow" class="text-muted text-xs">▶</span>
@@ -942,7 +999,7 @@
               <span data-i18n="enableSubtitle">启用字幕</span>
             </label>
           </div>
-          <div class="border-t border-white/5 pt-4">
+          <div class="border-t border-rule/40 pt-4">
             <div class="mb-4">
               <label class="block text-sm text-muted mb-1.5" data-i18n="subStyleMode">样式模式</label>
               <select id="c_sub_style_mode" onchange="toggleSubStyleMode('c')" class="w-full glass-input rounded-lg px-3 py-2 text-sm text-ink">
@@ -1100,7 +1157,7 @@
               <span data-i18n="enableSubtitle">启用字幕</span>
             </label>
           </div>
-          <div class="border-t border-white/5 pt-4">
+          <div class="border-t border-rule/40 pt-4">
             <div class="mb-4">
               <label class="block text-sm text-muted mb-1.5" data-i18n="subStyleMode">样式模式</label>
               <select id="m_sub_style_mode" onchange="toggleSubStyleMode('m')" class="w-full glass-input rounded-lg px-3 py-2 text-sm text-ink">
@@ -1307,7 +1364,7 @@
               <span data-i18n="enableSubtitle">启用字幕</span>
             </label>
           </div>
-          <div class="border-t border-white/5 pt-4">
+          <div class="border-t border-rule/40 pt-4">
             <div class="mb-4">
               <label class="block text-sm text-muted mb-1.5" data-i18n="subStyleMode">样式模式</label>
               <select id="a_sub_style_mode" onchange="toggleSubStyleMode('a')" class="w-full glass-input rounded-lg px-3 py-2 text-sm text-ink">
@@ -1593,7 +1650,7 @@
   </div>
 
 <footer class="text-center pb-8">
-  <div class="border-t border-white/[0.04] pt-8 mt-4">
+  <div class="border-t border-rule/30 pt-8 mt-4">
     <p class="text-xs text-muted mb-3" data-i18n="moreResources">更多资源</p>
     <div class="flex justify-center flex-wrap gap-x-5 gap-y-2 text-xs">
       <a href="https://video.lichuanyang.top" target="_blank" rel="noopener" class="text-muted hover:text-ink-2 transition-colors" data-i18n="projectHome">🏠 项目主页</a>
@@ -6295,6 +6352,8 @@ function applyLanguage(lang) {
   });
   // 更新配置面板折叠按钮的 title/aria-label（组合：收起/展开 + 面板标题）
   refreshPanelA11y();
+  // 主题按钮标签随语言切换（themeApply 幂等，读 localStorage）
+  try { themeApply(themeStored()); } catch(e) {}
   // 更新"用户要求"和"视觉风格"默认值（仅在用户未修改时）
   const updateDefault = (inputId, i18nKey) => {
     const el = document.getElementById(inputId);
@@ -6322,6 +6381,71 @@ function applyLanguage(lang) {
 }
 
 function switchLang(lang) { applyLanguage(lang); }
+
+// ═══════════════════════════════════════════════════
+// Theme（三态：system / light / dark，与官网 video-website 完全一致）
+// ═══════════════════════════════════════════════════
+
+const THEME_MODES = ['system', 'light', 'dark'];
+const THEME_ICON_PATHS = {
+  system: 'M8 4h8a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2Zm-3 12h14',
+  light: 'M12 3v2M12 19v2M3 12h2M19 12h2M5.6 5.6l1.4 1.4M17 17l1.4 1.4M18.4 5.6L17 7M7 17l-1.4 1.4M12 8a4 4 0 1 0 0 8 4 4 0 0 0 0-8Z',
+  dark: 'M21 12.8A9 9 0 1 1 11.2 3 7 7 0 0 0 21 12.8Z',
+};
+const THEME_LABELS = {
+  zh: { system: '主题：跟随系统', light: '主题：亮色', dark: '主题：暗色' },
+  en: { system: 'Theme: System', light: 'Theme: Light', dark: 'Theme: Dark' },
+};
+
+function themeResolved(mode) {
+  if (mode === 'system') {
+    try { return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'; }
+    catch (e) { return 'dark'; }
+  }
+  return mode;
+}
+
+function themeApply(mode) {
+  try { localStorage.setItem('theme', mode); } catch (e) {}
+  document.documentElement.setAttribute('data-theme', themeResolved(mode));
+  const label = THEME_LABELS[(currentLang && THEME_LABELS[currentLang]) ? currentLang : 'zh'][mode];
+  const hint = currentLang === 'en'
+    ? 'Switch theme (click to cycle: System / Light / Dark)'
+    : '切换主题（点击循环：跟随系统 / 亮色 / 暗色）';
+  const labelEl = document.getElementById('theme-label');
+  const iconEl = document.getElementById('theme-icon-path');
+  const btnEl = document.getElementById('theme-toggle');
+  if (labelEl) labelEl.textContent = label;
+  if (iconEl) iconEl.setAttribute('d', THEME_ICON_PATHS[mode]);
+  if (btnEl) {
+    btnEl.title = label + ' · ' + hint;
+    btnEl.setAttribute('aria-label', label + ' · ' + hint);
+  }
+}
+
+function themeStored() {
+  try {
+    const v = localStorage.getItem('theme');
+    if (v === 'light' || v === 'dark' || v === 'system') return v;
+  } catch (e) {}
+  return 'system';
+}
+
+function cycleTheme() {
+  const modes = THEME_MODES;
+  const next = modes[(modes.indexOf(themeStored()) + 1) % modes.length];
+  themeApply(next);
+}
+
+// system 模式下跟随系统切换
+if (window.matchMedia) {
+  window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', function () {
+    if (themeStored() === 'system') themeApply('system');
+  });
+}
+
+// 初始化（幂等；head 内联脚本已先设置 data-theme 防闪烁，这里仅同步按钮 UI）
+themeApply(themeStored());
 
 // 配置面板折叠按钮的无障碍文案（收起/展开 + 面板标题，随语言切换）
 function refreshPanelA11y() {
