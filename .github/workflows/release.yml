@@ -216,7 +216,7 @@ jobs:
           # 追加「新增内容 / What's New」（release notes 文档中对应章节起）
           NOTES="docs/public/release-notes/release_notes_v${VERSION}.md"
           if [ -f "$NOTES" ]; then
-            printf '\n---\n\n' >> "$BODY"
+            printf '%s\n' '' '---' '' >> "$BODY"
             awk '/^## What.s New/{f=1} f' "$NOTES" >> "$BODY"
           else
             echo "::warning::缺少 release notes 文档 $NOTES，GitHub Release 将只有「使用方式」。"
@@ -258,9 +258,9 @@ jobs:
           # 前部追加 release 新增内容（What's New 章节起）
           NOTES="docs/public/release-notes/release_notes_v${VERSION}.md"
           if [ -f "$NOTES" ]; then
-            printf '---\n\n# What\x27s New in v%s\n\n' "$VERSION" > /tmp/npm-rel.md
+            printf '%s\n' '---' '' "# What's New in v${VERSION}" '' > /tmp/npm-rel.md
             awk '/^## What.s New/{f=1} f' "$NOTES" >> /tmp/npm-rel.md
-            printf '\n---\n\n' >> /tmp/npm-rel.md
+            printf '%s\n' '' '---' '' >> /tmp/npm-rel.md
             cat /tmp/npm-rel.md /tmp/npm-header.md /tmp/README.orig.md > README.md
           else
             echo "::warning::缺少 release notes 文档 $NOTES，npm README 将只有 Quick Start。"
