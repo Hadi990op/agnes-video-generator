@@ -113,7 +113,11 @@ async function pollTaskProgress(taskId: string) {
     }
 
     if (state.status === 'completed') {
-      trackTaskResultOnce('task_completed', taskId, { task_type: state.task_type || appState.currentTaskType })
+      trackTaskResultOnce('task_completed', taskId, {
+        task_type: state.task_type || appState.currentTaskType,
+        // simple 任务携带生成模式（t2v / i2v / ti2vid / keyframes），便于 GA 按模式统计生成量
+        ...(state.mode ? { mode: state.mode } : {}),
+      })
       showResult(state.final_video_file, taskId)
       clearRunning()
       scheduleArtifactRefresh()
@@ -122,6 +126,7 @@ async function pollTaskProgress(taskId: string) {
     if (state.status === 'failed' || (step === 'error' && status === 'failed')) {
       trackTaskResultOnce('task_failed', taskId, {
         task_type: state.task_type || appState.currentTaskType,
+        ...(state.mode ? { mode: state.mode } : {}),
         error: (state.current_message || '').slice(0, 120),
       })
       clearRunning()
