@@ -33,6 +33,8 @@ const form = reactive({
   useEndFrames: false,
   genEndFromRef: true,
   endFrames: [] as File[],
+  // v5.0 优化 5：用户上传分镜场景图（按场景 index 对齐）
+  sceneRefs: [] as File[],
 })
 
 const submitting = ref(false)
@@ -67,6 +69,11 @@ function addEndFrameInput() {
 function onEndFrameChange(e: Event, idx: number) {
   const file = (e.target as HTMLInputElement).files?.[0] || null
   if (file) form.endFrames[idx] = file
+}
+
+function onSceneRefChange(e: Event, idx: number) {
+  const file = (e.target as HTMLInputElement).files?.[0] || null
+  if (file) form.sceneRefs[idx] = file
 }
 
 async function submitCreative() {
@@ -108,6 +115,12 @@ async function submitCreative() {
   if (form.useEndFrames) {
     form.endFrames.forEach((f) => {
       if (f && f.size > 0) fd.append('end_frame_images', f)
+    })
+  }
+  // v5.0 优化 5：用户上传分镜场景图（多文件，后端按上传顺序对应场景 index）
+  if (form.sceneRefs.length > 0) {
+    form.sceneRefs.forEach((f) => {
+      if (f && f.size > 0) fd.append('scene_reference_images', f)
     })
   }
 
@@ -290,6 +303,18 @@ async function submitCreative() {
               <span class="text-xs text-muted w-16">{{ t('scene_') }} {{ i }}</span>
               <input type="file" accept="image/*" class="end-frame-file flex-1 text-sm text-muted file:mr-3 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-sm file:bg-paper-3 file:text-ink-2 hover:file:bg-paper-3" @change="onEndFrameChange($event, i - 1)" />
             </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Scene Reference Images (v5.0 优化 5) -->
+      <div class="mb-4">
+        <label class="block text-sm text-muted mb-1.5">{{ t('sceneReferenceImages') }}</label>
+        <p class="text-xs text-muted mb-2">{{ t('sceneRefDesc') }}</p>
+        <div class="space-y-2">
+          <div v-for="i in form.sceneCount" :key="i" class="flex items-center gap-3 mb-2">
+            <span class="text-xs text-muted w-16">{{ t('scene_') }} {{ i }}</span>
+            <input type="file" accept="image/*" class="scene-ref-file flex-1 text-sm text-muted file:mr-3 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-sm file:bg-paper-3 file:text-ink-2 hover:file:bg-paper-3" @change="onSceneRefChange($event, i - 1)" />
           </div>
         </div>
       </div>

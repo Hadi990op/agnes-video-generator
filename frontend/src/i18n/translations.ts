@@ -4,7 +4,8 @@ export const T: Record<string, Record<string, string>> = {
   zh: {
     subtitle: 'AI 视频，一键生成',
     apiKeyTitle: 'API Key 配置', apiKeyNotConfigured: '未配置', apiKeyConfigured: '已配置',
-    apiKeyPlaceholder: '输入 Agnes API Key（在 platform.agnes-ai.com 免费获取）', apiKeyMasked: '已配置 (●●●)', save: '保存',
+    apiKeyPlaceholder: '输入 Agnes API Key（多个 Key 用换行或逗号分隔，配额自动叠加；在 platform.agnes-ai.com 免费获取）', apiKeyMasked: '已配置 (●●●)', save: '保存',
+    keyCountLabel: '已配置 Key',
     clear: '清除', clearConfirm: '确定要清除已配置的 API Key 吗？', apiKeyFromEnv: '已配置 (环境变量)',
     clearEnvHint: '当前 API Key 来自环境变量 AGNES_API_KEY，无法从界面清除。请取消环境变量后重试。',
     modelTitle: '模型选择', modelHint: '选择生成时使用的 Agnes 模型。图像与视频模型暂未开放，保留默认配置。',
@@ -69,6 +70,7 @@ export const T: Record<string, Record<string, string>> = {
     taskId: '任务ID', dir: '目录', idea_: '创意', sceneCount: '场景数', chainingMode_: '串联模式',
     // v3.x scene config
     sceneConfig: '场景配置', durationSource: '场景信息获取方式',
+    sceneReferenceImages: '分镜场景参考图（可选）', sceneRefDesc: '为每个场景上传参考图，视频将以该图作为视觉起点（跳过该场景的 AI 分镜图）。未上传的场景使用 AI 生成图。',
     sourceManual: '手动设置', sourcePrompt: '从创意描述中提取',
     sourceManualHint: '手动指定场景数量和每场景时长',
     sourcePromptHint: 'AI 将从创意描述中自动分析场景数和时长',
@@ -81,6 +83,8 @@ export const T: Record<string, Record<string, string>> = {
     stopConfirm: '确定要中断当前任务吗？中断后可到任务列表续传。',
     stopConfirmById: '确定要中断该任务吗？中断后可续传。',
     stopped: '任务已中断，可在任务列表中续传', stoppedById: '任务已中断',
+    deleteTask: '删除', deleteTaskConfirm: '确定删除该任务及其全部生成文件吗？此操作不可恢复！',
+    failDelete: '删除失败', deletedTask: '任务已删除',
     enterApiKey: '请输入 API Key', enterPrompt: '请输入视频描述', enterIdea: '请输入创意描述', enterText: '请输入稿件内容',
     taskRunningWarn: '已有任务正在运行或排队中，请等待完成',
     failCreate: '创建失败', failResume: '续传失败', failLoad: '加载任务详情失败', failStop: '中断失败',

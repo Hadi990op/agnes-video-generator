@@ -10,13 +10,15 @@
 
 | # | 优化点 | 优先级 | 一句话价值 |
 |---|--------|--------|-----------|
-| 1 | 多 API Key 轮询 + 限流整合 + `.env.example` | 🔴 | KeyRing 统一轮换 + 429 换 Key + 配额按 Key 数缩放，吞吐提升 N 倍；配置模板一栏可查 |
-| 2 | 通用图片归一化模块 | 🔴 | 全环节参考图统一归一化，传输体积降 5-10 倍 |
-| 3 | 删除任务端点 `DELETE /api/tasks/{id}` | 🔴 | 一键清理任务全目录，防磁盘膨胀 |
-| 4 | LLM JSON 输出容错（json_repair） | 🔴 | 修复 LLM 常见 JSON 语法错误，降编剧失败率 |
-| 5 | 用户上传分镜场景图 | 🟡 | 关键分镜可手工供给参考图，不再完全依赖 AI 生成 |
-| 6 | `start.bat` Windows 一键启动 | 🟢 | Windows 用户开箱即用 |
+| 1 | ✅ 多 API Key 轮询 + 限流整合 + `.env.example` | 🔴 | KeyRing 统一轮换 + 429 换 Key + 配额按 Key 数缩放，吞吐提升 N 倍；配置模板一栏可查 |
+| 2 | ✅ 通用图片归一化模块 | 🔴 | 全环节参考图统一归一化，传输体积降 5-10 倍 |
+| 3 | ✅ 删除任务端点 `DELETE /api/tasks/{id}` | 🔴 | 一键清理任务全目录，防磁盘膨胀 |
+| 4 | ✅ LLM JSON 输出容错（json_repair） | 🔴 | 修复 LLM 常见 JSON 语法错误，降编剧失败率 |
+| 5 | ✅ 用户上传分镜场景图 | 🟡 | 关键分镜可手工供给参考图，不再完全依赖 AI 生成 |
+| 6 | ✅ `start.bat` Windows 一键启动 | 🟢 | Windows 用户开箱即用 |
 
+> **实施状态**：六项全部于 2026-08-13 落地（v5.0），详见各节末尾「✅ 已实施」标注与文末「实施记录」。mock 单测由 GitHub Action（`.github/workflows/test.yml`）自动执行；专项回归条目见 `docs/dev/regression_test_plan.md` 三点五节。
+>
 > 已抽离待调研项：**角色一致性增强 + 对话支持** → `docs/plans/optimization-research/character_consistency_and_dialogue.md`
 
 ---
@@ -42,14 +44,16 @@
 
 ### 1.3 配置层：Key 采集（core/config.py）
 
-新增 `get_api_keys() -> list[str]`，返回全部可用 Key（去重、去空），优先级从高到低：
+新增 `get_api_keys() -> list[str]`，返回全部可用 Key（去重、去空），**env 与 config 合并**（同 Key 只保留一次，env 位置优先）：
 
 ```
-0. .env 文件中 AGNES_API_KEY, AGNES_API_KEY_2 ... AGNES_API_KEY_N
-1. 环境变量 AGNES_API_KEY, AGNES_API_KEY_2 ... _N（覆盖 .env）
-2. 配置文件中的 api_keys 列表（新增字段）
-3. 旧配置 api_key 单个字段（向后兼容）
+1. .env 文件中 AGNES_API_KEY, AGNES_API_KEY_2 ... AGNES_API_KEY_N（低优先）
+2. 环境变量 AGNES_API_KEY, AGNES_API_KEY_2 ... _N（高优先，同槽位覆盖 .env）
+3. 配置文件中的 api_keys 列表（新增字段，与 env 并存）
+4. 旧配置 api_key 单个字段（向后兼容）
 ```
+
+> **实施说明**：与初稿"env 优先、config 仅兜底"不同，实际实现为 **env + config 合并**——Web UI 保存的多 Key（config）与 env Key 可并存，使 UI 配置的多 Key 真实生效；去重保证与 env 重复的 Key 只出现一次。采集逻辑见 `core/config.py` 的 `_collect_env_keys()` + `get_api_keys()`。
 
 **实现要点**（完整实现骨架）：
 
@@ -872,7 +876,23 @@ REM 5) .venv\Scripts\python server.py 并自动打开浏览器（起服务后用
 
 ## 实施建议
 
-1. **第一梯队（🔴）做批次一**：1 → 4 → 3 → 2，均为独立小改动、低回归风险、收益直接（吞吐×N、失败率↓、磁盘回收、传输体积↓）。
-2. 每完成一项，在 `docs/dev/regression_test_plan.md` 增加对应验收条目；涉及 API 模块的改动跑一遍 `scripts/regression_runner.py` 回归。
-3. 优化点 1 已整合 `.env.example` 配置模板，落地时一并产出（见 §1.8）；优化点 2 是 5 的底层依赖，先做 2 再做 5。
-4. 优化点 5 贴近创意视频核心路径，改动面较大，建议作为独立小版本（v5.1.x）推进并对创意类型做专项回归。
+## 实施记录（2026-08-13，全部完成 ✅）
+
+按建议批次 1 → 4 → 3 → 2 → 5 → 6 实施，均通过 py_compile / import / 端点冒烟自验；mock 单测由 GitHub Action（`.github/workflows/test.yml`）执行。
+
+| 优化 | 落地文件 | 自验记录 |
+|------|---------|---------|
+| 1 多 Key + 限流 | `core/config.py`、`core/api/key_manager.py`（新增）、`core/api/rate_limiter.py`、`agnes_chat/image/video.py`、`web/routes/config_routes.py`、`.env.example`（新增）、`frontend/src`（ConfigPanel/useConfig/api）、`requirements.txt` | 3 Key 配置下共享桶 48/min、视频桶 3/min、KeyRing 轮转正常；`GET/POST /api/config/keys` 端点冒烟通过 |
+| 4 json_repair | `core/api/agnes_chat.py`、`requirements.txt` | 可选导入正常；`repair_json` 加载成功 |
+| 3 删除任务 | `web/routes/video_routes.py`、`web/app_state.py`、`frontend/src`（TaskListPanel/useTasks/api）、i18n | DELETE 已完成任务返回 `ok:true` 且目录移除；不存在任务 404 |
+| 2 图片归一化 | `utils/image_normalizer.py`（新增）、`agnes_image.py`/`agnes_video.py` 入参归一化、`steps_frames.py` 收敛、`requirements.txt`（显式 Pillow） | 模块 import / 降级逻辑正常 |
+| 5 用户场景参考图 | `models/task.py`、`web/routes/task_creation_routes.py`、`steps_video.py`（三种模式接入）、`frontend/src`（CreativeForm）、i18n | 端点字段校验、前端构建（vue-tsc）通过 |
+| 6 start.bat | `start.bat`（新增） | 语法/流程按 roadmap §6.5（Windows 手动验证） |
+
+**遗留说明**：
+- mock 全量单测与覆盖率由 GitHub Action 在 push 后自动执行，无需本地阻塞。
+- 专项回归条目 V1-V8 已写入 `docs/dev/regression_test_plan.md` 三点五节；全量 8 场景回归待用户触发「执行大版本回归」。
+
+---
+
+*文档版本：v5.0 | 更新日期：2026-08-13 | 状态：六项全部完成*

@@ -4,7 +4,7 @@ import { t } from '@/i18n'
 import { useTasks } from '@/composables/useTasks'
 import type { TaskListItem } from '@/types'
 
-const { tasks, loading, viewTask, viewRunningTask, resumeTask, stopTaskById } = useTasks()
+const { tasks, loading, viewTask, viewRunningTask, resumeTask, stopTaskById, deleteTaskById } = useTasks()
 
 const statusColors: Record<string, string> = {
   completed: 'text-emerald-400',
@@ -100,6 +100,13 @@ function onMainBtn(task: TaskListItem) {
           @click="stopTaskById(task.task_id)"
         >
           {{ t('btnStop') }}
+        </button>
+        <button
+          v-if="!isRunning(task)"
+          class="text-xs px-3 py-1.5 bg-red-900/60 hover:bg-red-700 text-red-200 rounded-lg transition"
+          @click="deleteTaskById(task.task_id)"
+        >
+          {{ t('deleteTask') }}
         </button>
       </div>
     </div>

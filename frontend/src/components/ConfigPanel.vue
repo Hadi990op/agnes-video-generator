@@ -9,7 +9,10 @@ import { useGa } from '@/composables/useGa'
 const { trackEvent } = useGa()
 const {
   apiKeyStatus,
-  saveApiKey,
+  keyCount,
+  keySource,
+  saveMultiKeys,
+  loadKeyInfo,
   clearApiKey,
   modelSyncStatus,
   modelSaveStatus,
@@ -64,9 +67,15 @@ async function onSaveApiKey() {
     alert(t('enterApiKey'))
     return
   }
-  await saveApiKey(key)
-  apiKeyInput.value = ''
+  // 多 Key 输入框：按换行/逗号拆分保存（单个 Key 同样适用）
+  const ok = await saveMultiKeys(key)
+  if (ok) {
+    apiKeyInput.value = ''
+  }
 }
+
+// 页面加载时刷新 Key 数量/来源展示
+loadKeyInfo()
 
 // 工作区
 const workspacePath = ref('')
@@ -122,30 +131,31 @@ initCollapse()
           <button class="text-xs text-muted hover:text-ink-2 transition px-2 py-1 rounded" @click="toggleConfigPanel('apikey')">▲</button>
         </div>
       </div>
-      <div class="flex gap-3">
-        <input
+      <div class="flex gap-3 items-start">
+        <textarea
           v-model="apiKeyInput"
-          type="password"
-          :placeholder="apiKeyStatus !== 'none' ? t('apiKeyMasked') : t('apiKeyPlaceholder')"
-          :disabled="apiKeyStatus !== 'none'"
-          class="flex-1 glass-input rounded-lg px-4 py-2.5 text-sm text-ink placeholder-muted"
-          :class="apiKeyStatus !== 'none' ? 'opacity-50 cursor-not-allowed' : ''"
-        />
+          rows="2"
+          :placeholder="t('apiKeyPlaceholder')"
+          class="flex-1 glass-input rounded-lg px-4 py-2.5 text-sm text-ink placeholder-muted resize-y"
+        ></textarea>
         <button
-          class="px-5 py-2.5 bg-accent text-accent-ink hover:bg-accent/90 rounded-lg text-sm font-medium transition"
-          :disabled="apiKeyStatus !== 'none'"
-          :class="apiKeyStatus !== 'none' ? 'opacity-50 cursor-not-allowed' : ''"
+          class="px-5 py-2.5 bg-accent text-accent-ink hover:bg-accent/90 rounded-lg text-sm font-medium transition whitespace-nowrap"
           @click="onSaveApiKey"
         >
           {{ t('save') }}
         </button>
         <button
           v-if="apiKeyStatus !== 'none'"
-          class="px-5 py-2.5 bg-red-600/80 hover:bg-red-500 rounded-lg text-sm font-medium transition"
+          class="px-5 py-2.5 bg-red-600/80 hover:bg-red-500 rounded-lg text-sm font-medium transition whitespace-nowrap"
           @click="clearApiKey"
         >
           {{ t('clear') }}
         </button>
+      </div>
+      <div v-if="keyCount > 0" class="mt-2">
+        <span class="text-xs px-2 py-0.5 rounded-full bg-green-900 text-green-300">
+          {{ t('keyCountLabel') }}: {{ keyCount }} <span class="opacity-70">({{ keySource }})</span>
+        </span>
       </div>
       <div class="flex flex-wrap items-center gap-x-5 gap-y-1.5 mt-3 text-xs">
         <a href="https://platform.agnes-ai.com" target="_blank" rel="noopener" class="text-accent hover:text-ink transition-colors">🚀 {{ t('apiKeyGetLink') }}</a>

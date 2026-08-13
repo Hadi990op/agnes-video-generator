@@ -90,6 +90,19 @@ async function stopTaskById(taskId: string) {
   }
 }
 
+async function deleteTaskById(taskId: string) {
+  if (!confirm(t('deleteTaskConfirm'))) return
+  try {
+    const d = await api.deleteTask(taskId)
+    if (!d.ok) throw new Error(d.detail || t('failDelete'))
+    trackEvent('task_deleted', { task_type: appState.currentTaskType || '', source: 'list' })
+    showToast(t('deletedTask'), 3000)
+    loadTaskList()
+  } catch (e: any) {
+    alert(t('failDelete') + ': ' + e.message)
+  }
+}
+
 // 详情展示（由组件消费）
 const detailState = ref<TaskState | null>(null)
 
@@ -109,6 +122,7 @@ export function useTasks() {
     viewRunningTask,
     resumeTask,
     stopTaskById,
+    deleteTaskById,
     showTaskDetail,
   }
 }

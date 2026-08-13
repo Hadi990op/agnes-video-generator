@@ -112,6 +112,29 @@
 | E8 | `POST /api/tasks/{id}/resume` | 续传未完成的任务 | 自动 | 200 或合理 4xx |
 | E9 | `POST /api/tasks/{id}/stop` | 停止运行中的任务 | 自动 | status 200 |
 | E10 | `POST /api/tasks/anchor` | 参数校验 | 自动 | 200/422 |
+| E11 | `GET /api/config/keys` | 返回 key_count 与 source，无 Key 明文（v5.0 优化 1） | 自动 | 200，`key_count >= 0` |
+| E12 | `POST /api/config/keys` | 多 Key 保存后重建 KeyRing/限速器（v5.0 优化 1） | 自动 | 200，`key_count` 等于入参数 |
+| E13 | `DELETE /api/tasks/{id}` | 删除已完成任务目录；运行中任务返回 400（v5.0 优化 3） | 自动 | 200 或 400 |
+
+---
+
+## 三点五、v5.0 优化专项回归（随「执行优化批次」增量执行）
+
+> 触发：完成 `docs/plans/v5.0/optimization_roadmap.md` 任一优化点后，执行对应专项验证。
+> 目的：以低成本（纯本地 / mock）覆盖优化引入的行为变化，不替代上方 8 场景全量回归。
+
+| ID | 优化点 | 验证内容 | 验证方式 | 判断标准 |
+|----|--------|---------|---------|---------|
+| V1 | 1 多 Key 轮询 | `get_api_keys()` 返回多 Key（env+config 合并、去重）；KeyRing round-robin 轮转；429 换 Key 立即重试 | 自动（py 单测 / mock 429） | 日志出现 `[KeyRotation] HTTP 429, 换 Key 立即重试`；单 Key 时走退避 |
+| V2 | 1 限流整合 | 共享桶 `20×N×0.8`/分、视频提交桶 `1×N`/分；`_submit_with_retry` 走独立桶 | 自动 | `stats.effective_rate_per_min` 随 Key 数缩放 |
+| V3 | 1 配置 API | `GET/POST /api/config/keys` 返回数量/来源，不泄露明文；保存后即时重建 | 自动（端点） | E11/E12 通过 |
+| V4 | 2 图片归一化 | 参考图归一化尺寸/压缩体积；URL/data 透传；Pillow 缺失降级 | 自动（py 单测） | `[ImageNormalizer]` 日志；透传/降级不抛异常 |
+| V5 | 3 删除任务 | DELETE 已完成任务删除目录、运行中任务 400 | 自动（端点） | E13 通过 |
+| V6 | 4 json_repair | 含尾随逗号/缺冒号 JSON 被修复；未装库时原路径不变 | 自动（py 单测） | 返回 dict；`[AgnesChat] JSON repaired` 日志 |
+| V7 | 5 用户场景参考图 | creative 场景上传参考图后该场景跳过 AI 分镜图、视频用用户图 | 回归（C 类新增 C4） | C4 场景日志显示使用用户图；未传场景行为不变 |
+| V8 | 6 start.bat | Windows 下脚本语法/流程 | 手动 | 见 roadmap §6.5 |
+
+> C4（创意+用户场景参考图）建议纳入下次全量回归场景矩阵（keyframes + 第 1 个场景上传参考图 + 无配音）。
 
 ---
 
@@ -330,4 +353,4 @@ for name, color in [('test_ref.png', (100,150,200)), ('test_end.png', (200,150,1
 
 ---
 
-*文档版本：v3.1 | 更新日期：2026-06-23*
+*文档版本：v3.2 | 更新日期：2026-08-13 | 变更：新增 v5.0 优化专项回归（V1-V8）与端点 E11-E13*

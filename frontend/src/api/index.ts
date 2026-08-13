@@ -18,6 +18,15 @@ export function saveApiKey(apiKey: string) {
 export function clearApiKey() {
   return fetch('/api/config', { method: 'DELETE' })
 }
+// 多 API Key（v5.0 优化：多 Key 轮询 + 限流整合）
+export function getConfigKeys() {
+  return request('/api/config/keys')
+}
+export function saveConfigKeys(keys: string[]) {
+  const form = new FormData()
+  form.append('keys_json', JSON.stringify(keys))
+  return fetch('/api/config/keys', { method: 'POST', body: form }).then((r) => r.json())
+}
 export function saveDomain(domain: string) {
   const form = new FormData()
   form.append('domain', domain)
@@ -82,6 +91,9 @@ export function resumeTask(taskId: string) {
 }
 export function stopTask(taskId: string) {
   return fetch('/api/tasks/' + taskId + '/stop', { method: 'POST' }).then((r) => r.json())
+}
+export function deleteTask(taskId: string) {
+  return fetch('/api/tasks/' + taskId, { method: 'DELETE' }).then((r) => r.json())
 }
 
 // ── 产物 ──

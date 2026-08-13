@@ -10,6 +10,9 @@ const { trackEvent } = useGa()
 
 // ── API Key ──
 const apiKeyStatus = ref<'none' | 'configured' | 'env'>('none')
+// 多 Key（v5.0 优化）：当前 Key 数 + 采集来源
+const keyCount = ref(0)
+const keySource = ref('')
 
 function isApiKeyConfigured() {
   return apiKeyStatus.value !== 'none'
@@ -20,7 +23,34 @@ async function saveApiKey(key: string) {
   if (r.ok) {
     trackEvent('config_action', { action: 'save_api_key' })
     apiKeyStatus.value = 'configured'
+    await loadKeyInfo()
   }
+}
+
+async function loadKeyInfo() {
+  try {
+    const d = await api.getConfigKeys()
+    keyCount.value = d.key_count || 0
+    keySource.value = d.source || ''
+  } catch (e) {
+    console.error('load /api/config/keys failed:', e)
+  }
+}
+
+async function saveMultiKeys(keysText: string) {
+  const parts = keysText
+    .split(/[\n,，;；\s]+/)
+    .map((s) => s.trim())
+    .filter(Boolean)
+  const r = await api.saveConfigKeys(parts)
+  if (r.ok) {
+    trackEvent('config_action', { action: 'save_multi_api_keys', count: parts.length })
+    keyCount.value = r.key_count || 0
+    keySource.value = r.source || ''
+    apiKeyStatus.value = keyCount.value > 0 ? 'configured' : 'none'
+    return true
+  }
+  return false
 }
 
 async function clearApiKey() {
@@ -212,8 +242,12 @@ async function addWorkspace(path: string, name: string) {
 export function useConfig() {
   return {
     apiKeyStatus,
+    keyCount,
+    keySource,
     isApiKeyConfigured,
     saveApiKey,
+    saveMultiKeys,
+    loadKeyInfo,
     clearApiKey,
     modelSyncStatus,
     modelSaveStatus,
