@@ -276,17 +276,16 @@ async def delete_task(task_id: str):
     dir_name = helpers.find_dir_name(task_id)
     removed_dir = False
     if dir_name:
-        task_dir = os.path.join(get_working_dir(), dir_name)
-        # 路径穿越防护：task_dir 必须位于工作目录内
-        real_task_dir = os.path.realpath(task_dir)
+        # 路径穿越防护：先经 realpath 解析，确认目录位于工作目录内才允许删除
         real_root = os.path.realpath(get_working_dir())
+        real_task_dir = os.path.realpath(os.path.join(get_working_dir(), dir_name))
         if real_task_dir != real_root and real_task_dir.startswith(real_root + os.sep):
-            if os.path.exists(task_dir):
-                shutil.rmtree(task_dir, ignore_errors=True)
+            if os.path.exists(real_task_dir):
+                shutil.rmtree(real_task_dir, ignore_errors=True)
                 removed_dir = True
-                logger.info(f"[Delete] Task {task_id} directory removed: {task_dir}")
+                logger.info(f"[Delete] Task {task_id} directory removed: {real_task_dir}")
         else:
-            logger.warning(f"[Delete] Unsafe task dir for {task_id}, skipped: {task_dir}")
+            logger.warning(f"[Delete] Unsafe task dir for {task_id}, skipped: {dir_name}")
 
     # 3. 从活动注册表 / 排队列表摘除
     app_state.active_pipelines.pop(task_id, None)

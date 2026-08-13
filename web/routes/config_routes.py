@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import hashlib
+import hmac
 import os
 import re
 import time
@@ -99,8 +100,14 @@ def _mask_key(key: str) -> str:
 
 
 def _key_id(key: str) -> str:
-    """生成 Key 的稳定标识（sha256 前 12 位），供前端删除时定位，不回传明文。"""
-    return hashlib.sha256(key.encode("utf-8")).hexdigest()[:12]
+    """生成 Key 的稳定标识（HMAC-SHA256 前 12 位），供前端删除时定位，不回传明文。
+
+    使用 HMAC 带固定密钥，避免对敏感 Key 使用可直接哈希爆破的算法。
+    """
+    secret = os.environ.get("AGNES_CONFIG_ID_HMAC_KEY", "agnes-config-keys-id-v1").encode(
+        "utf-8"
+    )
+    return hmac.new(secret, key.encode("utf-8"), hashlib.sha256).hexdigest()[:12]
 
 
 @router.get("/api/config/keys")

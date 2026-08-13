@@ -17,7 +17,7 @@ import itertools
 import logging
 import threading
 
-from core.config import get_api_keys, get_api_keys_source
+from core.config import get_api_keys
 
 logger = logging.getLogger(__name__)
 
@@ -71,10 +71,7 @@ def get_key_ring() -> KeyRing:
                         "No Agnes API Key configured (AGNES_API_KEY or config api_key)"
                     )
                 _instance = KeyRing(keys)
-                logger.info(
-                    f"[KeyManager] KeyRing 初始化: {len(keys)} 个 Key "
-                    f"({get_api_keys_source()})"
-                )
+                logger.info(f"[KeyManager] KeyRing 初始化: {len(keys)} 个 Key")
     return _instance
 
 
