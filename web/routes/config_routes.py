@@ -71,7 +71,7 @@ async def save_config(api_key: str = Form(...)):
 
 @router.delete("/api/config")
 async def clear_config():
-    """Delete the API key from the config file."""
+    """Delete the API key(s) from the config file（api_key 与 api_keys 一并清除）。"""
     source = get_api_key_source()
     if source == "env":
         raise HTTPException(
@@ -79,6 +79,9 @@ async def clear_config():
             detail="API Key 来自环境变量，无法从界面清除",
         )
     delete_api_key()
+    # 清除后重建 KeyRing 与限速器（回退到 env 采集 / 空）
+    reset_key_ring()
+    reset_rate_limiter()
     return {"ok": True}
 
 

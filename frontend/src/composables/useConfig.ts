@@ -32,6 +32,12 @@ async function loadKeyInfo() {
     const d = await api.getConfigKeys()
     keyCount.value = d.key_count || 0
     keySource.value = d.source || ''
+    // 同步 Key 状态：source 以 'env' 开头（env:1 / mixed:...）→ env；有 Key → configured
+    if (keyCount.value > 0) {
+      apiKeyStatus.value = keySource.value.startsWith('env') ? 'env' : 'configured'
+    } else {
+      apiKeyStatus.value = 'none'
+    }
   } catch (e) {
     console.error('load /api/config/keys failed:', e)
   }

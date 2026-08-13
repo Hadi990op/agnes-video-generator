@@ -305,20 +305,32 @@ def save_config(config: dict):
 
 
 def get_api_key() -> str:
-    env_key = os.environ.get("AGNES_API_KEY", "")
-    if env_key:
-        return env_key
-    return load_settings().api_key
+    """返回首个可用 Key（兼容入口）。
+
+    统一走 ``get_api_keys()``（env + config 合并去重），因此：
+    - 只配过 1 个 key（env 或 config api_key）时返回该 key；
+    - 用户新增 key 后（config api_keys 列表）自动返回第一个 key，
+      无需改动任何调用方，即自然进入多 Key 逻辑。
+    """
+    keys = get_api_keys()
+    return keys[0] if keys else ""
 
 
 def set_api_key(key: str):
+    """保存单个 Key（兼容旧端点 POST /api/config）。
+
+    与 ``set_api_keys`` 互斥：写入 api_key 字段并清掉 api_keys，
+    避免两套字段并存造成 `api_keys` 优先级混乱。
+    注意：env Key 始终参与 ``get_api_keys()`` 合并，不受影响。
+    """
     config = load_config()
     config["api_key"] = key
+    config.pop("api_keys", None)
     save_config(config)
 
 
 def delete_api_key() -> bool:
-    """Remove the API key from the config file.
+    """Remove the API key from the config file（单 Key 与多 Key 字段一并清理）。
 
     Returns:
         True if a key was removed, False if no key existed.
@@ -328,11 +340,16 @@ def delete_api_key() -> bool:
         If the env var is set, get_api_key() will still return it.
     """
     config = load_config()
+    removed = False
     if "api_key" in config:
         del config["api_key"]
+        removed = True
+    if "api_keys" in config:
+        del config["api_keys"]
+        removed = True
+    if removed:
         save_config(config)
-        return True
-    return False
+    return removed
 
 
 def get_api_key_source() -> str:
@@ -340,12 +357,12 @@ def get_api_key_source() -> str:
 
     Returns:
         'env' if from AGNES_API_KEY environment variable,
-        'config' if from the config file,
+        'config' if from the config file（api_key 或 api_keys 字段）,
         'none' if no key is configured.
     """
-    if os.environ.get("AGNES_API_KEY", ""):
-        return "env"
-    if load_settings().api_key:
+    if get_api_keys():
+        if _collect_env_keys():
+            return "env"
         return "config"
     return "none"
 
