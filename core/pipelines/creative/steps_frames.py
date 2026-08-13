@@ -8,6 +8,7 @@ from typing import List, Optional
 
 from core.pipelines import PipelineShutdown
 from models.task import StepStatus
+from utils.image_normalizer import PAD, normalize_image_async
 
 logger = logging.getLogger(__name__)
 
@@ -80,14 +81,15 @@ class FramesStepsMixin:
 
     @staticmethod
     async def _normalize_image_to_size(src: str, vw: int, vh: int, dst: str) -> str:
-        """Normalize an image to exactly ``vw x vh`` using ffmpeg scale+pad.
+        """Normalize an image to exactly ``vw x vh`` (delegated to utils.image_normalizer).
 
         Keeps the original aspect ratio (no stretching) and pads with black
         bars. This avoids feeding i2i a composition that the model would
         otherwise stretch/letterbox unpredictably — the i2i model then only
         needs to preserve identity, not reshape the layout.
 
-        Uses ``_run_ffmpeg_async`` to avoid blocking the event loop.
+        Outputs PNG（保摸底）with black bars, matching the legacy ffmpeg pad
+        semantics. Uses ``normalize_image_async`` to avoid blocking the loop.
 
         Args:
             src: Source image path.
@@ -102,17 +104,10 @@ class FramesStepsMixin:
             logger.debug(f"[Pipeline] normalize cache hit: {dst}")
             return dst
         os.makedirs(os.path.dirname(dst), exist_ok=True)
-        await _run_ffmpeg_async(
-            [
-                "ffmpeg", "-y", "-i", src,
-                "-vf",
-                f"scale={vw}:{vh}:force_original_aspect_ratio=decrease,"
-                f"pad={vw}:{vh}:(ow-iw)/2:(oh-ih)/2",
-                dst,
-            ],
-            timeout=30,
+        return await normalize_image_async(
+            src=src, width=vw, height=vh, dst=dst,
+            strategy=PAD, fmt="PNG", background=(0, 0, 0),  # 保持黑边语义
         )
-        return dst
 
     async def _get_normalized_character_ref(self, character_ref_path: str) -> str:
         """Return a character-reference image normalized to the video size.
@@ -218,15 +213,11 @@ class FramesStepsMixin:
                 )
                 if os.path.exists(user_ef):
                     dest = os.path.join(scene_dir, "end_frame.png")
-                    await _run_ffmpeg_async(
-                        [
-                            "ffmpeg", "-y", "-i", user_ef,
-                            "-vf", f"scale={vw}:{vh}:force_original_aspect_ratio=decrease,pad={vw}:{vh}:(ow-iw)/2:(oh-ih)/2",
-                            dest,
-                        ],
-                        timeout=30,
+                    # 优化 2：用户上传尾帧统一走归一化模块（PAD/PNG/黑边，与原 ffmpeg 语义一致）
+                    end_frame_path = await normalize_image_async(
+                        src=user_ef, width=vw, height=vh, dst=dest,
+                        strategy=PAD, fmt="PNG", background=(0, 0, 0),
                     )
-                    end_frame_path = dest
                 pregenerated[scene_idx] = end_frame_path
                 cached[str(scene_idx)] = end_frame_path
                 prev_end_frame = end_frame_path  # 维护视觉链

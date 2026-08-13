@@ -109,6 +109,11 @@ def get_pipeline_lock(task_id: str) -> asyncio.Lock:
     return lock
 
 
+def release_pipeline_lock(task_id: str) -> None:
+    """删除任务后释放 per-task 锁（防字典无限膨胀）。"""
+    _pipeline_locks.pop(task_id, None)
+
+
 def launch_background_task(coro):
     """Launch a background task with a strong reference to prevent GC."""
     task = asyncio.create_task(coro)

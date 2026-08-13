@@ -11,9 +11,11 @@ from typing import List, Optional
 import requests
 
 from core.api.error_collector import collect_error, collect_error_from_exception
+from core.api.key_manager import get_key_ring
 from core.api.rate_limiter import get_rate_limiter
 from core.config import get_agnes_base_url
 from utils.image import download_image
+from utils.image_normalizer import normalize_reference_path
 
 logger = logging.getLogger(__name__)
 
@@ -59,10 +61,19 @@ class AgnesImageAPI:
         # i2i 默认与 t2i 同模型（官方 2.1 同时支持 t2i/i2i）；环境变量可回退到 2.0。
         env_i2i = os.environ.get("AGNES_IMAGE_I2I_MODEL")
         self.i2i_model = i2i_model or env_i2i or model
-        self.headers = {
-            "Authorization": f"Bearer {api_key}",
+        # 基础 headers（不含 Authorization）：每次请求前经 _auth_headers() 注入当前 Key
+        self._base_headers = {
             "Content-Type": "application/json",
         }
+        # 向后兼容：旧调用方可能读取 self.headers
+        self.headers = dict(self._base_headers)
+
+    def _auth_headers(self) -> dict:
+        """每次请求前生成带当前 Key 的 headers 副本（从 KeyRing 轮转取 Key）。"""
+        key = get_key_ring().next()
+        h = dict(self._base_headers)
+        h["Authorization"] = f"Bearer {key}"
+        return h
 
     async def _path_to_b64(self, path: str) -> str:
         def _read():
@@ -102,7 +113,20 @@ class AgnesImageAPI:
             payload["negative_prompt"] = kwargs["negative_prompt"]
 
         if reference_image_paths:
-            resolved = [await self._resolve_image_ref(p) for p in reference_image_paths]
+            # 优化 2：入参处先归一化参考图（尺寸统一 + 体积压缩），再 resolve。
+            # 目标尺寸从 size（"768x1152"）解析，失败回退 1024x1024。
+            sw, sh = 1024, 1024
+            try:
+                parts = (size or "").lower().split("x")
+                if len(parts) == 2:
+                    sw, sh = int(parts[0]), int(parts[1])
+            except (ValueError, TypeError):
+                sw, sh = 1024, 1024
+            normalized_paths = []
+            for p in reference_image_paths:
+                norm = await asyncio.to_thread(normalize_reference_path, p, sw, sh)
+                normalized_paths.append(norm)
+            resolved = [await self._resolve_image_ref(p) for p in normalized_paths]
             # 官方文档所有 i2i 示例均用 image 数组形式（extra_body.image=[url]），
             # 单图也统一传数组，保持与官方协议一致。
             payload["extra_body"] = {
@@ -113,7 +137,11 @@ class AgnesImageAPI:
         logger.info(f"[AgnesImage] Generating ({'i2i' if use_i2i else 't2i'}): {prompt[:80]}...")
 
         resp = None
-        for attempt in range(max_retries):
+        attempt = 0
+        rotations = 0
+        ring = get_key_ring()
+        max_rotations = len(ring) * max_retries
+        while attempt < max_retries:
             try:
                 # 全局限速：在发起 HTTP 请求前获取令牌
                 await asyncio.to_thread(get_rate_limiter().acquire)
@@ -122,29 +150,51 @@ class AgnesImageAPI:
                 resp = await asyncio.to_thread(
                     requests.post,
                     f"{get_agnes_base_url()}/images/generations",
-                    headers=self.headers,
+                    headers=self._auth_headers(),
                     json=payload,
                     timeout=(30, read_timeout),
                 )
 
-                # 429 限流：退避重试
-                if resp.status_code == 429 and attempt < max_retries - 1:
-                    delay = retry_base_delay * (attempt + 1)
-                    logger.warning(
-                        f"[AgnesImage] 429 rate limit, "
-                        f"retry {attempt + 1}/{max_retries} in {delay:.0f}s..."
-                    )
+                # 429 限流：多 Key 换 Key 立即重试；否则指数退避
+                if resp.status_code == 429:
+                    if ring.has_multiple() and rotations < max_rotations:
+                        rotations += 1
+                        ring.rotate()
+                        logger.warning(
+                            f"[KeyRotation] HTTP 429, 换 Key 立即重试 "
+                            f"(image, rotation {rotations})"
+                        )
+                        continue
+                    if attempt < max_retries - 1:
+                        delay = retry_base_delay * (attempt + 1)
+                        logger.warning(
+                            f"[AgnesImage] 429 rate limit, "
+                            f"retry {attempt + 1}/{max_retries} in {delay:.0f}s..."
+                        )
+                        collect_error(
+                            "image", "generate_single_image",
+                            prompt=prompt,
+                            error_type="RateLimit429",
+                            error_message=f"HTTP 429: rate limited",
+                            status_code=429,
+                            response_body=resp.text,
+                            retry_count=attempt + 1,
+                        )
+                        await asyncio.sleep(delay)
+                        attempt += 1
+                        continue
+                    # 退避耗尽：记录最终失败并抛出
                     collect_error(
                         "image", "generate_single_image",
                         prompt=prompt,
                         error_type="RateLimit429",
-                        error_message=f"HTTP 429: rate limited",
+                        error_message=f"HTTP 429: retries exhausted",
                         status_code=429,
                         response_body=resp.text,
-                        retry_count=attempt + 1,
+                        retry_count=max_retries,
                     )
-                    await asyncio.sleep(delay)
-                    continue
+                    resp.raise_for_status()
+                    break
 
                 # 5xx 服务端错误：退避重试
                 if resp.status_code >= 500 and attempt < max_retries - 1:
@@ -163,6 +213,7 @@ class AgnesImageAPI:
                         retry_count=attempt + 1,
                     )
                     await asyncio.sleep(delay)
+                    attempt += 1
                     continue
 
                 if resp.status_code != 200:
@@ -183,6 +234,7 @@ class AgnesImageAPI:
                         f"retry {attempt + 1}/{max_retries} in {delay:.0f}s..."
                     )
                     await asyncio.sleep(delay)
+                    attempt += 1
                     continue
                 raise
         else:

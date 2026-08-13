@@ -12,8 +12,10 @@ from typing import List, Optional
 import requests
 
 from core.api.error_collector import collect_error, collect_error_from_exception
-from core.api.rate_limiter import get_rate_limiter
+from core.api.key_manager import get_key_ring
+from core.api.rate_limiter import get_rate_limiter, get_video_submit_limiter
 from core.config import get_agnes_base_url, get_agnes_api_root
+from utils.image_normalizer import normalize_reference_path
 from utils.video import download_video
 
 logger = logging.getLogger(__name__)
@@ -61,10 +63,19 @@ class AgnesVideoAPI:
         self.max_retries = max_retries
         self.retry_base_delay = retry_base_delay
         self.shutdown_event = None
-        self.headers = {
-            "Authorization": f"Bearer {api_key}",
+        # 基础 headers（不含 Authorization）：每次请求前经 _auth_headers() 注入当前 Key
+        self._base_headers = {
             "Content-Type": "application/json",
         }
+        # 向后兼容：旧调用方可能读取 self.headers
+        self.headers = dict(self._base_headers)
+
+    def _auth_headers(self) -> dict:
+        """每次请求前生成带当前 Key 的 headers 副本（从 KeyRing 轮转取 Key）。"""
+        key = get_key_ring().next()
+        h = dict(self._base_headers)
+        h["Authorization"] = f"Bearer {key}"
+        return h
 
     def _path_to_b64(self, path: str) -> str:
         with open(path, "rb") as f:
@@ -121,7 +132,11 @@ class AgnesVideoAPI:
         return ref
 
     async def _upload_image_to_url(self, image_path: str, retries: int = 3) -> Optional[str]:
-        for attempt in range(retries):
+        attempt = 0
+        rotations = 0
+        ring = get_key_ring()
+        max_rotations = len(ring) * retries
+        while attempt < retries:
             if self.shutdown_event and self.shutdown_event.is_set():
                 logger.info("[AgnesVideo] Image upload cancelled by shutdown")
                 return None
@@ -142,14 +157,23 @@ class AgnesVideoAPI:
                 resp = await asyncio.to_thread(
                     requests.post,
                     f"{get_agnes_base_url()}/images/generations",
-                    headers=self.headers,
+                    headers=self._auth_headers(),
                     json=payload,
                     timeout=(30, 120),
                 )
                 if resp.status_code == 429:
+                    if ring.has_multiple() and rotations < max_rotations:
+                        rotations += 1
+                        ring.rotate()
+                        logger.warning(
+                            f"[KeyRotation] HTTP 429, 换 Key 立即重试 "
+                            f"(upload, rotation {rotations})"
+                        )
+                        continue
                     delay = _UPLOAD_RETRY_BASE_DELAY_SECONDS * (attempt + 1)
                     logger.warning(f"[AgnesVideo] Image upload 429, retry in {delay}s...")
                     await asyncio.sleep(delay)
+                    attempt += 1
                     continue
                 resp.raise_for_status()
                 result = resp.json()
@@ -241,16 +265,24 @@ class AgnesVideoAPI:
                     logger.info(f"[AgnesVideo] Polling video {video_id[:16]}... (poll #{poll_count + 1}, elapsed {elapsed:.0f}s)")
                 # 全局限速：每次轮询都消耗一个令牌
                 await asyncio.to_thread(get_rate_limiter().acquire)
-                # M2: 用 wait_for 包裹以支持取消
-                resp = await asyncio.wait_for(
-                    asyncio.to_thread(
-                        requests.get,
-                        f"{get_agnes_api_root()}/agnesapi?video_id={video_id}",
-                        headers=self.headers,
-                        timeout=15,
-                    ),
-                    timeout=30,
-                )
+                # M2: 用 wait_for 包裹以支持取消；429 换 Key 立即重试（轮询也轮转 Key 分摊配额）
+                poll_attempts = 0
+                while True:
+                    resp = await asyncio.wait_for(
+                        asyncio.to_thread(
+                            requests.get,
+                            f"{get_agnes_api_root()}/agnesapi?video_id={video_id}",
+                            headers=self._auth_headers(),
+                            timeout=15,
+                        ),
+                        timeout=30,
+                    )
+                    if resp.status_code == 429 and get_key_ring().has_multiple() and poll_attempts < 5:
+                        get_key_ring().rotate()
+                        poll_attempts += 1
+                        logger.warning("[KeyRotation] HTTP 429 on poll, 换 Key 立即重试")
+                        continue
+                    break
                 resp.raise_for_status()
                 result = resp.json()
                 status = result.get("status", "")
@@ -309,19 +341,23 @@ class AgnesVideoAPI:
 
     async def _submit_with_retry(self, payload: dict, mode_desc: str) -> str:
         frame_reductions_left = 2  # allow up to 2 frame-count reductions on 400
-        for attempt in range(self.max_retries):
+        attempt = 0
+        rotations = 0
+        ring = get_key_ring()
+        max_rotations = len(ring) * self.max_retries
+        while attempt < self.max_retries:
             if self.shutdown_event and self.shutdown_event.is_set():
                 raise RuntimeError("Video generation cancelled by user")
             try:
                 logger.info(f"[AgnesVideo] Submitting {mode_desc} (attempt {attempt + 1}/{self.max_retries})...")
-                # 全局限速：在发起提交请求前获取令牌
-                await asyncio.to_thread(get_rate_limiter().acquire)
+                # 视频提交独立限速桶（服务端 1/min 硬限制，不与 chat/image 共享配额）
+                await asyncio.to_thread(get_video_submit_limiter().acquire)
                 # M2: 缩短读超时从 180s 到 60s，使 stop() 更快生效
                 resp = await asyncio.wait_for(
                     asyncio.to_thread(
                         requests.post,
                         f"{get_agnes_base_url()}/videos",
-                        headers=self.headers,
+                        headers=self._auth_headers(),
                         json=payload,
                         timeout=(15, 60),
                     ),
@@ -335,6 +371,15 @@ class AgnesVideoAPI:
                         return video_id
 
                 if resp.status_code == 429:
+                    # 多 Key：换 Key 立即重试（不 sleep、不计入退避）
+                    if ring.has_multiple() and rotations < max_rotations:
+                        rotations += 1
+                        ring.rotate()
+                        logger.warning(
+                            f"[KeyRotation] HTTP 429 on submit, 换 Key 立即重试 "
+                            f"(rotation {rotations})"
+                        )
+                        continue
                     delay = self.retry_base_delay * (attempt + 1)
                     logger.warning(
                         f"[AgnesVideo] 429 rate limit on {mode_desc}, "
@@ -351,6 +396,7 @@ class AgnesVideoAPI:
                         extra={"mode": mode_desc},
                     )
                     await asyncio.sleep(delay)
+                    attempt += 1
                     continue
 
                 if resp.status_code >= 500:
@@ -370,6 +416,7 @@ class AgnesVideoAPI:
                         extra={"mode": mode_desc},
                     )
                     await asyncio.sleep(delay)
+                    attempt += 1
                     continue
 
                 # HTTP 400 with num_frames exceeded → reduce frames and retry
@@ -427,6 +474,7 @@ class AgnesVideoAPI:
                         f"retry {attempt + 1}/{self.max_retries} in {delay:.0f}s..."
                     )
                     await asyncio.sleep(delay)
+                    attempt += 1
                     continue
                 raise
 
@@ -495,7 +543,10 @@ class AgnesVideoAPI:
 
         resolved_refs = []
         for p in reference_image_paths:
-            resolved_refs.append(await self._resolve_image_ref(p))
+            # 优化 2：入参处先归一化参考图（尺寸统一 + 体积压缩），再 resolve。
+            # URL/data: 透传、失败回退原图，安全无回归。
+            norm = await asyncio.to_thread(normalize_reference_path, p, width, height)
+            resolved_refs.append(await self._resolve_image_ref(norm))
         n_refs = len(resolved_refs)
 
         if n_refs == 0:
