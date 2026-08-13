@@ -573,6 +573,7 @@ async def create_task_legacy(
         video_height=video_height,
         reference_image=reference_image,
         end_frame_images=end_frame_images,
+        scene_reference_images=[],
         use_custom_end_frames=use_custom_end_frames,
         generate_end_frames_from_ref=generate_end_frames_from_ref,
         # v3.x 场景配置：直接调用时 Form() 默认值是对象而非字符串，
