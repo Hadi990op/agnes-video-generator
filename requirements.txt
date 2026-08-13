@@ -12,6 +12,11 @@ python-multipart>=0.0.6,<1.0.0
 edge_tts>=6.1.0,<8.0.0          # Azure Edge TTS，免费无需 API Key
 srt>=3.5.0,<4.0.0               # SRT 字幕解析/生成工具
 
+# v5.0 优化（可选依赖：缺失时自动降级，行为与旧版一致）
+json-repair>=0.25.0,<1.0.0      # LLM JSON 输出容错（optimization_roadmap §4）
+python-dotenv>=1.0.0,<2.0.0     # .env 支持（optimization_roadmap §1.8，.env.example 模板）
+Pillow>=9.0.0                   # 图片归一化（optimization_roadmap §2，utils/image_normalizer.py）
+
 # 静态 ffmpeg 二进制，替代系统 ffmpeg。
 # 显式声明后，npm 包（bin/cli.js）与 Docker 均能在无宿主机 ffmpeg 时一键拿到二进制，
 # 用户无需另行安装系统级 ffmpeg。此前仅靠 moviepy 的传递依赖隐式引入，存在断裂风险。

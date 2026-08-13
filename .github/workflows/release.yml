@@ -130,82 +130,102 @@ jobs:
         env:
           DH_USER: ${{ secrets.DOCKERHUB_USERNAME }}
           DH_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
+          RELEASE_VERSION: ${{ github.ref_name }}
         run: python3 .github/scripts/update_dockerhub_overview.py
 
-      # ── Auto-generate GitHub Release notes ──
+      # ── 组装 GitHub Release body：使用方式（原有）+ 新增内容（新增） ──
+      # 使用方式 = 各 release 包（Docker / npm）获取与运行方法
+      # 新增内容 = 读取 docs/public/release-notes/release_notes_vX.Y.Z.md 的「新增内容」章节
+      # 规范见 docs/dev/release_process.md（版本号规则 + 新增内容红线：不写文档整理/SEO/引流）
+      - name: Prepare GitHub Release body
+        run: |
+          VERSION="${GITHUB_REF_NAME#v}"
+          BODY=/tmp/release_body.md
+          cat > "$BODY" <<'EOF'
+          ## 使用方式
+          
+          ### Docker Image
+          
+          Multi-arch (`linux/amd64`, `linux/arm64`) images for this release are published to **GHCR** and **Docker Hub**.
+          
+          #### Pull
+          
+          GitHub Container Registry (GHCR):
+          ```bash
+          docker pull ghcr.io/${{ github.repository_owner }}/${{ env.IMAGE_NAME }}:${{ steps.meta.outputs.version }}
+          ```
+          
+          Docker Hub:
+          ```bash
+          docker pull ${{ secrets.DOCKERHUB_USERNAME }}/${{ env.IMAGE_NAME }}:${{ github.ref_name }}
+          ```
+          
+          #### Run
+          
+          > **Data persistence:** the app writes all generated videos, uploads and settings into `/app/.working_dir` and `/app/.agnes_config` *inside the container*. A plain `docker run` without a volume loses everything when the container is recreated. Mount these paths to your host so outputs survive restarts and can be exported.
+          
+          **Option A — bind mount to a host folder (recommended; files land directly in the folder):**
+          ```bash
+          mkdir -p ~/agnes-data/working ~/agnes-data/config
+          docker run -d -p 8765:8765 \
+            -e AGNES_API_KEY=<your-key> \
+            -v ~/agnes-data/working:/app/.working_dir \
+            -v ~/agnes-data/config:/app/.agnes_config \
+            ghcr.io/${{ github.repository_owner }}/${{ env.IMAGE_NAME }}:${{ steps.meta.outputs.version }}
+          ```
+          Your videos will be in `~/agnes-data/working/` on your machine.
+          
+          **Option B — named Docker volume (no host path needed; survives container recreation):**
+          ```bash
+          docker volume create agnes-working
+          docker volume create agnes-config
+          docker run -d -p 8765:8765 \
+            -e AGNES_API_KEY=<your-key> \
+            -v agnes-working:/app/.working_dir \
+            -v agnes-config:/app/.agnes_config \
+            ghcr.io/${{ github.repository_owner }}/${{ env.IMAGE_NAME }}:${{ steps.meta.outputs.version }}
+          ```
+          Export files from a named volume:
+          ```bash
+          docker run --rm -v agnes-working:/data -v "$PWD":/out busybox cp -r /data/. /out/agnes-export
+          ```
+          
+          Then open **http://localhost:8765**.
+          
+          **Notes**
+          - Prefer Docker Hub? Replace the image with `${{ secrets.DOCKERHUB_USERNAME }}/${{ env.IMAGE_NAME }}:${{ github.ref_name }}`.
+          - The image already declares `VOLUME` for both paths, so `docker run -p 8765:8765 <image>` (no `-v`) keeps data only while you reuse the same container (`stop`/`start`); recreating the container starts fresh.
+          - `AGNES_API_KEY` can also be set later in the Web UI; it is then stored in the mounted config volume.
+          
+          ### npm
+          
+          Use `npx` for a one-shot run or install globally:
+          
+          ```bash
+          # Quick run (no install):
+          npx free-short-video
+          
+          # Global install:
+          npm install -g free-short-video
+          free-short-video
+          ```
+          
+          > Requires Python 3.10+ and ffmpeg on your system.
+          > On first run, a Python virtual environment is auto-created and dependencies are installed.
+          EOF
+          # 追加「新增内容 / What's New」（release notes 文档中对应章节起）
+          NOTES="docs/public/release-notes/release_notes_v${VERSION}.md"
+          if [ -f "$NOTES" ]; then
+            printf '\n---\n\n' >> "$BODY"
+            awk '/^## What.s New/{f=1} f' "$NOTES" >> "$BODY"
+          else
+            echo "::warning::缺少 release notes 文档 $NOTES，GitHub Release 将只有「使用方式」。"
+          fi
+
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
-          generate_release_notes: true
-          body: |
-            ## Docker Image
-
-            Multi-arch (`linux/amd64`, `linux/arm64`) images for this release are published to **GHCR** and **Docker Hub**.
-
-            ### Pull
-
-            GitHub Container Registry (GHCR):
-            ```bash
-            docker pull ghcr.io/${{ github.repository_owner }}/${{ env.IMAGE_NAME }}:${{ steps.meta.outputs.version }}
-            ```
-
-            Docker Hub:
-            ```bash
-            docker pull ${{ secrets.DOCKERHUB_USERNAME }}/${{ env.IMAGE_NAME }}:${{ github.ref_name }}
-            ```
-
-            ### Run
-
-            > **Data persistence:** the app writes all generated videos, uploads and settings into `/app/.working_dir` and `/app/.agnes_config` *inside the container*. A plain `docker run` without a volume loses everything when the container is recreated. Mount these paths to your host so outputs survive restarts and can be exported.
-
-            **Option A — bind mount to a host folder (recommended; files land directly in the folder):**
-            ```bash
-            mkdir -p ~/agnes-data/working ~/agnes-data/config
-            docker run -d -p 8765:8765 \
-              -e AGNES_API_KEY=<your-key> \
-              -v ~/agnes-data/working:/app/.working_dir \
-              -v ~/agnes-data/config:/app/.agnes_config \
-              ghcr.io/${{ github.repository_owner }}/${{ env.IMAGE_NAME }}:${{ steps.meta.outputs.version }}
-            ```
-            Your videos will be in `~/agnes-data/working/` on your machine.
-
-            **Option B — named Docker volume (no host path needed; survives container recreation):**
-            ```bash
-            docker volume create agnes-working
-            docker volume create agnes-config
-            docker run -d -p 8765:8765 \
-              -e AGNES_API_KEY=<your-key> \
-              -v agnes-working:/app/.working_dir \
-              -v agnes-config:/app/.agnes_config \
-              ghcr.io/${{ github.repository_owner }}/${{ env.IMAGE_NAME }}:${{ steps.meta.outputs.version }}
-            ```
-            Export files from a named volume:
-            ```bash
-            docker run --rm -v agnes-working:/data -v "$PWD":/out busybox cp -r /data/. /out/agnes-export
-            ```
-
-            Then open **http://localhost:8765**.
-
-            **Notes**
-            - Prefer Docker Hub? Replace the image with `${{ secrets.DOCKERHUB_USERNAME }}/${{ env.IMAGE_NAME }}:${{ github.ref_name }}`.
-            - The image already declares `VOLUME` for both paths, so `docker run -p 8765:8765 <image>` (no `-v`) keeps data only while you reuse the same container (`stop`/`start`); recreating the container starts fresh.
-            - `AGNES_API_KEY` can also be set later in the Web UI; it is then stored in the mounted config volume.
-
-            ## npm
-
-            Use `npx` for a one-shot run or install globally:
-
-            ```bash
-            # Quick run (no install):
-            npx free-short-video
-
-            # Global install:
-            npm install -g free-short-video
-            free-short-video
-            ```
-
-            > Requires Python 3.10+ and ffmpeg on your system.
-            > On first run, a Python virtual environment is auto-created and dependencies are installed.
+          body_path: /tmp/release_body.md
 
   # ── npm 包发布（整个项目 = free-short-video）──
   # 与 Docker 镜像同由 v* 标签触发；未配置 NPM_TOKEN 时自动跳过，不影响 Docker 发布。
@@ -230,11 +250,22 @@ jobs:
           TAG="${GITHUB_REF_NAME#v}"
           npm pkg set version="$TAG"
 
-      - name: Prepare npm README (add Quick Start at top)
+      - name: Prepare npm README (add Quick Start + What's New at top)
         run: |
+          VERSION="${GITHUB_REF_NAME#v}"
           cp README.md /tmp/README.orig.md
           printf '## Quick Start (npm)\n\n```bash\nnpx free-short-video\n```\n\nOr install globally:\n\n```bash\nnpm install -g free-short-video\nfree-short-video\n```\n\n> Requires Python 3.10+ and ffmpeg.\n\n' > /tmp/npm-header.md
-          cat /tmp/npm-header.md /tmp/README.orig.md > README.md
+          # 前部追加 release 新增内容（What's New 章节起）
+          NOTES="docs/public/release-notes/release_notes_v${VERSION}.md"
+          if [ -f "$NOTES" ]; then
+            printf '---\n\n# What\x27s New in v%s\n\n' "$VERSION" > /tmp/npm-rel.md
+            awk '/^## What.s New/{f=1} f' "$NOTES" >> /tmp/npm-rel.md
+            printf '\n---\n\n' >> /tmp/npm-rel.md
+            cat /tmp/npm-rel.md /tmp/npm-header.md /tmp/README.orig.md > README.md
+          else
+            echo "::warning::缺少 release notes 文档 $NOTES，npm README 将只有 Quick Start。"
+            cat /tmp/npm-header.md /tmp/README.orig.md > README.md
+          fi
 
       - name: Publish to npm
         env:

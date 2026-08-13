@@ -217,6 +217,10 @@ class CreativeVideoTask(BaseTaskState):
     use_custom_end_frames: bool = False
     generate_end_frames_from_ref: bool = True  # i2i 尾帧优化后默认开启
 
+    # ── v5.0 优化 5：用户上传分镜场景图（按场景顺序存储参考图路径）──
+    # 某场景存在用户图时，视频生成以用户图为参考（跳过该场景的 AI 分镜图生成）
+    scene_reference_images: List[str] = Field(default_factory=list)
+
     # ── v3.x 场景配置步骤 ──
     step_scene_config: StepStatus = StepStatus.PENDING
 

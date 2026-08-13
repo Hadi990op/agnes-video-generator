@@ -159,6 +159,35 @@ class BasePipeline(ABC):
             logger.warning("[Pipeline] Failed to save prompts: %s", e)
         return path
 
+    def _save_narration_txt(self, text: str, audio_path: str = "") -> str:
+        """将旁白/读稿纯文本导出为 .txt（v5.x 产物规范前置工作）。
+
+        文件名与音频同名推导（``xxx.mp3`` → ``xxx.txt``）；未给 ``audio_path``
+        时使用 ``narration.txt``。导出文件供用户 / 外部 Agent 直接投喂给 LLM
+        润色或修正，属于 v6.0 手动模式「产物可外部处理」的前置。
+
+        Args:
+            text: 旁白纯文本（无则跳过）。
+            audio_path: 对应音频文件路径（可为空）。
+
+        Returns:
+            落盘的 txt 路径；失败或空文本时返回空串。
+        """
+        if not text:
+            return ""
+        if audio_path:
+            txt_path = os.path.splitext(audio_path)[0] + ".txt"
+        else:
+            txt_path = os.path.join(self.working_dir, "narration.txt")
+        try:
+            with open(txt_path, "w", encoding="utf-8") as f:
+                f.write(text)
+            logger.info("[Artifacts] narration txt saved → %s", txt_path)
+        except Exception as e:
+            logger.warning("[Artifacts] failed to save narration txt: %s", e)
+            return ""
+        return txt_path
+
     @staticmethod
     def get_audio_duration(audio_path: str) -> float:
         """通过 ffprobe 获取音频文件时长（秒），失败返回 0.0。"""

@@ -13,7 +13,7 @@ Agnes Video Generator v2.0 — 大版本回归测试脚本 (并发版)
   - 加权信号量控制并发提交数（≤ 10 权重并发）
   - 服务端全局令牌桶限速器（core/api/rate_limiter.py）确保 Agnes API
     总调用 ≤ 20 次/分钟（含 Chat + Image + Video 提交 + Video 轮询）
-  - 测试报告在 docs/regression_report.json 增量写入，中断后可续传
+  - 测试报告在 docs/dev/regression_report.json 增量写入，中断后可续传
 
 续传策略:
   - completed / skipped → 跳过
@@ -50,9 +50,9 @@ REGRESSION_WORKING_DIR = os.path.join(PROJECT_ROOT, ".regression_workspace")
 REGRESSION_WORKING_DIR_ENV = "AGNES_REGRESSION_WORKING_DIR"
 WORKING_DIR = REGRESSION_WORKING_DIR
 UPLOAD_DIR = os.path.join(WORKING_DIR, "uploads")
-REPORT_PATH = os.path.join(PROJECT_ROOT, "docs", "regression_report.json")
-REPORT_MD_PATH = os.path.join(PROJECT_ROOT, "docs", "regression_report.md")
-ISSUES_MD_PATH = os.path.join(PROJECT_ROOT, "docs", "regression_issues.md")
+REPORT_PATH = os.path.join(PROJECT_ROOT, "docs", "dev", "regression_report.json")
+REPORT_MD_PATH = os.path.join(PROJECT_ROOT, "docs", "dev", "regression_report.md")
+ISSUES_MD_PATH = os.path.join(PROJECT_ROOT, "docs", "dev", "regression_issues.md")
 SERVER_URL = "http://localhost:8765"
 SERVER_LOG = os.path.join(PROJECT_ROOT, ".regression_server.log")
 MANIFEST_PATH = os.path.join(WORKING_DIR, ".regression_manifest.json")

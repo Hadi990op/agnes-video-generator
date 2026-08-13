@@ -31,6 +31,8 @@ from models.task import (
 from core.config import get_working_dir
 from core.path_security import safe_join
 
+logger = logging.getLogger(__name__)
+
 
 # ═══════════════════════════════════════════════════════════════
 # 数据类
@@ -53,6 +55,7 @@ class ArtifactDescriptor:
     exists: bool = False       # 文件是否存在
     size: int = 0              # 文件大小(字节)
     deletable: bool = True     # 是否允许删除
+    schema_hint: str = ""      # v5.x：人类可读字段说明（供外部 Agent/工具处理产物）
 
 
 @dataclass
@@ -228,6 +231,37 @@ def _get_steps_for_state(state: BaseTaskState) -> list[tuple[Optional[str], str]
     return []
 
 
+# ═══════════════════════════════════════════════════════════════
+# 产物 schema 说明（v5.x：产物规范前置工作）
+# ═══════════════════════════════════════════════════════════════
+
+# 按产物 type 的人类可读字段说明，供清单（manifest.json）、MANIFEST.md
+# 与 artifacts 端点输出；外部 Agent / 手动工具依据此说明处理产物。
+_SCHEMA_HINTS = {
+    "image_analysis": "参考图分析文本（纯文本）。可修改，修改后影响故事与分镜生成。",
+    "story": "故事文本（纯文本）。可修改，修改后影响角色参考图、分镜与旁白生成。",
+    "character_ref": "角色参考图 PNG（建议 768x1152，主体居中）。可用外部工具处理后覆盖同名文件。",
+    "script": ("分镜脚本 JSON 数组，UTF-8、缩进 2 空格。字段：scenes[].scene_prompt=画面描述；"
+               "scenes[].end_frame_prompt=尾帧描述；scenes[].narration_text=旁白；scenes[].duration=时长(秒)。"
+               "只修改 scene_prompt/end_frame_prompt 最安全，修改 narration_text 会触发重新配音与字幕。"),
+    "end_frame_prompts": "尾帧描述 JSON：{scene_i: {prompt: 画面描述}}。可修改后影响对应场景尾帧图与视频。",
+    "end_frame": "场景尾帧图 PNG（关键帧衔接用）。可替换后影响后续场景视频。",
+    "video": "场景视频 MP4（H.264+AAC）。可用 ffmpeg 或外部 Agent 剪辑/调色后覆盖同名文件。",
+    "audio": "配音音频 MP3。同名 .txt 为旁白纯文本，建议先修改文本再重新生成音频。",
+    "subtitle": "标准 SubRip SRT（UTF-8，每条 ≤2 行）。可手动修正断句与时间轴。",
+    "final_video": "最终成片 MP4（含配音与字幕）。",
+    "scene_prompts": "段落场景 prompt JSON（prompts.json）。可修改后影响对应段落视频。",
+    "anchor_image": "数字人形象 PNG。可替换后影响数字人视频。",
+    "clip_prompts": "数字人视频 prompt JSON（prompts.json）。",
+    "clip": "数字人循环视频 MP4。",
+}
+
+
+def _schema_hint_for(d: dict) -> str:
+    """取产物定义的 schema_hint，缺省回退空串。"""
+    return _SCHEMA_HINTS.get(d.get("type", ""), "")
+
+
 def _get_artifact_defs(state: BaseTaskState) -> list[dict]:
     """根据 state 类型返回产物定义列表。"""
     if isinstance(state, CreativeVideoTask):
@@ -321,6 +355,7 @@ def list_artifacts(state: BaseTaskState, task_dir: str) -> list[ArtifactDescript
                 exists=exists,
                 size=size,
                 deletable=True,
+                schema_hint=_schema_hint_for(d),
             ))
         elif d["scope"] in ("scene", "paragraph"):
             # 场景/段落级产物
@@ -344,6 +379,7 @@ def list_artifacts(state: BaseTaskState, task_dir: str) -> list[ArtifactDescript
                     exists=exists,
                     size=size,
                     deletable=True,
+                    schema_hint=_schema_hint_for(d),
                 ))
 
     return result
@@ -655,3 +691,167 @@ def sweep_stale_tasks(age_days: int = 7,
             errors.append(f"{name}: 删除失败 ({e})")
 
     return {"swept": swept, "protected": protected, "errors": errors}
+
+
+# ═══════════════════════════════════════════════════════════════
+# 产物清单（manifest.json / MANIFEST.md）— v5.x 产物规范前置工作
+# ═══════════════════════════════════════════════════════════════
+
+# 清单自身文件名（扫描文件树时排除）
+_MANIFEST_FILES = {"manifest.json", "MANIFEST.md", "task_state.json"}
+
+
+def _scan_task_files(task_dir: str) -> list[dict]:
+    """通用文件树扫描：列出任务目录下全部文件（相对路径 + 大小）。
+
+    对无结构化产物定义的类型（simple / poetry 等）同样有效，
+    保证 manifest 对任何任务都可用。
+    """
+    files: list[dict] = []
+    if not os.path.isdir(task_dir):
+        return files
+    for root, _dirs, names in os.walk(task_dir):
+        for name in sorted(names):
+            if name in _MANIFEST_FILES:
+                continue
+            abs_path = os.path.join(root, name)
+            rel_path = os.path.relpath(abs_path, task_dir)
+            try:
+                size = os.path.getsize(abs_path)
+            except OSError:
+                size = 0
+            files.append({"path": rel_path, "size": size})
+    return sorted(files, key=lambda f: f["path"])
+
+
+def build_manifest(state: BaseTaskState, task_dir: str) -> dict:
+    """构建任务产物清单（manifest 数据）。
+
+    包含三部分：
+    1. meta：任务 ID / 类型 / 状态 / 目录绝对路径
+    2. artifacts：结构化产物（creative/manuscript/anchor），含路径、格式、
+       schema_hint、可编辑性、预览 URL、生成步骤
+    3. files：通用文件树（所有任务类型均有）
+
+    该清单是 v6.0「手动模式」checkpoint.json 的数据基础。
+    """
+    # Path-injection hardening: ensure the task directory stays within the working
+    # directory even if it originated from untrusted input downstream.
+    task_dir = safe_join(get_working_dir(), task_dir)
+
+    artifacts = []
+    for art in list_artifacts(state, task_dir):
+        artifacts.append({
+            "artifact_id": art.artifact_id,
+            "name_key": art.label_key,
+            "category": art.category,
+            "scope": art.scope,
+            "scope_index": art.scope_index,
+            "path": art.file_relpath,
+            "exists": art.exists,
+            "size": art.size,
+            "editable": True,  # 文本/JSON 可编辑；图片/视频/音频可替换覆盖
+            "schema_hint": art.schema_hint,
+            "generated_by_step": art.step_key,
+            "preview_url": (
+                f"/api/tasks/{state.task_id}/artifacts/{art.artifact_id}/file"
+                if art.file_relpath else ""
+            ),
+        })
+
+    return {
+        "format_version": "1.0",
+        "task_id": state.task_id,
+        "task_type": state.task_type.value,
+        "task_status": state.status.value if state.status else "pending",
+        "dir_name": os.path.basename(task_dir.rstrip(os.sep)),
+        "working_dir": task_dir,
+        "artifacts": artifacts,
+        "files": _scan_task_files(task_dir),
+    }
+
+
+def write_manifest(state: BaseTaskState, task_dir: str) -> str:
+    """将产物清单落盘为 ``manifest.json``（UTF-8、indent=2），返回路径。
+
+    失败时静默返回空串（清单为辅助产物，不应阻塞主流程）。
+    """
+    try:
+        manifest = build_manifest(state, task_dir)
+        # 使用 build_manifest 归一化后的绝对路径写盘（兼容相对/绝对入参）
+        path = os.path.join(manifest["working_dir"], "manifest.json")
+        with open(path, "w", encoding="utf-8") as f:
+            json.dump(manifest, f, ensure_ascii=False, indent=2)
+        return path
+    except Exception as e:
+        logger.warning("[Artifacts] failed to write manifest.json: %s", e)
+        return ""
+
+
+def write_manifest_md(state: BaseTaskState, task_dir: str) -> str:
+    """将任务目录说明落盘为 ``MANIFEST.md``（供用户与外部 Agent 阅读），返回路径。"""
+    try:
+        manifest = build_manifest(state, task_dir)
+        lines = [
+            "# 任务产物说明（自动生成）",
+            "",
+            "> 本文件由系统自动生成，说明任务目录内各产物的含义、格式与可修改性。",
+            "> 修改产物后可通过网页操作或直接覆盖同名文件；修改 JSON / 文本 / SRT",
+            "> 后需重新生成受影响的下游步骤（见各产物的「说明」）。",
+            "",
+            "## 任务信息",
+            "",
+            f"- 任务 ID：`{manifest['task_id']}`",
+            f"- 任务类型：`{manifest['task_type']}`",
+            f"- 任务状态：`{manifest['task_status']}`",
+            f"- 工作目录：`{manifest['working_dir']}`",
+            "",
+        ]
+
+        if manifest["artifacts"]:
+            lines += [
+                "## 产物清单",
+                "",
+                "| 文件（相对路径） | 类型 | 说明 |",
+                "|---|---|---|",
+            ]
+            for a in manifest["artifacts"]:
+                if not a["path"]:
+                    continue
+                marker = "✅" if a["exists"] else "—"
+                lines.append(
+                    f"| {marker} `{a['path']}` | {a['category']} | {a['schema_hint'] or ''} |"
+                )
+            lines.append("")
+
+        if manifest["files"]:
+            lines += [
+                "## 目录文件树",
+                "",
+                "```",
+            ]
+            lines += [f["path"] for f in manifest["files"]]
+            lines += ["```", ""]
+
+        lines += [
+            "## 协作提示",
+            "",
+            "- 文本 / JSON / SRT 产物可直接用编辑器或外部 AI Agent（如 opencode、workbuddy）修改。",
+            "- 图片 / 视频产物可用 ffmpeg、Python 等外部工具处理后覆盖同名文件。",
+            "- 产物字段说明见 `docs/dev/artifact_standard.md`。",
+            "",
+        ]
+
+        path = os.path.join(manifest["working_dir"], "MANIFEST.md")
+        with open(path, "w", encoding="utf-8") as f:
+            f.write("\n".join(lines))
+        return path
+    except Exception as e:
+        logger.warning("[Artifacts] failed to write MANIFEST.md: %s", e)
+        return ""
+
+
+def write_task_manifests(state: BaseTaskState, task_dir: str) -> None:
+    """一次性落盘 manifest.json + MANIFEST.md（任务运行开始/结束时调用）。"""
+    write_manifest(state, task_dir)
+    write_manifest_md(state, task_dir)

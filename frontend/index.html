@@ -1,0 +1,28 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Agnes Video Generator</title>
+    <link rel="icon" type="image/x-icon" href="/static/favicon.ico" />
+    <link rel="icon" type="image/png" sizes="1024x1024" href="/static/icon.png" />
+    <link rel="apple-touch-icon" href="/static/icon.png" />
+    <script>
+      /* ── 主题防闪烁：hydration/DOM 前同步设置 <html data-theme>（与官网一致）── */
+      (function () {
+        try {
+          var m = localStorage.getItem('theme');
+          var mode = (m === 'light' || m === 'dark' || m === 'system') ? m : 'system';
+          var dark = mode === 'dark' || (mode === 'system' && window.matchMedia('(prefers-color-scheme: dark)').matches);
+          document.documentElement.setAttribute('data-theme', dark ? 'dark' : 'light');
+        } catch (e) {
+          document.documentElement.setAttribute('data-theme', 'dark');
+        }
+      })();
+    </script>
+  </head>
+  <body class="text-ink min-h-screen font-sans" style="background: radial-gradient(ellipse 45% 38% at 50% 0%, color-mix(in oklab, var(--color-accent) 6%, transparent), transparent 70%), var(--color-paper);">
+    <div id="app"></div>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>

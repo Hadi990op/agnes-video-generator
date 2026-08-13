@@ -140,6 +140,187 @@ def load_settings() -> AppSettings:
 # API Key 管理（保持现有逻辑）
 # ═══════════════════════════════════════════════════
 
+# .env 支持（可选依赖 python-dotenv）：不存在时跳过，Key 仍可从环境变量 / 配置文件获取
+try:
+    from dotenv import load_dotenv as _load_dotenv
+    _dotenv_path = os.path.join(_PROJECT_ROOT, ".env")
+    if os.path.exists(_dotenv_path):
+        _load_dotenv(_dotenv_path)
+    _HAS_DOTENV = True
+except ImportError:
+    _HAS_DOTENV = False
+
+
+def _dotenv_value(var: str) -> str:
+    """从 .env 文件读取变量值（需已引入 python-dotenv；否则返回空串）。
+
+    注意：dotenv 只做一次性注入到 os.environ，此处仅用于区分「Key 来自 .env」
+    的场景（env 采集的 fallback 优先级高于 config 文件）。未引入 dotenv 时
+    恒返回空串，行为与现状一致。
+    """
+    if not _HAS_DOTENV:
+        return ""
+    # load_dotenv(override=False) 语义：.env 值不会覆盖已有环境变量。
+    # 这里仅读取 .env 中的原始值（不覆盖 os.environ）。
+    try:
+        from dotenv import dotenv_values
+        vals = dotenv_values(_dotenv_path)
+        return str(vals.get(var, "") or "")
+    except Exception:
+        return ""
+
+
+def _dedup(keys: list) -> list:
+    """去重、去空，保持顺序。"""
+    seen = set()
+    out = []
+    for k in keys:
+        if k and k not in seen:
+            seen.add(k)
+            out.append(k)
+    return out
+
+
+def _collect_env_keys() -> list:
+    """采集 .env（低优先）+ 环境变量（高优先，同槽位覆盖）的 Key 列表。
+
+    Returns:
+        按 AGNES_API_KEY, AGNES_API_KEY_2 ... 顺序排列的原始 Key 列表（未去重）。
+    """
+    keys: list = []
+    for i in range(1, 100):
+        var = "AGNES_API_KEY" if i == 1 else f"AGNES_API_KEY_{i}"
+        dot_val = _dotenv_value(var).strip()
+        env_val = os.environ.get(var, "").strip()
+        val = env_val or dot_val  # 环境变量覆盖 .env
+        if val:
+            keys.append(val)
+        elif i > 1:
+            break
+    return keys
+
+
+def get_api_keys() -> list:
+    """返回所有可用 API Key（去重、去空），合并顺序：
+
+    1. 环境变量 / .env：AGNES_API_KEY, AGNES_API_KEY_2 ... _N（环境变量覆盖 .env）
+    2. 配置文件：api_keys 列表（新字段）或旧 api_key 单个字段（向后兼容）
+
+    两来源合并后去重（同 Key 只保留一次，env 位置优先）。因此：
+    - Web UI 保存的多 Key（config）与 env Key 可并存；
+    - 与 env 重复的 Key 自动去重，不产生双份调用。
+    """
+    env_keys = _collect_env_keys()
+    config = load_config()
+    cfg_keys = config.get("api_keys", []) or []
+    if not cfg_keys and config.get("api_key"):
+        cfg_keys = [config["api_key"]]
+    cfg_keys = [k for k in cfg_keys if k]
+    return _dedup(env_keys + cfg_keys)
+
+
+def set_api_keys(keys: list) -> None:
+    """持久化多 Key 到配置文件 ``api_keys`` 字段（原子写 + 0o600 权限）。
+
+    keys 为空数组时：移除配置中的 api_keys 字段，使采集回退到 env（.env/环境变量）。
+
+    写入后必须在调用侧重建 KeyRing 与限速器（reset_key_ring / reset_rate_limiter），
+    否则旧配置（单桶 + 旧 KeyRing）继续生效。
+    """
+    config = load_config()
+    cleaned = _dedup([k for k in keys])
+    if cleaned:
+        config["api_keys"] = cleaned
+        config.pop("api_key", None)
+    else:
+        config.pop("api_keys", None)
+    save_config(config)
+
+
+def _collect_config_keys() -> list:
+    """采集配置文件中的 Key（api_keys 列表或旧 api_key 字段），去重、去空。"""
+    config = load_config()
+    cfg_keys = config.get("api_keys", []) or []
+    if not cfg_keys and config.get("api_key"):
+        cfg_keys = [config["api_key"]]
+    return _dedup([k for k in cfg_keys if k])
+
+
+def get_api_keys_with_sources() -> list:
+    """返回去重后的 Key 列表（env 优先），每个条目含来源标记。
+
+    Returns:
+        [{"key": "sk-...", "source": "env"|"config"}, ...]
+        同 Key 在 env 与 config 中重复时只保留一次，标记为 env。
+    """
+    env_keys = _dedup(_collect_env_keys())
+    cfg_keys = _collect_config_keys()
+    seen = set()
+    out = []
+    for k in env_keys:
+        if k and k not in seen:
+            seen.add(k)
+            out.append({"key": k, "source": "env"})
+    for k in cfg_keys:
+        if k and k not in seen:
+            seen.add(k)
+            out.append({"key": k, "source": "config"})
+    return out
+
+
+def remove_api_key_single(key: str) -> tuple:
+    """从配置文件移除单个 Key（不影响 env 来源）。
+
+    Args:
+        key: 要移除的 Key 明文。
+
+    Returns:
+        (changed, still_active): changed=是否移除了 config 副本；
+        still_active=该 Key 是否仍生效（env 中存在同 Key 时仍生效）。
+    """
+    config = load_config()
+    changed = False
+    # 1. 从 api_keys 列表移除
+    cfg_keys = config.get("api_keys", []) or []
+    if key in cfg_keys:
+        cfg_keys = [k for k in cfg_keys if k != key]
+        changed = True
+    # 2. 命中旧 api_key 字段
+    if config.get("api_key") == key:
+        config.pop("api_key", None)
+        changed = True
+    if changed:
+        if cfg_keys:
+            config["api_keys"] = cfg_keys
+        else:
+            config.pop("api_keys", None)
+        save_config(config)
+    still_active = key in _dedup(_collect_env_keys())
+    return changed, still_active
+
+
+def get_api_keys_source() -> str:
+    """返回多 Key 采集来源描述，供 ``GET /api/config/keys`` 与日志展示。
+
+    Returns:
+        'env:N' / 'config:N' / 'mixed:envX+configY' / 'none'
+        （各来源计数均为各自去重后的数量；合并去重后的总数见 get_api_keys()）
+    """
+    keys = get_api_keys()
+    if not keys:
+        return "none"
+
+    env_keys = _dedup(_collect_env_keys())
+    cfg_keys = _collect_config_keys()
+
+    if env_keys and cfg_keys:
+        return f"mixed:env{len(env_keys)}+config{len(cfg_keys)}"
+    if env_keys:
+        return f"env:{len(env_keys)}"
+    if cfg_keys:
+        return f"config:{len(cfg_keys)}"
+    return "none"
+
 
 def _ensure_config_dir():
     os.makedirs(CONFIG_DIR, exist_ok=True)
@@ -173,20 +354,32 @@ def save_config(config: dict):
 
 
 def get_api_key() -> str:
-    env_key = os.environ.get("AGNES_API_KEY", "")
-    if env_key:
-        return env_key
-    return load_settings().api_key
+    """返回首个可用 Key（兼容入口）。
+
+    统一走 ``get_api_keys()``（env + config 合并去重），因此：
+    - 只配过 1 个 key（env 或 config api_key）时返回该 key；
+    - 用户新增 key 后（config api_keys 列表）自动返回第一个 key，
+      无需改动任何调用方，即自然进入多 Key 逻辑。
+    """
+    keys = get_api_keys()
+    return keys[0] if keys else ""
 
 
 def set_api_key(key: str):
+    """保存单个 Key（兼容旧端点 POST /api/config）。
+
+    与 ``set_api_keys`` 互斥：写入 api_key 字段并清掉 api_keys，
+    避免两套字段并存造成 `api_keys` 优先级混乱。
+    注意：env Key 始终参与 ``get_api_keys()`` 合并，不受影响。
+    """
     config = load_config()
     config["api_key"] = key
+    config.pop("api_keys", None)
     save_config(config)
 
 
 def delete_api_key() -> bool:
-    """Remove the API key from the config file.
+    """Remove the API key from the config file（单 Key 与多 Key 字段一并清理）。
 
     Returns:
         True if a key was removed, False if no key existed.
@@ -196,11 +389,16 @@ def delete_api_key() -> bool:
         If the env var is set, get_api_key() will still return it.
     """
     config = load_config()
+    removed = False
     if "api_key" in config:
         del config["api_key"]
+        removed = True
+    if "api_keys" in config:
+        del config["api_keys"]
+        removed = True
+    if removed:
         save_config(config)
-        return True
-    return False
+    return removed
 
 
 def get_api_key_source() -> str:
@@ -208,12 +406,12 @@ def get_api_key_source() -> str:
 
     Returns:
         'env' if from AGNES_API_KEY environment variable,
-        'config' if from the config file,
+        'config' if from the config file（api_key 或 api_keys 字段）,
         'none' if no key is configured.
     """
-    if os.environ.get("AGNES_API_KEY", ""):
-        return "env"
-    if load_settings().api_key:
+    if get_api_keys():
+        if _collect_env_keys():
+            return "env"
         return "config"
     return "none"
 

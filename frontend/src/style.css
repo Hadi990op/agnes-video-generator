@@ -1,0 +1,322 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+  /* ── Hallmark · genre: atmospheric · theme: Midnight (custom) · design-system: design.md ──
+   * theme-modes: dark (:root 默认) / light ([data-theme='light'] 同族反转) · toggle: system/light/dark
+   * 与官网 video-website token 体系完全一致，双主题共用 */
+
+  :root {
+    --color-paper:    oklch(13% 0.012 55);
+    --color-paper-2:  oklch(17% 0.014 55);
+    --color-paper-3:  oklch(22% 0.016 55);
+    --color-ink:      oklch(94% 0.008 65);
+    --color-ink-2:    oklch(78% 0.012 60);
+    --color-muted:    oklch(64% 0.014 60);
+    --color-rule:     oklch(30% 0.014 55);
+    --color-accent:   oklch(80% 0.14 75);
+    --color-accent-ink: oklch(20% 0.05 75);
+    --color-focus:    oklch(82% 0.16 75);
+    --color-danger:   oklch(66% 0.19 27);
+    --color-success:  oklch(80% 0.13 152);
+    --color-warning:  oklch(80% 0.13 75);
+    --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+    --dur-micro: 120ms; --dur-short: 220ms; --dur-long: 420ms;
+  }
+
+  /* 亮色——同族反转：hue 55 暖灰家族 + accent 加深保证对比度（与官网一致） */
+  [data-theme='light'] {
+    --color-paper:    oklch(97% 0.008 60);
+    --color-paper-2:  oklch(100% 0.004 60);
+    --color-paper-3:  oklch(93% 0.01 60);
+    --color-ink:      oklch(22% 0.016 55);
+    --color-ink-2:    oklch(43% 0.016 55);
+    --color-muted:    oklch(55% 0.016 55);
+    --color-rule:     oklch(87% 0.012 60);
+    --color-accent:   oklch(52% 0.13 75);
+    --color-accent-ink: oklch(98% 0.008 75);
+    --color-focus:    oklch(48% 0.15 75);
+    --color-danger:   oklch(50% 0.19 27);
+    --color-success:  oklch(50% 0.13 152);
+    --color-warning:  oklch(52% 0.13 75);
+  }
+
+  /* ── Base Animations（fade only，atmospheric）── */
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .animate-spin { animation: spin 1s linear infinite; }
+  @keyframes pulse-dot { 0%,100%{opacity:1} 50%{opacity:0.3} }
+  .animate-pulse-dot { animation: pulse-dot 1.5s ease-in-out infinite; }
+  @keyframes fadeIn { from { opacity: 0 } to { opacity: 1 } }
+  .animate-fade-in { animation: fadeIn 0.42s var(--ease-out) forwards; }
+
+  /* ── Card Surface（paper-2 + rule 边框，无玻璃、无 glow）── */
+  .glass-card {
+    background: var(--color-paper-2);
+    border: 1px solid var(--color-rule);
+    transition: border-color var(--dur-short) var(--ease-out), background-color var(--dur-short) var(--ease-out), transform var(--dur-micro) var(--ease-out);
+  }
+  .glass-card:hover {
+    border-color: color-mix(in oklab, var(--color-accent) 30%, var(--color-rule));
+    background: var(--color-paper-3);
+    transform: translateY(-1px);
+  }
+
+  /* ── Primary Button（琥珀金填充，无渐变无 glow）── */
+  .glow-btn {
+    position: relative;
+    overflow: hidden;
+    background: var(--color-accent);
+    color: var(--color-accent-ink);
+    font-weight: 600;
+    transition: transform var(--dur-micro) var(--ease-out), background-color var(--dur-short) var(--ease-out);
+  }
+  .glow-btn:hover:not(:disabled) {
+    background: color-mix(in oklab, var(--color-accent) 90%, white 10%);
+    transform: translateY(-1px);
+  }
+  .glow-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+  /* ── Input ── */
+  .glass-input {
+    background: var(--color-paper);
+    border: 1px solid var(--color-rule);
+    transition: border-color var(--dur-short) var(--ease-out), box-shadow var(--dur-short) var(--ease-out), background-color var(--dur-short) var(--ease-out);
+  }
+  .glass-input:focus {
+    border-color: var(--color-accent);
+    box-shadow: 0 0 0 1px color-mix(in oklab, var(--color-accent) 30%, transparent);
+    background: var(--color-paper);
+  }
+
+  /* ── Tabs（选中 = accent 面，非渐变）── */
+  .tab-active {
+    background: color-mix(in oklab, var(--color-accent) 15%, var(--color-paper-3));
+    border: 1px solid color-mix(in oklab, var(--color-accent) 50%, transparent);
+    color: var(--color-accent);
+  }
+  .tab-inactive {
+    background: var(--color-paper-2);
+    color: var(--color-muted);
+    border: 1px solid var(--color-rule);
+  }
+  .tab-inactive:hover {
+    background: var(--color-paper-3);
+    border-color: var(--color-rule);
+    color: var(--color-ink-2);
+  }
+
+  /* ── Progress Bar（accent 纯色）── */
+  .progress-glow {
+    background: var(--color-accent);
+  }
+
+  /* ── Step Connector ── */
+  .step-line { transition: all var(--dur-long) var(--ease-out); }
+
+  /* ── Collapse ── */
+  .collapse-header { cursor: pointer; user-select: none; }
+  .collapse-body { overflow: hidden; transition: max-height 0.3s var(--ease-in-out, cubic-bezier(0.65,0,0.35,1)); }
+
+  /* ── Misc ── */
+  pre { white-space: pre-wrap; word-break: break-all; }
+
+  /* ── Scrollbar ── */
+  ::-webkit-scrollbar { width: 6px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: var(--color-rule); border-radius: 3px; }
+  ::-webkit-scrollbar-thumb:hover { background: var(--color-muted); }
+
+  /* ── Selection ── */
+  ::selection { background: color-mix(in oklab, var(--color-accent) 28%, transparent); color: var(--color-ink); }
+
+  /* ── Voice Selector Chip ── */
+  .voice-selector {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    width: 100%;
+    padding: 0.625rem 0.75rem;
+    border-radius: 0.5rem;
+    background: var(--color-paper);
+    border: 1px solid var(--color-rule);
+    cursor: pointer;
+    transition: all var(--dur-short) var(--ease-out);
+    text-align: left;
+  }
+  .voice-selector:hover { border-color: color-mix(in oklab, var(--color-accent) 50%, var(--color-rule)); background: var(--color-paper-3); }
+  .voice-selector:focus { outline: none; border-color: var(--color-accent); box-shadow: 0 0 0 1px color-mix(in oklab, var(--color-accent) 30%, transparent); }
+  .vs-main { display: flex; flex-direction: column; flex: 1; min-width: 0; }
+  .vs-name { font-size: 0.875rem; color: var(--color-ink-2); font-weight: 500; line-height: 1.2; }
+  .vs-desc { font-size: 0.72rem; color: var(--color-muted); line-height: 1.2; margin-top: 2px;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .vs-arrow { color: var(--color-muted); font-size: 0.7rem; flex-shrink: 0; }
+
+  /* ── Voice Picker Modal ── */
+  .vp-overlay {
+    position: fixed; inset: 0; z-index: 1000;
+    background: rgba(0,0,0,0.7);
+    display: flex; align-items: center; justify-content: center;
+    padding: 1rem;
+  }
+  .vp-modal {
+    width: 100%; max-width: 720px; max-height: 88vh;
+    display: flex; flex-direction: column;
+    background: var(--color-paper-2);
+    border: 1px solid var(--color-rule);
+    border-radius: 1rem;
+    box-shadow: 0 20px 60px rgba(0,0,0,0.5);
+    overflow: hidden;
+  }
+  .vp-header {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 1rem 1.25rem; border-bottom: 1px solid var(--color-rule);
+  }
+  .vp-header h3 { font-size: 1rem; font-weight: 600; color: var(--color-ink); }
+  .vp-close { background: none; border: none; color: var(--color-muted); font-size: 1.25rem; cursor: pointer; line-height: 1; }
+  .vp-close:hover { color: var(--color-ink); }
+  .vp-search { padding: 0.75rem 1.25rem 0.25rem; }
+  .vp-search input {
+    width: 100%; padding: 0.55rem 0.85rem; border-radius: 0.5rem;
+    background: var(--color-paper); border: 1px solid var(--color-rule);
+    color: var(--color-ink); font-size: 0.85rem;
+  }
+  .vp-search input:focus { outline: none; border-color: var(--color-accent); box-shadow: 0 0 0 1px color-mix(in oklab, var(--color-accent) 30%, transparent); }
+  .vp-tabs {
+    display: flex; gap: 0.4rem; padding: 0.6rem 1.25rem; overflow-x: auto;
+    border-bottom: 1px solid var(--color-rule); flex-shrink: 0;
+  }
+  .vp-tab {
+    flex-shrink: 0; padding: 0.35rem 0.8rem; border-radius: 999px;
+    font-size: 0.78rem; cursor: pointer; white-space: nowrap;
+    background: var(--color-paper-2); color: var(--color-muted);
+    border: 1px solid var(--color-rule); transition: all var(--dur-short) var(--ease-out);
+  }
+  .vp-tab:hover { background: var(--color-paper-3); color: var(--color-ink-2); }
+  .vp-tab.active { background: color-mix(in oklab, var(--color-accent) 15%, var(--color-paper-3)); color: var(--color-accent); border-color: color-mix(in oklab, var(--color-accent) 50%, transparent); }
+  .vp-count { font-size: 0.72rem; color: var(--color-muted); margin-left: 4px; }
+  .vp-grid {
+    flex: 1; overflow-y: auto; padding: 1rem 1.25rem;
+    display: grid; grid-template-columns: repeat(auto-fill, minmax(210px, 1fr)); gap: 0.6rem;
+  }
+  .vp-card {
+    position: relative; padding: 0.7rem 0.8rem; border-radius: 0.6rem;
+    background: var(--color-paper); border: 1px solid var(--color-rule);
+    cursor: pointer; transition: all var(--dur-short) var(--ease-out);
+  }
+  .vp-card:hover { border-color: color-mix(in oklab, var(--color-accent) 40%, var(--color-rule)); background: var(--color-paper-3); }
+  .vp-card.selected { border-color: var(--color-accent); box-shadow: 0 0 0 1px color-mix(in oklab, var(--color-accent) 40%, transparent); }
+  .vp-card-top { display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; }
+  .vp-card-name { font-size: 0.85rem; font-weight: 600; color: var(--color-ink); }
+  .vp-card-region { font-size: 0.7rem; color: var(--color-muted); }
+  .vp-tags { display: flex; flex-wrap: wrap; gap: 0.25rem; margin-top: 0.4rem; }
+  .vp-tag {
+    font-size: 0.65rem; padding: 0.1rem 0.45rem; border-radius: 999px;
+    background: color-mix(in oklab, var(--color-accent) 12%, transparent); color: var(--color-accent); border: 1px solid color-mix(in oklab, var(--color-accent) 20%, transparent);
+  }
+  .vp-tag.gender-female { background: color-mix(in oklab, var(--color-danger) 12%, transparent); color: var(--color-danger); border-color: color-mix(in oklab, var(--color-danger) 20%, transparent); }
+  .vp-tag.gender-male { background: color-mix(in oklab, var(--color-accent) 12%, transparent); color: var(--color-accent); border-color: color-mix(in oklab, var(--color-accent) 20%, transparent); }
+  .vp-preview-btn {
+    margin-top: 0.5rem; width: 100%; padding: 0.35rem; border-radius: 0.4rem;
+    background: var(--color-paper-2); border: 1px solid var(--color-rule);
+    color: var(--color-ink-2); font-size: 0.72rem; cursor: pointer; display: flex;
+    align-items: center; justify-content: center; gap: 0.35rem; transition: all var(--dur-short) var(--ease-out);
+  }
+  .vp-preview-btn:hover { background: color-mix(in oklab, var(--color-accent) 15%, transparent); color: var(--color-accent); }
+  .vp-preview-btn.playing { background: color-mix(in oklab, var(--color-accent) 25%, transparent); color: var(--color-accent); border-color: color-mix(in oklab, var(--color-accent) 50%, transparent); }
+  .vp-preview-btn.loading { opacity: 0.7; cursor: wait; }
+  .vp-selection {
+    display: flex; align-items: center; justify-content: space-between; gap: 0.75rem;
+    padding: 0.85rem 1.25rem; border-top: 1px solid var(--color-rule);
+    background: var(--color-paper); flex-shrink: 0;
+  }
+  .vp-current { font-size: 0.8rem; color: var(--color-muted); min-width: 0; }
+  .vp-current b { color: var(--color-ink-2); font-weight: 500; }
+  .vp-actions { display: flex; gap: 0.5rem; flex-shrink: 0; }
+  .vp-btn {
+    padding: 0.5rem 1rem; border-radius: 0.5rem; font-size: 0.8rem; cursor: pointer; border: none; transition: all var(--dur-short) var(--ease-out);
+  }
+  .vp-btn-cancel { background: var(--color-paper-3); color: var(--color-ink-2); border: 1px solid var(--color-rule); }
+  .vp-btn-cancel:hover { background: var(--color-paper-3); color: var(--color-ink); }
+  .vp-btn-confirm { background: var(--color-accent); color: var(--color-accent-ink); font-weight: 600; }
+  .vp-btn-confirm:hover { filter: brightness(1.05); transform: translateY(-1px); }
+  .vp-warning {
+    margin: 0 1.25rem 0.5rem; padding: 0.6rem 0.8rem; border-radius: 0.5rem;
+    background: color-mix(in oklab, var(--color-warning) 12%, transparent); border: 1px solid color-mix(in oklab, var(--color-warning) 30%, transparent);
+    color: var(--color-warning); font-size: 0.76rem; line-height: 1.4;
+  }
+  .vp-empty { grid-column: 1 / -1; text-align: center; color: var(--color-muted); font-size: 0.85rem; padding: 2rem 0; }
+
+  /* ── Mobile: fullscreen modal ── */
+  @media (max-width: 640px) {
+    .vp-modal { max-width: 100%; max-height: 100vh; height: 100vh; border-radius: 0; }
+    .vp-grid { grid-template-columns: repeat(2, 1fr); }
+  }
+
+  /* ── Sidebars (lg+) ── */
+  .sidebar-card {
+    background: var(--color-paper-2);
+    border: 1px solid var(--color-rule);
+    border-radius: 0.75rem;
+    padding: 0.75rem;
+    margin-bottom: 0.5rem;
+    font-size: 0.75rem;
+  }
+  .sidebar-card:hover { border-color: color-mix(in oklab, var(--color-accent) 20%, var(--color-rule)); }
+  .sidebar-card a {
+    display: flex;
+    align-items: center;
+    gap: 0.35rem;
+    padding: 0.3rem 0.25rem;
+    color: var(--color-muted);
+    text-decoration: none;
+    transition: color var(--dur-short) var(--ease-out);
+    border-radius: 0.25rem;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .sidebar-card a:hover { color: var(--color-ink-2); background: var(--color-paper-3); }
+  .sidebar-card .stitle {
+    font-size: 0.7rem;
+    font-weight: 600;
+    color: var(--color-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    margin-bottom: 0.4rem;
+    padding-bottom: 0.4rem;
+    border-bottom: 1px solid var(--color-rule);
+    /* 长标题（英文/俄文等）允许换行，避免溢出卡片；emoji 与文字间可断行 */
+    overflow-wrap: anywhere;
+  }
+
+  /* ── Design tokens 工具类（Tailwind CDN 不识别自定义 token，手动补齐）── */
+  .text-ink { color: var(--color-ink); }
+  .text-ink-2 { color: var(--color-ink-2); }
+  .text-muted { color: var(--color-muted); }
+  .text-accent { color: var(--color-accent); }
+  .text-accent-ink { color: var(--color-accent-ink); }
+  .text-rule { color: var(--color-rule); }
+  .hover\:text-ink:hover { color: var(--color-ink); }
+  .hover\:text-ink-2:hover { color: var(--color-ink-2); }
+  .hover\:text-accent:hover { color: var(--color-accent); }
+  .bg-paper { background-color: var(--color-paper); }
+  .bg-paper-2 { background-color: var(--color-paper-2); }
+  .bg-paper-3 { background-color: var(--color-paper-3); }
+  .bg-accent { background-color: var(--color-accent); }
+  .hover\:bg-paper-3:hover { background-color: var(--color-paper-3); }
+  .border-rule { border-color: var(--color-rule); }
+  .border-rule\/30 { border-color: color-mix(in oklab, var(--color-rule) 30%, transparent); }
+  .border-rule\/40 { border-color: color-mix(in oklab, var(--color-rule) 40%, transparent); }
+  .text-danger { color: var(--color-danger); }
+  .text-success { color: var(--color-success); }
+  .text-warning { color: var(--color-warning); }
+  .placeholder-muted::placeholder { color: var(--color-muted); }
+
+  /* 亮色下：Tailwind 语义浅色文字在浅底上对比度不足，加深为语义 token */
+  [data-theme='light'] .text-green-400,
+  [data-theme='light'] .text-green-300,
+  [data-theme='light'] .text-emerald-400 { color: var(--color-success); }
+  [data-theme='light'] .text-red-400,
+  [data-theme='light'] .text-red-500 { color: var(--color-danger); }
+  [data-theme='light'] .text-yellow-400,
+  [data-theme='light'] .text-amber-400 { color: var(--color-warning); }

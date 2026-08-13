@@ -14,6 +14,9 @@ __pycache__/
 build/
 dist/
 
+# 前端源码与依赖（构建产物已在 static/，镜像无需携带源码与 node_modules）
+frontend/
+
 # 运行时产物与媒体（体积大，不进镜像）
 .working_dir/
 static/generated/

@@ -96,12 +96,12 @@ Agnes Video Generator 完全免费且开源，**本项目绝不会提供付费�
 
 ## 📚 文档导航
 
-- **[核心功能](docs/features.zh.md)** — 多种创作模式、完全免费的 AI 模型链、AI 旁白配音与智能字幕、灵活的创作控制、生产级可靠性与多语言 Web UI。
-- **[快速开始](docs/getting-started.zh.md)** — 4 种部署方式：手动（`start.sh`）、Docker、npm（`npx free-short-video`）、AI Agent 辅助。
-- **[使用说明](docs/usage.zh.md)** — 配置 API Key、选择视频模式、断点续传、三种串联模式，以及日志与输出目录。
-- **[项目架构](docs/architecture.zh.md)** — 项目结构与技术栈。
-- **[API 接口](docs/api.zh.md)** — 完整 REST + WebSocket 接口列表。
-- **[常见问题](docs/faq.zh.md)** — 高频疑问解答。
-- **[关于与许可](docs/about.zh.md)** — 致谢与 MIT 开源协议。
+- **[核心功能](docs/public/features.zh.md)** — 多种创作模式、完全免费的 AI 模型链、AI 旁白配音与智能字幕、灵活的创作控制、生产级可靠性与多语言 Web UI。
+- **[快速开始](docs/public/getting-started.zh.md)** — 4 种部署方式：手动（`start.sh`）、Docker、npm（`npx free-short-video`）、AI Agent 辅助。
+- **[使用说明](docs/public/usage.zh.md)** — 配置 API Key、选择视频模式、断点续传、三种串联模式，以及日志与输出目录。
+- **[项目架构](docs/public/architecture.zh.md)** — 项目结构与技术栈。
+- **[API 接口](docs/public/api.zh.md)** — 完整 REST + WebSocket 接口列表。
+- **[常见问题](docs/public/faq.zh.md)** — 高频疑问解答。
+- **[关于与许可](docs/public/about.zh.md)** — 致谢与 MIT 开源协议。
 
 **关键词**：免费AI视频生成器, AI视频生成工具, 文字转视频AI, 免费AI视频制作, AI视频创作, 开源视频生成器, Agnes AI, 文生视频, 图生视频, 关键帧视频, AI旁白配音, 自动字幕, 多场景视频, 零成本AI视频, 无需订阅的AI视频工具, 数字人口播, 自托管AI视频生成器, Runway开源替代
