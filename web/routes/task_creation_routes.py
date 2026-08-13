@@ -177,6 +177,7 @@ async def create_creative_task(
     scene_durations_json: str = Form("[5,5,5]"),
     reference_image: UploadFile = File(None),
     end_frame_images: List[UploadFile] = File(None),
+    scene_reference_images: List[UploadFile] = File(None),
     use_custom_end_frames: bool = Form(False),
     generate_end_frames_from_ref: bool = Form(True),
     # v2.0 音频配置
@@ -272,6 +273,16 @@ async def create_creative_task(
         if saved_paths:
             state.end_frame_images = saved_paths
             logger.info(f"[Pipeline] Saved {len(saved_paths)} custom end frame images for task {task_id}")
+
+    # v5.0 优化 5：用户上传分镜场景图（按场景顺序落盘，场景数不匹配时按场景 index 对齐）
+    if scene_reference_images:
+        saved_scene_refs = []
+        for idx, sref_file in enumerate(scene_reference_images):
+            if sref_file and sref_file.filename:
+                saved_scene_refs.append(await _save_upload_file(sref_file, upload_dir, f"{task_id}_scene_{idx}"))
+        if saved_scene_refs:
+            state.scene_reference_images = saved_scene_refs
+            logger.info(f"[Pipeline] Saved {len(saved_scene_refs)} user scene reference images for task {task_id}")
 
     pipeline = deps.create_pipeline_for_type(TaskType.CREATIVE, api_key, task_id, dir_name)
     app_state.active_pipelines[task_id] = pipeline
