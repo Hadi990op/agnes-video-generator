@@ -11,6 +11,7 @@
 > - 测试覆盖 & CI：`docs/dev/test_coverage_and_ci.md`
 > - 优化路线图：`docs/plans/v5.0/optimization_roadmap.md`（可落地优化点）
 > - 待调研存档：`docs/plans/optimization-research/README.md`
+> - 发版规范：`docs/dev/release_process.md`（版本号规则 + 新增内容规范 + 发布流程）
 
 ---
 
@@ -191,6 +192,7 @@ agnes-video-generator/
 | **"验证项目" / "跑一下检查"** | 按「〇 部署与验证」执行 | 部署后验证 |
 | **"执行优化批次"** | 按 `docs/plans/v5.0/optimization_roadmap.md` 执行对应批次 | 每完成一项按文档验收标准自验 + 更新 `docs/dev/regression_test_plan.md` 回归条目 |
 | **"待调研优化点" / "优化调研"** | 按 `docs/plans/optimization-research/README.md` 索引与调研方法评估 | 价值存疑的新点子先存档，转入可执行需移回 `optimization_roadmap.md` |
+| **"发版" / "发布" / "release"** | 按 `docs/dev/release_process.md` 执行（确认版本类型 → 升位 → 写 release notes → 打 tag） | 需用户明确版本类型或版本号 |
 
 ---
 
@@ -404,7 +406,30 @@ python scripts/scene_runner.py --endpoints         # 端点验证
 
 ---
 
-## 八、开发规范
+## 八、Release 发布工作流
+
+用户说 **"发版" / "发布" / "release"** 时，加载 `docs/dev/release_process.md` 按流程执行。
+
+### 核心规则
+
+1. **版本号三种类型**：大版本 `X.0.0` / 中版本 `X.Y.0` / 小版本 `X.Y.Z`，对应版本号三位；**升位由用户要求触发**，Agent 不得自行升版。
+2. **release 文档 = 使用方式 + 新增内容**：使用方式沿用现有各 release 包用法；新增内容含「大的功能更新」「大的代码层面优化/重构（开源价值）」「集中的小 bug 修复」。
+3. **红线不写**：文档整理、纯营收向 SEO/引流优化、镜像同步等对用户无作用的工作，一律不提及；小型重构也不写。
+4. **SEO 与独立检索**：release 内容后续供官网板块展示，标题/Overview 覆盖核心功能关键词、自包含可独立检索；但只做内容型 SEO，不做关键词堆砌等作弊。
+5. **产出**：`docs/public/release-notes/release_notes_vX.Y.Z.md` + git tag，CI 自动组 GitHub Release（body = 使用方式 + 新增内容）。
+
+### 版本号映射
+
+| 用户要求 | 升位 | 新增内容侧重 |
+|----------|------|--------------|
+| 发个小版本 | `Z+1` | 以 Bug 修复为主，按类归纳 |
+| 发布中版本 | `Y+1`，`Z` 清零 | 功能更新 + 修复并重 |
+| 发大版本 | `X+1`，`Y/Z` 清零 | 以功能更新为主，分节介绍 |
+| 升到 vX.Y.Z | 直接采用 | 按实际变化写 |
+
+---
+
+## 九、开发规范
 
 - **Python**：Google 风格 docstring，类型注解，async/await 用于 IO
 - **前端**：ES6+，不引入框架
@@ -414,4 +439,4 @@ python scripts/scene_runner.py --endpoints         # 端点验证
 
 ---
 
-*文档版本：v7.0 | 更新日期：2026-08-13 | 阶段：🟢 维护模式（六种任务类型 + artifacts/水印/多工作区/13 语言音色）*
+*文档版本：v7.2 | 更新日期：2026-08-13 | 阶段：🟢 维护模式（六种任务类型 + artifacts/水印/多工作区/13 语言音色）*
