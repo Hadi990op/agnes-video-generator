@@ -3,18 +3,47 @@
 
 Docker Hub does not auto-populate these from GitHub, so we set them via the Hub API.
 Expected environment variables:
-  DH_USER    Docker Hub username
-  DH_TOKEN   Docker Hub token (PAT works as the login password)
-  REPO_DESC  GitHub repository description (short overview)
-  IMAGE_NAME image/repository name on Docker Hub (defaults to free-short-video)
+  DH_USER         Docker Hub username
+  DH_TOKEN        Docker Hub token (PAT works as the login password)
+  RELEASE_VERSION release tag name WITHOUT the leading 'v' (e.g. "3.0.0").
+                  When set, the release's "What's New" section is prepended
+                  to the front of the Docker Hub overview page.
+  IMAGE_NAME      image/repository name on Docker Hub (defaults to free-short-video)
 """
 import os
+import re
 import sys
 import json
 import urllib.request
 import urllib.error
 
 DOCKERHUB_API = "https://hub.docker.com/v2"
+
+
+def _load_whats_new(version: str) -> str:
+    """Load the release notes' 'What's New' section for the given version.
+
+    Reads ``docs/public/release-notes/release_notes_v{version}.md`` and returns
+    everything from the ``## What's New`` heading onward (the release doc structure
+    per ``docs/dev/release_process.md``). Returns "" when the file is missing or
+    has no such section.
+    """
+    if not version:
+        return ""
+    note = os.path.join("docs", "public", "release-notes", f"release_notes_v{version}.md")
+    if not os.path.exists(note):
+        print(f"No release notes doc at {note}; skipping 'What's New' prepend.")
+        return ""
+    with open(note, encoding="utf-8") as f:
+        lines = f.read().splitlines()
+    start = next((i for i, l in enumerate(lines) if l.startswith("## What's New")), None)
+    if start is None:
+        print(f"No '## What's New' section in {note}; skipping prepend.")
+        return ""
+    section = "\n".join(lines[start:]).strip()
+    # Drop the trailing footer marker if the doc ends with one (e.g. *文档版本：...*).
+    section = re.sub(r"\n*---\s*\n*\*.*\*\s*$", "", section).strip()
+    return section
 
 
 def main() -> int:
@@ -49,6 +78,13 @@ def main() -> int:
         if line.startswith("# ") and "Agnes Video Generator" in line:
             readme_lines[i] = line.replace("Agnes Video Generator", "free-short-video", 1)
             break
+    # Prepend the latest release's "What's New" section at the very front of the
+    # page (right after the H1), so Docker Hub visitors see release content first.
+    release_version = os.environ.get("RELEASE_VERSION", "").lstrip("v")
+    what_new = _load_whats_new(release_version)
+    if what_new:
+        page_header = f"**Latest release: v{release_version}** — full details below.\n\n---\n\n{what_new}\n\n---\n"
+        readme_lines.insert(1, page_header)
     # Prepend Docker Quick Start at the very beginning of the page, after the H1.
     docker_usage = (
         "---\n\n"
@@ -62,7 +98,7 @@ def main() -> int:
         "Then open **http://localhost:8765**.\n\n"
         "---\n"
     )
-    readme_lines.insert(1, docker_usage)
+    readme_lines.insert(2, docker_usage)
     readme = "\n".join(readme_lines)
 
     # Docker Hub caps full_description; truncate at a newline before the limit.

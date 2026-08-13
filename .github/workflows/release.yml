@@ -130,6 +130,7 @@ jobs:
         env:
           DH_USER: ${{ secrets.DOCKERHUB_USERNAME }}
           DH_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
+          RELEASE_VERSION: ${{ github.ref_name }}
         run: python3 .github/scripts/update_dockerhub_overview.py
 
       # ── 组装 GitHub Release body：使用方式（原有）+ 新增内容（新增） ──
@@ -212,11 +213,11 @@ jobs:
           > Requires Python 3.10+ and ffmpeg on your system.
           > On first run, a Python virtual environment is auto-created and dependencies are installed.
           EOF
-          # 追加「新增内容」（release notes 文档中的「## 新增内容」章节起）
+          # 追加「新增内容 / What's New」（release notes 文档中对应章节起）
           NOTES="docs/public/release-notes/release_notes_v${VERSION}.md"
           if [ -f "$NOTES" ]; then
             printf '\n---\n\n' >> "$BODY"
-            awk '/^## 新增内容/{f=1} f' "$NOTES" >> "$BODY"
+            awk '/^## What.s New/{f=1} f' "$NOTES" >> "$BODY"
           else
             echo "::warning::缺少 release notes 文档 $NOTES，GitHub Release 将只有「使用方式」。"
           fi
@@ -249,11 +250,22 @@ jobs:
           TAG="${GITHUB_REF_NAME#v}"
           npm pkg set version="$TAG"
 
-      - name: Prepare npm README (add Quick Start at top)
+      - name: Prepare npm README (add Quick Start + What's New at top)
         run: |
+          VERSION="${GITHUB_REF_NAME#v}"
           cp README.md /tmp/README.orig.md
           printf '## Quick Start (npm)\n\n```bash\nnpx free-short-video\n```\n\nOr install globally:\n\n```bash\nnpm install -g free-short-video\nfree-short-video\n```\n\n> Requires Python 3.10+ and ffmpeg.\n\n' > /tmp/npm-header.md
-          cat /tmp/npm-header.md /tmp/README.orig.md > README.md
+          # 前部追加 release 新增内容（What's New 章节起）
+          NOTES="docs/public/release-notes/release_notes_v${VERSION}.md"
+          if [ -f "$NOTES" ]; then
+            printf '---\n\n# What\x27s New in v%s\n\n' "$VERSION" > /tmp/npm-rel.md
+            awk '/^## What.s New/{f=1} f' "$NOTES" >> /tmp/npm-rel.md
+            printf '\n---\n\n' >> /tmp/npm-rel.md
+            cat /tmp/npm-rel.md /tmp/npm-header.md /tmp/README.orig.md > README.md
+          else
+            echo "::warning::缺少 release notes 文档 $NOTES，npm README 将只有 Quick Start。"
+            cat /tmp/npm-header.md /tmp/README.orig.md > README.md
+          fi
 
       - name: Publish to npm
         env:

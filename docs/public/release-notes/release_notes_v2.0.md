@@ -4,64 +4,42 @@
 
 ## Overview
 
-v2.0 is a complete architectural refactor from a single-file script to an engineered application with three distinct video generation pipelines, a four-layer backend, WebSocket real-time progress, and a 7-language internationalized frontend.
+v2.0 is a **major version** that rebuilds the single-file script into an engineered application: **three video generation pipelines** (Simple / Creative / Manuscript), each with its own backend engine, a fully **internationalized 7-language Web UI**, and a rich **AI subtitle system** built on edge_tts word-level timestamps.
 
----
+## Usage
 
-## Features
+From v1.0, upgrade in place — no data migration required:
 
-### Three Task Types
-- **Simple Video** — Single prompt → single video, exposing all 9 Agnes API parameters (t2v/i2v/ti2vid/keyframes)
-- **Creative Video** — AI screenwriter → storyboards → per-scene videos → edge_tts narration → fine-grained subtitles → concatenation
-- **Manuscript Video** — Long text splitting → AI scene prompt → per-paragraph videos → unified TTS+subtitles → concatenation
-
-### Architecture
-- `core/api/` — Agnes Chat / Image / Video API wrappers with retry and polling
-- `core/audio/` — edge_tts engine (word-level timestamps) + SRT subtitle generation + moviepy overlay
-- `core/compositor/` — Video concatenation, scaling, frame extraction, silent audio generation
-- `core/pipelines/` — Three pipeline implementations (simple / creative / manuscript)
-- `models/` — Pydantic v2 data models with persistent task state serialization
-
-### Web UI
-- Three-tab frontend (Simple / Creative / Manuscript), Tailwind CDN single-page
-- 7 languages: 中文 / English / Русский / 日本語 / 한국어 / Bahasa Melayu / Bahasa Indonesia
-- WebSocket real-time progress push
-- Task pause, resume, and stop
-
-### Subtitle System
-- edge_tts word-level timestamps → fine-grained SRT grouping
-- CJK multi-line wrapping (break at punctuation)
-- `method="caption"` rendering, supports stroke / background / position customization
-
-### Other
-- One-click startup script `start.sh`
-- `docs/plans/v1.0/system_design.md` system design document
-- 3 demo videos embedded in README
-
----
-
-## Stats
-
-```
-40 files changed, 11,268 insertions(+), 2,792 deletions(-)
+```bash
+git pull
+.venv/bin/pip install -r requirements.txt
+./start.sh        # opens http://localhost:8765
 ```
 
-### New Files
-| File | Description |
-|------|-------------|
-| `core/pipelines/` | Three pipeline types (simple / creative / manuscript) |
-| `core/api/` | Agnes API wrapper layer |
-| `core/audio/` | TTS + subtitle engine |
-| `core/compositor/` | Video compositing / processing |
-| `models/task.py` | Three task subtype data models |
-| `scripts/regression_runner.py` | Regression test script |
-| `docs/plans/v1.0/system_design.md` | System design document |
-| `docs/dev/regression_test_plan.md` | Test plan |
+> **Requirements**: Python 3.10+. New dependencies: `edge_tts>=6.1.0`, `srt>=3.5.0`.
+
+## What's New
+
+### Features & Improvements
+
+- **Three task types with shared foundations** — Simple Video (single prompt → single video via Agnes Video API, `t2v`/`i2v`/`ti2vid`/`keyframes`), Creative Video (AI screenwriter → storyboards → per-scene videos → edge_tts narration → fine-grained subtitles → concatenation), Manuscript Video (long-text splitting → AI scene prompts → per-segment videos → unified TTS + subtitles → concatenation).
+- **Multilingual Web UI** — three-tab single-page frontend (Simple / Creative / Manuscript) with i18n for 中文 / English / Русский / 日本語 / 한국어 / Bahasa Melayu / Bahasa Indonesia.
+- **Real-time progress** — WebSocket push of pipeline progress; task pause, resume, and stop.
+- **Fine-grained subtitle system** — word-level SRT grouping from edge_tts timestamps, CJK multi-line wrapping, `method="caption"` rendering with stroke / background / position customization.
+
+### Refactoring & Optimizations
+
+- **Four-layer architecture** — `core/api` (Agnes Chat / Image / Video wrappers with retry + polling), `core/audio` (edge_tts + SRT + moviepy overlay), `core/compositor` (concatenation / scaling / frame extraction), `core/pipelines` (three pipeline implementations).
+- **Pydantic v2 data models** — typed task subclasses with persistent state serialization and backward-compatible task loading.
+- **Two-phase manuscript generation** — A/B split of video generation for parallelism and faster completion.
+
+### Bug Fixes
+
+- MoviePy 2.x compatibility for subtitle `bg_color`/`position`; TTS volume auto-boosted.
+- CJK font fallback for legacy tasks; bundled fonts shipped for reliable rendering.
+- Video frame cap at the Agnes API limit (409 at 720p) with auto-retry for transient failures.
+- Single continuous TTS + SRT for the manuscript pipeline, eliminating per-segment padding drift.
 
 ---
 
-## Upgrade Notes
-
-- Python 3.10+ required
-- New dependencies: `edge_tts>=6.1.0`, `srt>=3.5.0`
-- Run `./start.sh` for one-click startup, or `.venv/bin/pip install -r requirements.txt && .venv/bin/python server.py`
+<可选>兼容性 / 配置变更提醒：v1.0 `start.sh` 一键启动已内置 venv 创建与依赖安装，升级后首次运行会自动准备环境。

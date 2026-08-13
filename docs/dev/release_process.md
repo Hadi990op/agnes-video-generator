@@ -101,6 +101,8 @@ release 内容后续会在**官网开辟板块展示**，并被搜索引擎**独
 
 ## 五、release 文档模板
 
+> ⚠️ **章节锚点与 CI 提取一致**：`release.yml`、`.github/scripts/update_dockerhub_overview.py` 均以 **`## What's New`** 为提取锚点（`awk '/^## What.s New/{f=1} f'`），因此文档必须使用**英文章节标题** `## Overview` / `## Usage` / `## What's New`（内容语言中英皆可）。该 `What's New` 章节会被自动前置到 **GitHub Release 正文、Docker Hub 页面前部、npm README 前部**（见「六、发布流程」第 7 步）。
+
 ```markdown
 # Release vX.Y.Z — <一句话副标题>
 
@@ -108,23 +110,23 @@ release 内容后续会在**官网开辟板块展示**，并被搜索引擎**独
 
 ## Overview
 
-<1-3 句总览：本版是大/中/小版本，核心变化是什么>
+<1-3 句总览：本版是大/中/小版本，核心变化是什么，覆盖本版功能关键词>
 
-## 使用方式
+## Usage（使用方式）
 
 <各 release 包（Docker / npm / 源码）获取与运行方法；本版特有的升级注意事项>
 
-## 新增内容
+## What's New（新增内容）
 
-### 功能更新
+### Features & Improvements（功能更新）
 
 - <大的功能更新逐条列出，说明能力与如何使用；条目标题用用户可搜索的关键词>
 
-### 代码层优化与重构
+### Refactoring & Optimizations（代码层优化与重构）
 
 - <大型代码层优化 / 架构演进，面向开源社区，说明对性能/架构/可维护性的意义>
 
-### Bug 修复
+### Bug Fixes（Bug 修复）
 
 - <集中概括的修复列表：按类别归纳，不展开细节>
 
@@ -143,13 +145,21 @@ release 内容后续会在**官网开辟板块展示**，并被搜索引擎**独
 1. 用户触发发版（含版本类型或明确版本号）
 2. 确认版本类型 → 按「二、版本号规则」升位，确定 vX.Y.Z
 3. 汇总本版变化 → 按「三、release 文档结构」筛选「新增内容」（过滤红线）
-4. 撰写 docs/public/release-notes/release_notes_vX.Y.Z.md（按「五、模板」）
+4. 撰写 docs/public/release-notes/release_notes_vX.Y.Z.md（按「五、模板」，必须含 ## What's New 锚点）
 5. 自验：.venv/bin/python -m py_compile <改动文件>；涉及流水线跑 ./scripts/run_mock_regression.sh
 6. git tag vX.Y.Z && git push origin vX.Y.Z
-7. CI（.github/workflows/release.yml）自动：构建多平台镜像 → GHCR/Docker Hub → npm 发布
-   → GitHub Release（body = 使用方式 + 新增内容，读取 release notes 文档）
+7. CI（.github/workflows/release.yml）自动：
+   - 构建多平台镜像 → GHCR / Docker Hub（同步 Docker Hub overview：description + README）
+   - npm 发布（整个项目作为 free-short-video 包）
+   - GitHub Release（body = 使用方式 + What's New，读取 release notes 文档）
+   - **Docker Hub 页面前部**：.github/scripts/update_dockerhub_overview.py 把本版
+     What's New 章节前置到 overview 顶部（Quick Start 之后）
+   - **npm README 前部**：release.yml 把本版 What's New 章节 + npm Quick Start
+     前置到发布用 README 顶部
 8. 若有版本号示例位置需同步（README / docker-compose / AGENTS.md），一并更新
 ```
+
+> **Docker / npm 页面前置规则**：每个版本的 release 新增内容（`## What's New` 章节）必须自动展示在 **Docker Hub 仓库页**与 **npm 包 README** 的**前部**（顶部），让访问分发页面的用户第一眼看到本版更新。此规则已固化在 CI（第 7 步），发版时无需手工操作；但**缺失 release notes 文档时 CI 会跳过前置并输出 warning**，因此第 4 步的文档是强制项。
 
 ### 用户要求与版本号映射
 
@@ -162,4 +172,4 @@ release 内容后续会在**官网开辟板块展示**，并被搜索引擎**独
 
 ---
 
-*文档版本：v1.1 | 更新日期：2026-08-13 | 状态：✅ 已生效*
+*文档版本：v1.2 | 更新日期：2026-08-13 | 状态：✅ 已生效*
