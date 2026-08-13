@@ -42,4 +42,4 @@ git pull
 
 ---
 
-<可选>兼容性 / 配置变更提醒：v1.0 `start.sh` 一键启动已内置 venv 创建与依赖安装，升级后首次运行会自动准备环境。
+> Optional: Compatibility / configuration change notice — since v1.0, `start.sh` already bundles venv creation and dependency installation, so the first run after upgrading will set up the environment automatically.

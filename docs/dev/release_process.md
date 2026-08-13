@@ -101,7 +101,7 @@ release 内容后续会在**官网开辟板块展示**，并被搜索引擎**独
 
 ## 五、release 文档模板
 
-> ⚠️ **章节锚点与 CI 提取一致**：`release.yml`、`.github/scripts/update_dockerhub_overview.py` 均以 **`## What's New`** 为提取锚点（`awk '/^## What.s New/{f=1} f'`），因此文档必须使用**英文章节标题** `## Overview` / `## Usage` / `## What's New`（内容语言中英皆可）。该 `What's New` 章节会被自动前置到 **GitHub Release 正文、Docker Hub 页面前部、npm README 前部**（见「六、发布流程」第 7 步）。
+> ⚠️ **章节锚点与 CI 提取一致**：`release.yml`、`.github/scripts/update_dockerhub_overview.py` 均以 **`## What's New`** 为提取锚点（`awk '/^## What.s New/{f=1} f'`），因此文档必须使用**英文章节标题** `## Overview` / `## Usage` / `## What's New`。**⚠️ 对外产物（GitHub Release body / release notes 文档 / Docker Hub / npm README）必须全英文**——release notes 文档整体用英文撰写（标题、正文、章节皆英文），禁止中英混杂（如中文标题 + 英文正文）。`release.yml` 组装 GitHub Release body 时使用英文标题 `## Usage`（勿改回中文）。该 `What's New` 章节会被自动前置到 **GitHub Release 正文、Docker Hub 页面前部、npm README 前部**（见「六、发布流程」第 7 步）。
 
 ```markdown
 # Release vX.Y.Z — <一句话副标题>
@@ -145,7 +145,7 @@ release 内容后续会在**官网开辟板块展示**，并被搜索引擎**独
 1. 用户触发发版（含版本类型或明确版本号）
 2. 确认版本类型 → 按「二、版本号规则」升位，确定 vX.Y.Z
 3. 汇总本版变化 → 按「三、release 文档结构」筛选「新增内容」（过滤红线）
-4. 撰写 docs/public/release-notes/release_notes_vX.Y.Z.md（按「五、模板」，必须含 ## What's New 锚点）
+4. 撰写 docs/public/release-notes/release_notes_vX.Y.Z.md（按「五、模板」，必须含 ## What's New 锚点，**全文英文**）
 5. 自验：.venv/bin/python -m py_compile <改动文件>；涉及流水线跑 ./scripts/run_mock_regression.sh
 6. git tag vX.Y.Z && git push origin vX.Y.Z
 7. CI（.github/workflows/release.yml）自动：
