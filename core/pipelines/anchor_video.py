@@ -271,6 +271,8 @@ class AnchorPipeline(MultiScenePipeline):
             return None
 
         audio_path = os.path.join(self.working_dir, "full_narration.mp3")
+        # v5.x 产物规范前置：导出读稿纯文本（供外部 Agent/工具处理）
+        self._save_narration_txt(full_text, audio_path)
 
         if os.path.exists(audio_path) and os.path.getsize(audio_path) > 0:
             self._state.combined_audio = audio_path

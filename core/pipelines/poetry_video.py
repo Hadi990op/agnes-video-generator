@@ -263,6 +263,10 @@ class PoetryVideoPipeline(MultiScenePipeline):
         audio_config = self._state.audio_config
         has_audio = audio_config.enabled
         sub_config = self._state.subtitle_config
+        # v5.x 产物规范前置：导出全篇朗诵纯文本（供外部 Agent/工具处理）
+        self._save_narration_txt(
+            "\n\n".join(s.narration_text for s in scenes if s.narration_text)
+        )
         # v2.0：逐场景缓存 sub_maker（cues），供 _generate_subtitles 使用（不持久化）
         self._scene_sub_makers: dict = {}
 

@@ -1,6 +1,7 @@
 """视频下载 + 中间产物管理路由。"""
 from __future__ import annotations
 
+import json
 import logging
 import os
 import shutil
@@ -62,6 +63,7 @@ async def list_task_artifacts(task_id: str):
         "ok": True,
         "task_type": state.task_type.value,
         "task_status": state.status.value if state.status else "pending",
+        "dir_name": dir_name,
         "artifacts": [
             {
                 "artifact_id": a.artifact_id,
@@ -73,6 +75,13 @@ async def list_task_artifacts(task_id: str):
                 "exists": a.exists,
                 "size": a.size,
                 "deletable": a.deletable,
+                # v5.x 产物规范前置：暴露相对路径 / 字段说明 / 预览 URL
+                "file_relpath": a.file_relpath,
+                "schema_hint": a.schema_hint,
+                "preview_url": (
+                    f"/api/tasks/{task_id}/artifacts/{a.artifact_id}/file"
+                    if a.file_relpath else ""
+                ),
             }
             for a in artifacts
         ],
@@ -103,6 +112,53 @@ async def serve_artifact_file(task_id: str, artifact_id: str):
 
     media_type = _ARTIFACT_MEDIA_TYPES.get(artifact.category, "application/octet-stream")
     return FileResponse(real_abs_path, media_type=media_type)
+
+
+@router.get("/api/tasks/{task_id}/manifest")
+async def get_task_manifest(task_id: str):
+    """返回任务产物清单（manifest.json）。
+
+    清单由流水线运行开始/结束时自动落盘；若不存在（如排队中或旧任务）
+    则现场构建并写盘。包含结构化产物（path/schema_hint/preview_url）
+    与通用文件树两部分，是 v6.0 手动模式 checkpoint 的数据基础。
+    """
+    dir_name = helpers.find_dir_name(task_id)
+    tm = TaskManager(task_id, dir_name=dir_name)
+    state = tm.load()
+    if not state:
+        raise HTTPException(status_code=404, detail="Task not found")
+
+    from core.artifacts import build_manifest, write_manifest
+
+    manifest_path = os.path.join(tm.task_dir, "manifest.json")
+    if not os.path.exists(manifest_path):
+        write_manifest(state, tm.task_dir)
+    try:
+        with open(manifest_path, "r", encoding="utf-8") as f:
+            manifest = json.load(f)
+    except (OSError, ValueError):
+        # 清单损坏/不可读 → 现场重建
+        manifest = build_manifest(state, tm.task_dir)
+    return {"ok": True, **manifest}
+
+
+@router.get("/api/tasks/{task_id}/manifest.md")
+async def get_task_manifest_md(task_id: str):
+    """返回任务目录说明文件 MANIFEST.md（供用户与外部 Agent 阅读）。"""
+    dir_name = helpers.find_dir_name(task_id)
+    tm = TaskManager(task_id, dir_name=dir_name)
+    state = tm.load()
+    if not state:
+        raise HTTPException(status_code=404, detail="Task not found")
+
+    from core.artifacts import write_manifest_md
+
+    md_path = os.path.join(tm.task_dir, "MANIFEST.md")
+    if not os.path.exists(md_path):
+        write_manifest_md(state, tm.task_dir)
+    if not os.path.exists(md_path):
+        raise HTTPException(status_code=404, detail="Manifest not available")
+    return FileResponse(md_path, media_type="text/markdown; charset=utf-8")
 
 
 @router.get("/api/tasks/{task_id}/artifacts/{artifact_id}/cascade-preview")

@@ -95,10 +95,23 @@ def create_pipeline_for_type(
         )
 
 
+def _refresh_task_manifests(state: BaseTaskState, pipeline: BasePipeline) -> None:
+    """落盘产物清单 manifest.json + MANIFEST.md（v5.x 产物规范前置工作）。
+
+    在任务运行开始与结束时调用；失败不阻断主流程（清单为辅助产物）。
+    """
+    try:
+        from core.artifacts import write_task_manifests
+        write_task_manifests(state, pipeline.working_dir)
+    except Exception as e:
+        logger.warning(f"[Artifacts] manifest refresh failed for {pipeline.task_id}: {e}")
+
+
 async def run_pipeline(pipeline: BasePipeline, state: BaseTaskState):
     """通用 Pipeline 执行包装器。"""
     try:
         logger.info(f"[Pipeline] Starting run for task {pipeline.task_id}, type={state.task_type}")
+        _refresh_task_manifests(state, pipeline)  # 初始产物清单
         await pipeline.run(state)
         logger.info(f"[Pipeline] Completed run for task {pipeline.task_id}")
     except PipelineShutdown:
@@ -106,6 +119,7 @@ async def run_pipeline(pipeline: BasePipeline, state: BaseTaskState):
     except Exception as e:
         logger.error(f"[Pipeline] Task {pipeline.task_id} failed: {e}", exc_info=True)
     finally:
+        _refresh_task_manifests(state, pipeline)  # 最终产物清单
         # 身份比对：仅当字典里仍是当前 pipeline 时才删除。
         # 否则快速 resume→stop 会让旧 pipeline 的 finally 误删新 pipeline。
         if app_state.active_pipelines.get(pipeline.task_id) is pipeline:

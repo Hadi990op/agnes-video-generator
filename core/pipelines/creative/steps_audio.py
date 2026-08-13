@@ -254,18 +254,20 @@ class AudioStepsMixin:
             return None
 
         combined_audio = os.path.join(self.working_dir, "combined_narration.mp3")
+        # v5.x 产物规范前置：导出旁白纯文本（供外部 Agent/工具处理）
+        narration_text = self._state.narrations[0] if self._state.narrations else ""
+        self._save_narration_txt(narration_text, combined_audio)
         if os.path.exists(combined_audio) and os.path.getsize(combined_audio) > 0:
             logger.info("[Pipeline] Step audio: SKIP (file exists)")
             self._state.step_audio = StepStatus.COMPLETED
             self.task_manager.update_step("step_audio", StepStatus.COMPLETED)
             # 续传：音频已存在则仅重采 cues，避免字幕退回 legacy 启发式
             return await self._recover_sub_maker(
-                self._state.narrations[0] if self._state.narrations else "",
+                narration_text,
                 self._state.audio_config, self._state.subtitle_config,
             )
 
         audio_enabled = self._state.audio_config.enabled
-        narration_text = self._state.narrations[0] if self._state.narrations else ""
         total_duration = sum(float(s.duration) for s in self._state.scenes)
 
         logger.info(
