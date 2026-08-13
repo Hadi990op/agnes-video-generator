@@ -10,10 +10,10 @@ const { trackEvent } = useGa()
 
 // ── API Key ──
 const apiKeyStatus = ref<'none' | 'configured' | 'env'>('none')
-// 多 Key（v5.0 优化）：当前 Key 数 + 采集来源 + 去重后的 Key 列表（含来源标记）
+// 多 Key（v5.0 优化）：当前 Key 数 + 采集来源 + 去重后的 Key 列表（掩码 + 来源 + 稳定 id，无明文）
 const keyCount = ref(0)
 const keySource = ref('')
-const keyList = ref<{ key: string; source: string }[]>([])
+const keyList = ref<{ id: string; mask: string; source: string }[]>([])
 
 function isApiKeyConfigured() {
   return apiKeyStatus.value !== 'none'
@@ -45,9 +45,9 @@ async function loadKeyInfo() {
   }
 }
 
-async function removeKey(key: string) {
+async function removeKey(id: string) {
   if (!confirm(t('removeKeyConfirm'))) return false
-  const r = await api.removeConfigKey(key)
+  const r = await api.removeConfigKey(id)
   if (r.ok) {
     trackEvent('config_action', { action: 'remove_api_key' })
     if (r.still_active) {
@@ -67,11 +67,6 @@ async function removeKey(key: string) {
   }
   alert(r.detail || t('failRemoveKey'))
   return false
-}
-
-function maskKey(key: string): string {
-  if (key.length <= 12) return key
-  return key.slice(0, 6) + '••••' + key.slice(-4)
 }
 
 async function saveMultiKeys(keysText: string) {
@@ -296,7 +291,6 @@ export function useConfig() {
     keyCount,
     keySource,
     keyList,
-    maskKey,
     isApiKeyConfigured,
     saveApiKey,
     saveMultiKeys,

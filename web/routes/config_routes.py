@@ -1,6 +1,7 @@
 """配置类路由：API Key、模型、水印、域名。"""
 from __future__ import annotations
 
+import hashlib
 import os
 import re
 import time
@@ -92,11 +93,21 @@ async def clear_config():
 # 多 API Key（优化 1：多 Key 轮询 + 限流整合）
 # ═══════════════════════════════════════════════════
 
+def _mask_key(key: str) -> str:
+    """生成 Key 掩码：仅展示首 6 + 尾 4，中间省略。"""
+    return f"{key[:6]}...{key[-4:]}" if len(key) > 12 else "***"
+
+
+def _key_id(key: str) -> str:
+    """生成 Key 的稳定标识（sha256 前 12 位），供前端删除时定位，不回传明文。"""
+    return hashlib.sha256(key.encode("utf-8")).hexdigest()[:12]
+
+
 @router.get("/api/config/keys")
 async def get_config_keys():
-    """返回 Key 列表（去重后，含来源标记）与数量。
+    """返回 Key 掩码列表（去重后，含来源标记）与数量。
 
-    返回明文 Key 仅供用户本人配置界面展示；不写入日志。
+    **不回传 Key 明文**：keys 数组仅含掩码（mask）与稳定标识（id）。
     env 与 config 中重复的 Key 只返回一次（标记 env，env 优先）。
 
     Returns:
@@ -104,7 +115,7 @@ async def get_config_keys():
           "ok": true,
           "key_count": int,            # 去重后总数
           "source": "env:N|config:N|mixed:...|none",
-          "keys": [{"key": "sk-...", "source": "env"|"config"}, ...],
+          "keys": [{"id": "sha256[:12]", "mask": "sk-xxx...xxxx", "source": "env"|"config"}, ...],
         }
     """
     items = get_api_keys_with_sources()
@@ -112,32 +123,48 @@ async def get_config_keys():
         "ok": True,
         "key_count": len(items),
         "source": get_api_keys_source(),
-        "keys": items,
+        "keys": [
+            {"id": _key_id(it["key"]), "mask": _mask_key(it["key"]), "source": it["source"]}
+            for it in items
+        ],
     }
 
 
 @router.delete("/api/config/keys")
-async def remove_config_key(key: str = Form("")):
+async def remove_config_key(id: str = Form(""), key: str = Form("")):
     """移除单个 Key（仅针对 config 中保存的 Key；env 来源不可在此移除）。
 
     Args:
-        key: 要移除的 Key 明文（Form 字段）。
+        id: Key 的稳定标识（GET /api/config/keys 返回的 id，掩码接口的定位方式）。
+        key: Key 明文（向后兼容的旧参数；新前端请用 id，避免明文回传）。
 
     Returns:
         {"ok": true, "key_count": ..., "source": ..., "removed": 掩码, "still_active": bool}
 
     Raises:
-        400: Key 来自环境变量，无法从界面移除；或 Key 不存在。
+        400: Key 来自环境变量，无法从界面移除；或 Key 参数缺失。
+        404: Key 不存在。
     """
+    id = (id or "").strip()
     key = (key or "").strip()
-    if not key:
+    if not key and not id:
         raise HTTPException(status_code=400, detail="Key 参数缺失")
 
     items = get_api_keys_with_sources()
-    env_has = any(it["source"] == "env" and it["key"] == key for it in items)
-    config_has = any(it["source"] == "config" and it["key"] == key for it in items)
-    if not env_has and not config_has:
-        raise HTTPException(status_code=404, detail="Key 不存在")
+    if key:
+        # 兼容旧调用：明文直接匹配
+        env_has = any(it["source"] == "env" and it["key"] == key for it in items)
+        config_has = any(it["source"] == "config" and it["key"] == key for it in items)
+        if not env_has and not config_has:
+            raise HTTPException(status_code=404, detail="Key 不存在")
+    else:
+        # 掩码接口：按稳定 id 定位明文 Key
+        matched = [it for it in items if _key_id(it["key"]) == id]
+        if not matched:
+            raise HTTPException(status_code=404, detail="Key 不存在")
+        key = matched[0]["key"]
+        env_has = matched[0]["source"] == "env"
+        config_has = not env_has
 
     changed, still_active = remove_api_key_single(key)
     if not changed and env_has and not config_has:

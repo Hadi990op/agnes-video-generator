@@ -12,7 +12,6 @@ const {
   keyCount,
   keySource,
   keyList,
-  maskKey,
   saveMultiKeys,
   loadKeyInfo,
   removeKey,
@@ -173,14 +172,14 @@ initCollapse()
           {{ t('multiKeyActive') }}
         </span>
       </div>
-      <!-- Key 列表：掩码展示 + 来源 + 单个移除 -->
+      <!-- Key 列表：后端掩码展示 + 来源 + 按稳定 id 单个移除 -->
       <div v-if="keyList.length > 0" class="mt-3 space-y-1.5">
         <div
           v-for="(item, idx) in keyList"
-          :key="item.key + idx"
+          :key="item.id + idx"
           class="flex items-center gap-2 rounded-lg px-3 py-1.5 bg-paper-3/70 text-xs"
         >
-          <code class="flex-1 font-mono text-ink-2 truncate">{{ maskKey(item.key) }}</code>
+          <code class="flex-1 font-mono text-ink-2 truncate">{{ item.mask }}</code>
           <span
             class="px-1.5 py-0.5 rounded text-[10px] uppercase"
             :class="item.source === 'env' ? 'bg-amber-900/60 text-amber-300' : 'bg-paper-3 text-muted'"
@@ -188,8 +187,8 @@ initCollapse()
           <button
             v-if="item.source !== 'env'"
             class="text-red-300 hover:text-red-200 transition"
-            title="移除该 Key"
-            @click="removeKey(item.key)"
+            :title="t('removeKeyBtn')"
+            @click="removeKey(item.id)"
           >
             ✕
           </button>

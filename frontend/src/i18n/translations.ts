@@ -9,7 +9,7 @@ export const T: Record<string, Record<string, string>> = {
     addKey: '添加 Key', multiKeyActive: '多 Key 轮询已启用',
     apiKeyAppendPlaceholder: '粘贴新的 API Key（自动追加到现有 Key，无需重输旧 Key）',
     keySrcEnv: 'ENV', keySrcConfig: 'CONFIG', keySrcEnvHint: '来自环境变量，请在启动环境/.env 中修改',
-    removeKeyConfirm: '确定移除该 Key 吗？', removedKey: '已移除 Key', failRemoveKey: '移除失败',
+    removeKeyConfirm: '确定移除该 Key 吗？', removedKey: '已移除 Key', failRemoveKey: '移除失败', removeKeyBtn: '移除该 Key',
     keyStillActive: 'Key 仍生效（env 中仍存在）',
     clear: '清除', clearConfirm: '确定要清除已配置的 API Key 吗？', apiKeyFromEnv: '已配置 (环境变量)',
     clearEnvHint: '当前 API Key 来自环境变量 AGNES_API_KEY，无法从界面清除。请取消环境变量后重试。',

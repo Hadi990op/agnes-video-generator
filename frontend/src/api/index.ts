@@ -28,9 +28,10 @@ export function saveConfigKeys(keys: string[], append = false) {
   if (append) form.append('append', 'true')
   return fetch('/api/config/keys', { method: 'POST', body: form }).then((r) => r.json())
 }
-export function removeConfigKey(key: string) {
+export function removeConfigKey(id: string) {
+  // 用掩码接口返回的稳定 id 定位删除，不回传 Key 明文
   const form = new FormData()
-  form.append('key', key)
+  form.append('id', id)
   return fetch('/api/config/keys', { method: 'DELETE', body: form }).then((r) => r.json())
 }
 export function saveDomain(domain: string) {
