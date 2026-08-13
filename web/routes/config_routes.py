@@ -2,12 +2,15 @@
 from __future__ import annotations
 
 import os
+import re
 import time
 from typing import List, Optional
 
 from fastapi import APIRouter, Form, HTTPException
 
 from core.api.agnes_models import fetch_available_models
+from core.api.key_manager import reset_key_ring
+from core.api.rate_limiter import reset_rate_limiter
 from core.config import (
     AGNES_DOMAIN_MAP,
     REGRESSION_WORKING_DIR_ENV,
@@ -18,11 +21,14 @@ from core.config import (
     get_agnes_domain,
     get_api_key,
     get_api_key_source,
+    get_api_keys,
+    get_api_keys_source,
     get_selected_models,
     get_watermark_config,
     get_workspaces,
     set_agnes_domain,
     set_api_key,
+    set_api_keys,
     set_selected_models,
     set_watermark_config,
 )
@@ -74,6 +80,61 @@ async def clear_config():
         )
     delete_api_key()
     return {"ok": True}
+
+
+# ═══════════════════════════════════════════════════
+# 多 API Key（优化 1：多 Key 轮询 + 限流整合）
+# ═══════════════════════════════════════════════════
+
+@router.get("/api/config/keys")
+async def get_config_keys():
+    """返回 Key 数量与来源（永不回传 Key 明文）。
+
+    Returns:
+        {"ok": true, "key_count": int, "source": "env:N|config:N|mixed:...|none"}
+    """
+    keys = get_api_keys()
+    return {
+        "ok": True,
+        "key_count": len(keys),
+        "source": get_api_keys_source(),
+    }
+
+
+@router.post("/api/config/keys")
+async def save_config_keys(keys_json: str = Form(...)):
+    """设置多 API Key（JSON 数组或逗号/换行分隔文本）。
+
+    保存后立即重建 KeyRing 与限速器，使新 Key 数与配额即时生效（无需重启）。
+    空数组/空串则回退到 env 采集（移除配置文件中的 api_keys 字段）。
+
+    Args:
+        keys_json: JSON 数组字符串（如 '["k1","k2"]'）或普通逗号/换行分隔文本。
+    """
+    import json as _json
+
+    raw = (keys_json or "").strip()
+    keys = []
+    if raw:
+        try:
+            parsed = _json.loads(raw)
+            if isinstance(parsed, list):
+                keys = [str(k).strip() for k in parsed]
+            else:
+                keys = [str(parsed).strip()]
+        except _json.JSONDecodeError:
+            # 非 JSON：按逗号/换行/空白分隔拆分
+            keys = [k.strip() for k in re.split(r"[\s,，;；]+", raw)]
+    keys = [k for k in keys if k]
+    set_api_keys(keys)
+    # Key 数变化 → 重建 KeyRing 与限速器（共享桶 + 视频提交桶）
+    reset_key_ring()
+    reset_rate_limiter()
+    return {
+        "ok": True,
+        "key_count": len(get_api_keys()),
+        "source": get_api_keys_source(),
+    }
 
 
 @router.get("/api/models")

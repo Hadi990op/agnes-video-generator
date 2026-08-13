@@ -16,10 +16,16 @@ from typing import List
 import requests
 
 from core.api.error_collector import collect_error, collect_error_from_exception
-from core.api.rate_limiter import get_rate_limiter
+from core.api.rate_limiter import get_rate_limiter, request_with_key_rotation
 from core.config import get_agnes_base_url
 
 logger = logging.getLogger(__name__)
+
+# json_repair 可选依赖（优化 4）：未安装时行为与现状完全一致
+try:
+    from json_repair import repair_json
+except ImportError:
+    repair_json = None
 
 # 重试配置
 _MAX_RETRIES = 3
@@ -57,10 +63,21 @@ class AgnesChatAPI:
     def __init__(self, api_key: str, model: str = "agnes-2.0-flash"):
         self.api_key = api_key
         self.model = model
-        self.headers = {
-            "Authorization": f"Bearer {api_key}",
+        # 基础 headers（不含 Authorization）：每次请求前经 _auth_headers() 注入当前 Key
+        self._base_headers = {
             "Content-Type": "application/json",
         }
+        # 向后兼容：旧调用方可能读取 self.headers
+        self.headers = dict(self._base_headers)
+
+    def _auth_headers(self) -> dict:
+        """每次请求前生成带当前 Key 的 headers 副本（从 KeyRing 轮转取 Key）。"""
+        from core.api.key_manager import get_key_ring
+
+        key = get_key_ring().next()
+        h = dict(self._base_headers)
+        h["Authorization"] = f"Bearer {key}"
+        return h
 
     def _image_to_b64_uri(self, path: str) -> str:
         with open(path, "rb") as f:
@@ -89,10 +106,12 @@ class AgnesChatAPI:
         return ""
 
     def _request_with_retry(self, payload: dict, timeout: int = 120) -> dict:
-        """带重试的 API 请求。
+        """带重试的 API 请求（429 换 Key + 5xx/超时/连接错误指数退避）。
 
-        对 5xx/429/超时/连接错误进行最多 3 次指数退避重试。
-        4xx 错误（非 429）直接抛出不重试。
+        经 ``request_with_key_rotation`` 统一封装：
+        - 多 Key 下 429 换 Key 立即重试（不计入退避）；
+        - 全 Key 429 / 5xx / 超时 / 连接错误 指数退避最多 3 次；
+        - 4xx（非 429）不重试，直接抛出。
         每次请求前通过全局限速器控制调用频率。
 
         Args:
@@ -105,75 +124,51 @@ class AgnesChatAPI:
         Raises:
             requests.HTTPError: 4xx 客户端错误或重试耗尽。
         """
-        last_exc = None
-        for attempt in range(_MAX_RETRIES):
-            try:
-                get_rate_limiter().acquire()
-                resp = requests.post(
-                    f"{get_agnes_base_url()}/chat/completions",
-                    headers=self.headers,
-                    json=payload,
-                    timeout=timeout,
-                )
-                if self._should_retry(resp) and attempt < _MAX_RETRIES - 1:
-                    delay = _RETRY_BASE_DELAY * (attempt + 1)
-                    logger.warning(
-                        f"[AgnesChat] Server error {resp.status_code}, "
-                        f"retry {attempt + 1}/{_MAX_RETRIES} in {delay}s..."
-                    )
-                    collect_error(
-                        "chat", "chat",
-                        prompt=self._extract_prompt_from_payload(payload),
-                        error_type=f"HTTP{resp.status_code}",
-                        error_message=f"HTTP {resp.status_code}: server error",
-                        status_code=resp.status_code,
-                        response_body=resp.text,
-                        retry_count=attempt + 1,
-                    )
-                    time.sleep(delay)
-                    continue
-                resp.raise_for_status()
-                return resp.json()
-            except (requests.ConnectionError, requests.Timeout) as e:
-                last_exc = e
-                # 每次失败都记录（包括中间重试）
-                collect_error_from_exception(
+        prompt = self._extract_prompt_from_payload(payload)
+        try:
+            get_rate_limiter().acquire()
+            resp = request_with_key_rotation(
+                requests.post,
+                f"{get_agnes_base_url()}/chat/completions",
+                max_retries=_MAX_RETRIES,
+                retry_base_delay=_RETRY_BASE_DELAY,
+                json=payload,
+                timeout=timeout,
+            )
+            if self._should_retry(resp):
+                # helper 内部重试已耗尽（单 Key 429 或持续 5xx），记录最终失败
+                collect_error(
                     "chat", "chat",
-                    exc=e, prompt=self._extract_prompt_from_payload(payload),
-                    retry_count=attempt + 1,
+                    prompt=prompt,
+                    error_type="RateLimit429" if resp.status_code == 429 else f"HTTP{resp.status_code}",
+                    error_message=f"HTTP {resp.status_code}: retries exhausted",
+                    status_code=resp.status_code,
+                    response_body=resp.text,
+                    retry_count=_MAX_RETRIES,
                 )
-                if attempt < _MAX_RETRIES - 1:
-                    delay = _RETRY_BASE_DELAY * (attempt + 1)
-                    logger.warning(
-                        f"[AgnesChat] {type(e).__name__}, "
-                        f"retry {attempt + 1}/{_MAX_RETRIES} in {delay}s..."
-                    )
-                    time.sleep(delay)
-                    continue
-                raise
-        # 重试耗尽
-        if last_exc:
+            resp.raise_for_status()
+            return resp.json()
+        except requests.HTTPError as e:
+            resp = getattr(e, "response", None)
+            if resp is not None and resp.status_code < 500 and resp.status_code != 429:
+                # 4xx（非 429）不可重试
+                collect_error(
+                    "chat", "chat",
+                    prompt=prompt,
+                    error_type=type(e).__name__,
+                    error_message=str(e),
+                    status_code=resp.status_code,
+                    response_body=resp.text[:5000],
+                    retry_count=_MAX_RETRIES,
+                )
+            raise
+        except (requests.ConnectionError, requests.Timeout) as e:
             collect_error_from_exception(
                 "chat", "chat",
-                exc=last_exc, prompt=self._extract_prompt_from_payload(payload),
-                retry_count=_MAX_RETRIES,
-            )
-            raise last_exc
-        # 不可重试的 HTTP 错误（4xx 非 429）
-        try:
-            resp.raise_for_status()  # type: ignore[possibly-undefined]
-        except requests.HTTPError as e:
-            collect_error(
-                "chat", "chat",
-                prompt=self._extract_prompt_from_payload(payload),
-                error_type=type(e).__name__,
-                error_message=str(e),
-                status_code=resp.status_code,  # type: ignore[possibly-undefined]
-                response_body=resp.text[:5000],  # type: ignore[possibly-undefined]
+                exc=e, prompt=prompt,
                 retry_count=_MAX_RETRIES,
             )
             raise
-        return resp.json()  # type: ignore[possibly-undefined]
 
     def chat(self, system_prompt: str, user_prompt: str, max_tokens: int = 4096) -> str:
         """纯文本 Chat 调用（含重试）。"""
@@ -229,6 +224,15 @@ class AgnesChatAPI:
                 try:
                     return json.loads(match.group())
                 except (json.JSONDecodeError, ValueError):
+                    pass
+            # Step 3.5: json_repair 修复（可选依赖，修复 LLM 常见缺冒号/尾随逗号/单引号）
+            if repair_json is not None:
+                try:
+                    repaired = repair_json(cleaned, return_objects=True)
+                    if isinstance(repaired, dict):
+                        logger.info("[AgnesChat] JSON repaired via json_repair")
+                        return repaired
+                except Exception:
                     pass
             # Step 4: 首轮失败则重试一次 chat 调用
             if retry == 0:
