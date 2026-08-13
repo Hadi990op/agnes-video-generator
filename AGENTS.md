@@ -344,7 +344,7 @@ agnes-video-generator/
 │   │   ├── agnes_chat.py             # LLM Chat API（text + multimodal + JSON mode）
 │   │   ├── agnes_image.py            # 图片生成 API（t2i + i2i + ref image）
 │   │   ├── agnes_video.py            # 视频生成 API（t2v/i2v/ti2vid/keyframes + 轮询 + 重试）
-│   │   ├── rate_limiter.py           # 全局令牌桶限速器（16 次/分钟，Chat+Image+Video 共享）
+│   │   ├── rate_limiter.py           # 令牌桶限速器：共享桶（chat/image/上传/轮询）+ 视频提交独立桶（D16 分层）
 │   │   └── error_collector.py        # 模型接口报错收集（prompt/错误类型/详情 → error_logs/）
 │   │
 │   ├── audio/
@@ -632,10 +632,10 @@ python scripts/scene_runner.py --endpoints
 
 | 场景 | 策略 |
 |------|------|
-| 全局限速 | `core/api/rate_limiter.py` 令牌桶（默认 `AGNES_RATE_LIMIT=20`，`_SAFETY_FACTOR` 留 20% 余量 → 实际 16 次/分钟），Chat+Image+Video 含轮询共享 |
+| 全局限速 | `core/api/rate_limiter.py` 令牌桶：**共享桶**（`get_rate_limiter`，默认 `AGNES_RATE_LIMIT=20`，`_SAFETY_FACTOR` 留 20% 余量 → 实际 16 次/分钟），Chat+Image+上传+轮询共享（见 D16）；**视频提交独立桶**（`get_video_submit_limiter`，1×Key 数/分钟） |
 | LLM Chat | 重试 3 次，间隔 15s 递增；5xx 和 429 均重试 |
 | 图片生成 | 重试 3 次，间隔 20s 递增；5xx 和 429 均重试 |
-| 视频提交 | 重试 5 次，间隔 30s 递增；5xx、429、超时均重试 |
+| 视频提交 | 独立限速 1×Key 数/分钟；重试 5 次，间隔 30s 递增；5xx、429、超时均重试 |
 | 视频轮询 | 间隔 60s（见 D14），每 10 次输出日志；连续 10 次失败后放弃 |
 | 报错收集 | `error_collector.py` 记录失败调用的 prompt/错误类型/详情至工作目录 `error_logs/` |
 | PipelineShutdown | 所有流水线统一处理，落盘当前状态 |
@@ -832,10 +832,11 @@ def resolve_font_path(font: str) -> str:
 | D9 | 字幕多行换行 | 动态计算每行字符数上限，CJK 标点处断行，method="caption" |
 | D10 | 音频叠加方式 | MoneyPrinterTurbo 方式：先拼接再整体叠加，避免 padding 累积 |
 | D11 | TTS 音量补偿 | 自动 2.5 倍放大，补偿 edge_tts 默认低音量 |
-| D12 | 全局 API 限速 | 令牌桶 16 次/分钟（Agnes 限制 20，留 20% 余量），Chat+Image+Video 含轮询共享 |
+| D12 | 全局 API 限速（现状） | 单 Key 令牌桶 16 次/分钟（Agnes 限制 20，留 20% 余量），Chat+Image+Video 含轮询共享；多 Key 分层方案见 D16（未落地） |
 | D13 | 429 统一重试 | Chat/Image/Video 三个 API 模块均处理 HTTP 429 限流，指数退避重试 |
 | D14 | 视频轮询间隔 | 60 秒（从 30s 改为 60s，进一步减少轮询对限速配额消耗） |
 | D15 | 回归续传策略 | 可恢复失败（timeout/API 故障）自动重试，不可恢复（400 提示词错误）跳过 |
+| D16 | 多 Key 轮询 + 限流整合 | KeyRing 统一轮换 + 429 换 Key 立即重试（全 Key 429 才退避）+ 限速器按 Key 数缩放；**分层**：视频提交独立桶（`get_video_submit_limiter`，1×Key 数/min）+ 共享桶（`get_rate_limiter`，20×Key 数×0.8/min，含 chat/image/上传/轮询），全局单桶 × Key 数而非 per-Key 桶（详见 `optimization_roadmap.md` §1） |
 
 ---
 

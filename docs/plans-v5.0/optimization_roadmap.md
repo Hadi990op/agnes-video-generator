@@ -10,27 +10,39 @@
 
 | # | 优化点 | 优先级 | 一句话价值 |
 |---|--------|--------|-----------|
-| 1 | 多 API Key 轮询 | 🔴 | 突破单 Key 限速瓶颈，吞吐提升 N 倍 |
+| 1 | 多 API Key 轮询 + 限流整合 + `.env.example` | 🔴 | KeyRing 统一轮换 + 429 换 Key + 配额按 Key 数缩放，吞吐提升 N 倍；配置模板一栏可查 |
 | 2 | 通用图片归一化模块 | 🔴 | 全环节参考图统一归一化，传输体积降 5-10 倍 |
 | 3 | 删除任务端点 `DELETE /api/tasks/{id}` | 🔴 | 一键清理任务全目录，防磁盘膨胀 |
 | 4 | LLM JSON 输出容错（json_repair） | 🔴 | 修复 LLM 常见 JSON 语法错误，降编剧失败率 |
 | 5 | 用户上传分镜场景图 | 🟡 | 关键分镜可手工供给参考图，不再完全依赖 AI 生成 |
 | 6 | `start.bat` Windows 一键启动 | 🟢 | Windows 用户开箱即用 |
-| 7 | `.env.example` 配置模板 | 🟢 | 多 Key / 端点可配置项一目了然 |
 
 > 已抽离待调研项：**角色一致性增强 + 对话支持** → `docs/optimization-research/character_consistency_and_dialogue.md`
 
 ---
 
-## 1. 多 API Key 轮询 🔴
+## 1. 多 API Key 轮询 + 限流整合 🔴
+
+> 本项将**多 Key 轮询**与**现有全局限速策略**整合为一个完整方案：Key 采集 → 统一轮换（KeyRing）→ 429 换 Key 重试 → 限速器配额按 Key 数缩放 → 请求编排统一封装 → 配置/API/UI → **`.env.example` 配置模板**（多 Key/限速参数一栏可查）。实施时可完整按 1.3-1.9 顺序落地。
 
 ### 1.1 目标
 
-当前配置只支持单个 `AGNES_API_KEY`（`core/config.py:176` 的 `get_api_key()`），Agnes 单 Key 限速 20 次/分钟、实际 16 次/分。多 Key 轮询使可配额随 Key 数量线性增长，长视频流水线（Chat+Image+Video 共享限速）不再排队等配额。
+当前配置只支持单个 `AGNES_API_KEY`（`core/config.py:175` 的 `get_api_key()`），Agnes 单 Key 限速 20 次/分钟、实际 16 次/分（`rate_limiter.py:31-34` 留 20% 余量）。多 Key 使可配额随 Key 数量**线性增长**，长视频流水线（Chat+Image+Video 共享限速）不再排队等配额；同时**429 时换 Key 立即重试**，绕开"同一 Key 指数退避"造成的长时间空闲。
 
-### 1.2 配置层改造（core/config.py）
+### 1.2 现状与缺口盘点
 
-新增 `get_api_keys() -> list[str]`，返回全部可用 Key，优先级从高到低：
+| # | 现状 | 位置 | 缺口 |
+|---|------|------|------|
+| 1 | 单 Key：`AGNES_API_KEY` 或 config `api_key` | `core/config.py:175` | 无多 Key 概念 |
+| 2 | 全局令牌桶单例，`rate_per_minute` 在**模块导入时固定**为 16 | `core/api/rate_limiter.py:31-34,48` | 不感知 Key 数，多 Key 后仍是 16/分 |
+| 3 | 429/5xx 指数退避后用**同一 Key** 重试（chat 3 次×15s、image 3 次×20s、video 5 次×30s，另有上传 429 30s） | `agnes_chat.py:118`、`agnes_image.py:131`、`agnes_video.py:337` | 无法换 Key，全 Key 429 才能止损，浪费配额 |
+| 4 | 三个 API 模块各自维护 `self.headers`（内含单 Key） | 三模块 `__init__` | 无统一轮换入口、无线程安全计数 |
+| 5 | 视频轮询 `_poll_task` 每 60s 消耗一个令牌 | `agnes_video.py:243` | 轮询也占用配额，需纳入多 Key 核算 |
+| 6 | **视频提交（`POST /videos`）与 chat/image 共用同一个共享桶**（`_submit_with_retry` 调 `get_rate_limiter().acquire()`） | `agnes_video.py:318` | 服务端对视频提交是 **1/min 独立限制**，现状未分层——视频提交独占共享桶配额或反之被挤占 |
+
+### 1.3 配置层：Key 采集（core/config.py）
+
+新增 `get_api_keys() -> list[str]`，返回全部可用 Key（去重、去空），优先级从高到低：
 
 ```
 0. .env 文件中 AGNES_API_KEY, AGNES_API_KEY_2 ... AGNES_API_KEY_N
@@ -93,66 +105,327 @@ def _dedup(keys: list[str]) -> list[str]:
     return out
 ```
 
-`get_api_key()` 保持不动（返回第一个/单个），由异常路径改用 `get_api_keys()`。同时新增 `set_api_keys(keys: list[str])` 持久化 `api_keys` 字段到配置文件（复用 `save_config` 的原子写 + `0o600` 权限逻辑）。
+- `get_api_key()` 保持不动（返回第一个），作为**兼容入口**；业务调用逐步迁移到 KeyRing。
+- 新增 `set_api_keys(keys: list[str])`：持久化 `api_keys` 字段到配置文件（复用 `save_config` 的原子写 + `0o600` 权限）。写入后必须调用 `reset_key_ring()` + `reset_rate_limiter()`（见 1.5），否则旧配置（单桶 16/分 + 旧 KeyRing）继续生效。
+- 新增 `get_api_keys_source() -> str`：返回 `'env:N'` / `'config:N'` / `'mixed:env2+config1'`，供 `GET /api/config/keys` 与日志展示。
 
-**请求层切换**：三个 API 模块 `AgnesChatAPI` / `AgnesImageAPI` / `AgnesVideoAPI` 的 `__init__` 接收 `api_key`。改造为：构造时 `self.api_keys = get_api_keys()`，`self._key_idx` 为线程安全计数。每发一次 HTTP 请求前按 `self._key_idx = (self._key_idx + 1) % len(self.api_keys)` 轮换一个 Key（各请求独享自己的 `headers` 副本）。
+### 1.4 统一轮换：KeyRing（新增 core/api/key_manager.py）
 
-### 1.3 429 换 Key 重试策略
-
-现状（见 `core/api/agnes_chat.py:118`、`core/api/agnes_image.py:131`）：429/5xx 时指数退避后**用同一 Key** 重试。
-
-改造：429 时先**轮换到下一个 Key 立即重试**（Key 级隔离限速，换 Key 后无需等待），全部 Key 都遭遇 429 后才进入原有指数退避。5xx 保持原逻辑。实现：
+三个 API 模块不再各自维护 `_key_idx`，统一收敛到 `KeyRing` 单例，提供**线程安全的轮换**与**换 Key**能力：
 
 ```python
-for attempt in range(_MAX_RETRIES):
-    key = next_key_with_retry()  # 429 换 key，不 429 保持
-    resp = post_with(key, payload)
-    if resp.status_code == 429 and self._has_other_key():
-        rotate_key(); continue       # 换 Key 立即重试，不 sleep
-    if self._should_retry(resp) and attempt < _MAX_RETRIES - 1:
-        time.sleep(_RETRY_BASE_DELAY * (attempt + 1)); continue
+"""core.api.key_manager — 多 API Key 统一轮换（KeyRing 单例）
+
+职责：
+1. 基于 get_api_keys() 惰性初始化；Key 变更后 reset_key_ring() 重建
+2. next(): 普通请求轮转（round-robin，原子计数，均匀分摊配额）
+3. rotate(): 429 时强制切到下一个 Key（供换 Key 重试）
+4. has_multiple() / __len__: 供限速器配额与重试策略判断
+"""
+import itertools
+import threading
+
+from core.config import get_api_keys
+
+logger = __import__("logging").getLogger(__name__)
+
+
+class KeyRing:
+    def __init__(self, keys: list[str]):
+        if not keys:
+            raise ValueError("KeyRing requires at least one key")
+        self._keys = list(keys)
+        self._count = itertools.count()
+        self._lock = threading.Lock()
+
+    def next(self) -> str:
+        """轮转取下一个 Key（普通请求调用，均匀分摊）。"""
+        return self._keys[next(self._count) % len(self._keys)]
+
+    def rotate(self) -> str:
+        """强制切换到下一个 Key（429 换 Key 重试调用）。"""
+        with self._lock:
+            idx = next(self._count) % len(self._keys)
+            return self._keys[idx]
+
+    @property
+    def keys(self) -> list[str]:
+        return list(self._keys)
+
+    def has_multiple(self) -> bool:
+        return len(self._keys) > 1
+
+    def __len__(self) -> int:
+        return len(self._keys)
+
+    def describe(self) -> str:
+        """日志用：key#2/3 等。"""
+        return f"key#{next(self._count) % len(self._keys) + 1}/{len(self._keys)}"
+
+
+_instance: KeyRing | None = None
+_lock = threading.Lock()
+
+
+def get_key_ring() -> KeyRing:
+    """获取全局 KeyRing（线程安全单例，惰性初始化）。"""
+    global _instance
+    if _instance is None:
+        with _lock:
+            if _instance is None:
+                keys = get_api_keys()
+                if not keys:
+                    raise RuntimeError(
+                        "No Agnes API Key configured (AGNES_API_KEY or config api_key)"
+                    )
+                _instance = KeyRing(keys)
+                logger.info(
+                    f"[KeyManager] KeyRing 初始化: {len(keys)} 个 Key "
+                    f"({get_api_keys_source() if 'get_api_keys_source' in globals() else ''})"
+                )
+    return _instance
+
+
+def reset_key_ring() -> None:
+    """Key 变更后重建 KeyRing（配合 set_api_keys / delete_api_key）。"""
+    global _instance
+    with _lock:
+        _instance = None
 ```
 
-### 1.4 限速器配额随之提升（core/api/rate_limiter.py）
-
-当前 `core/api/rate_limiter.py:31-34`：
+**请求层切换**：三个 API 模块 `AgnesChatAPI` / `AgnesImageAPI` / `AgnesVideoAPI` 构造时保留 `api_key` 参数（兼容旧调用），但内部改为：
 
 ```python
-_AGNES_RATE_LIMIT = int(os.environ.get("AGNES_RATE_LIMIT", "20"))
-_SAFETY_FACTOR = 0.8
-_EFFECTIVE_RATE = _AGNES_RATE_LIMIT * _SAFETY_FACTOR   # 16 次/分钟
+def _auth_headers(self) -> dict:
+    """每次请求前生成带当前 Key 的 headers 副本（从 KeyRing 轮转取 Key）。"""
+    key = get_key_ring().next()
+    h = dict(self._base_headers)          # 原有 Accept/Content-Type 等
+    h["Authorization"] = f"Bearer {key}"
+    return h
 ```
 
-改造：以 Key 数缩放配额，并保持 `max_burst` 与速率匹配。参考口径：每个 Key 20 次/分 × Key 数 × 0.8 安全系数。例如 8 个 Key → `_AGNES_RATE_LIMIT = 160`，`_EFFECTIVE_RATE = 128`。注意 `max_burst`（令牌桶容量）同步上调（如 4×Key 数），否则多 Key 下高并发仍被突发容量卡住。可由新环境变量统一覆盖：
+所有 `requests.post/get(..., headers=self.headers)` 改为 `headers=self._auth_headers()`，确保每请求独立 Key、互不污染。
+
+### 1.5 限速器整合：共享桶 × Key 数 + 视频提交独立桶（core/api/rate_limiter.py）
+
+**目标限速规则**（Agnes 服务端口径）：
+
+| 接口类别 | 服务端限制 | 客户端策略 |
+|---------|-----------|-----------|
+| **视频提交**（`POST /videos`） | **1 次/分**（独立） | **独立令牌桶** `1 × Key 数`/分，桶容量 `1 × Key 数` |
+| **其他接口**（chat / image / 上传 / 轮询） | 20 次/分 | **共享令牌桶** `20 × Key 数 × 0.8`/分 |
+
+**决策①：共享桶采用全局单桶 × Key 数，而非 per-Key 桶。** 理由：
+- 多 Key 时轮转均匀分摊配额（1.4 `next()`），各 Key 使用率接近 1/N；
+- 即使某瞬时把请求压到同一 Key，服务端 429 会被 1.6 的换 Key 逻辑兜底；
+- per-Key 桶需管理 Key 增删生命周期、且在单 Key 退化时徒增复杂度，收益低。
+
+**决策②：视频提交独立成桶，不并入共享桶。** 理由：
+- 服务端对视频提交是 **1/min 硬限制**，与共享桶 20/min 差 20 倍；并入共享桶意味着视频提交独占配额时可能让其他接口饿死，或反之被其他接口挤占；
+- 当前实现（`agnes_video.py:318`）视频提交与 chat/image 共用同一个 `get_rate_limiter()` 桶，**未区分**——这是现状缺口；
+- 独立桶后，视频提交 429 只在极端情况触发（多任务并发提交瞬间），由 1.6 换 Key 兜底。
+
+**改造**（`rate_limiter.py`）：
 
 ```python
-_KEY_COUNT = len(get_api_keys())
-_AGNES_RATE_LIMIT = int(os.environ.get("AGNES_RATE_LIMIT", str(20 * max(_KEY_COUNT, 1))))
+# 模块导入时不再固定速率：惰性初始化时从 KeyRing 读 Key 数
+_KEY_BASE_RATE = 20             # 单 Key 共享接口原始配额（Agnes 限制）
+_VIDEO_SUBMIT_RATE = 1          # 单 Key 视频提交配额（Agnes 独立限制 1/min）
+_SAFETY_FACTOR = 0.8            # 共享桶保留 20% 余量
+_VIDEO_SAFETY_FACTOR = 1.0      # 视频提交桶不降额：服务端 1/min 已很严，且 429 换 Key 兜底
+
+
+def _key_count() -> int:
+    try:
+        return len(get_key_ring())
+    except Exception:
+        return 1
+
+
+def _effective_rate() -> float:
+    """共享桶有效速率 = 单 Key 配额 × Key 数 × 安全系数。"""
+    limit = int(os.environ.get("AGNES_RATE_LIMIT", str(_KEY_BASE_RATE * _key_count())))
+    return limit * _SAFETY_FACTOR
+
+
+def _video_submit_rate() -> float:
+    """视频提交桶速率 = 1 × Key 数（AGNES_VIDEO_RATE_LIMIT 可覆盖）。
+
+    注：若服务端对视频提交是全局限 1/min（而非 per-Key），
+    设置 AGNES_VIDEO_RATE_LIMIT=1 即可，无需改代码。
+    """
+    limit = int(os.environ.get("AGNES_VIDEO_RATE_LIMIT", str(_VIDEO_SUBMIT_RATE * _key_count())))
+    return limit * _VIDEO_SAFETY_FACTOR
+
+
+def _max_burst() -> int:
+    """共享桶容量随 Key 数上调：4 × Key 数，否则高并发被突发容量卡住。"""
+    return int(os.environ.get("AGNES_RATE_BURST", str(4 * _key_count())))
+
+
+def _video_max_burst() -> int:
+    """视频提交桶容量 = 1 × Key 数：允许每 Key 立即提交一次，随后受 1/min 限制。"""
+    return int(os.environ.get("AGNES_VIDEO_RATE_BURST", str(_key_count())))
+
+
+class AgnesRateLimiter:
+    def __init__(self, rate_per_minute: float | None = None, max_burst: int | None = None):
+        rate_per_minute = rate_per_minute if rate_per_minute is not None else _effective_rate()
+        max_burst = max_burst if max_burst is not None else _max_burst()
+        ...
 ```
 
-### 1.5 涉及文件
+**两个单例**：
+
+```python
+def get_rate_limiter() -> AgnesRateLimiter:
+    """共享桶：chat / image / 上传 / 轮询（20 × Key 数 × 0.8 次/分）。"""
+
+
+def get_video_submit_limiter() -> AgnesRateLimiter:
+    """视频提交独立桶：1 × Key 数 次/分。"""
+```
+
+- 视频提交处（`agnes_video.py:318` `_submit_with_retry`）改用 `get_video_submit_limiter().acquire()`；
+- 上传（`agnes_video.py:141`）、轮询（`agnes_video.py:243`）保持走共享桶 `get_rate_limiter()`——它们是普通查询接口，不占视频提交配额；
+- `reset_rate_limiter()` 在 `set_api_keys()` / `delete_api_key()` 之后由 `config` 侧调用（1.3），同时重建两个单例，使新 Key 数即时生效。
+- 两个 limiter 的 `stats` 均新增 `key_count` 与 `effective_rate_per_min`。
+
+**示例口径**（8 个 Key）：共享桶原始配额 160、有效速率 128 次/分、桶容量 32；视频提交桶 8 次/分、容量 8。
+
+### 1.6 请求编排：429 换 Key + 指数退避统一封装
+
+现状（`agnes_chat.py:118`、`agnes_image.py:131`、`agnes_video.py:337`）：429/5xx 指数退避后**同 Key** 重试。整合后三模块共用一套算法（新增 `core/api/rate_limiter.py` 或 `core/api/key_manager.py` 的 helper，各模块 `from ... import request_with_key_rotation`）：
+
+```python
+def request_with_key_rotation(
+    requester,            # 可调用: (url, headers, **kw) -> requests.Response
+    url: str,
+    *,
+    max_retries: int = 3,
+    retry_base_delay: float = 20.0,
+    key_ring=None,
+    **requester_kwargs,
+) -> requests.Response:
+    """429 换 Key 立即重试；全 Key 429 或 5xx/超时才指数退避。
+
+    规则：
+    1. 每请求前 key_ring.next()（round-robin，均匀分摊）
+    2. 429 且 has_multiple() -> key_ring.rotate() 立即重试（不 sleep、不计入退避）
+       —— Key 级隔离限速，换 Key 后配额是满的
+    3. 所有 Key 均 429（rotation 计数达到 len(keys) × 退避上限）-> 指数退避
+    4. 5xx / 超时 / 连接错误 -> 同 Key 指数退避（保持现状）
+    """
+    ring = key_ring or get_key_ring()
+    retries = 0
+    rotations = 0
+    max_rotations = len(ring) * max_retries
+    while True:
+        headers = requester_kwargs.pop("headers", None)
+        resp = requester(url, headers=headers, **requester_kwargs)
+        if resp.status_code == 429:
+            if ring.has_multiple() and rotations < max_rotations:
+                rotations += 1
+                ring.rotate()
+                logger.warning(f"[KeyRotation] HTTP 429, 换 Key 立即重试 (rotation {rotations})")
+                continue                          # 换 Key 后无配额缺口，立即重发
+            if retries < max_retries:
+                delay = retry_base_delay * (retries + 1)
+                logger.warning(f"[KeyRotation] 全 Key 429, 退避 {delay}s 后重试")
+                time.sleep(delay); retries += 1; continue
+            return resp                          # 全部耗尽，交给调用方 collect_error + raise
+        if resp.status_code >= 500 and retries < max_retries:
+            delay = retry_base_delay * (retries + 1)
+            logger.warning(f"[KeyRotation] HTTP {resp.status_code}, 退避 {delay}s 后重试")
+            time.sleep(delay); retries += 1; continue
+        return resp
+```
+
+各模块接入：
+- `AgnesChatAPI._request_with_retry`：`post` 换为 `request_with_key_rotation`（基延迟保持 15s）。
+- `AgnesImageAPI` 主请求（基延迟 20s）与 `AgnesVideoAPI` 主请求/上传（基延迟 30s）同理。
+- **视频轮询 `_poll_task`（`agnes_video.py:243`）**：每 60s 一次 `GET`，同样走 `request_with_key_rotation`（轮转 Key 分摊配额；429 换 Key 重试，避免轮询卡死）。`max_poll_duration` / `consecutive_failures` 逻辑不变。
+- 429 分支仍需调用 `collect_error(..., error_type="RateLimit429", extra={"rotations": rotations})` 记录，5xx 分支维持现状。
+- **边界**：429 且 `has_multiple()==False`（单 Key 退化）→ 直接落入指数退避，行为与现状完全一致。
+
+### 1.7 配置 API 与前端
+
+| 接口 | 说明 |
+|------|------|
+| `GET /api/config/keys` | 返回 `{ok, key_count, source}`（来源/数量，**永不回传 Key 明文**） |
+| `POST /api/config/keys` | body `{"keys": ["k1", "k2"]}` → `set_api_keys()` + 重建 KeyRing/限速器；空数组则回退到 env 采集 |
+
+- `static/index.html` 设置页：API Key 输入框支持多行/逗号分隔粘贴；保存后调 `POST /api/config/keys`，并展示 `key_count`。
+- `web/routes/config_routes.py` 新增上述两个路由；删除旧 `DELETE /api/config` 的行为不涉及（`api_key` 单字段仍由 `set_api_key`/`delete_api_key` 管理，两套并存，`get_api_keys()` 统一聚合）。
+
+### 1.8 配置模板：`.env.example`（随包分发出货）
+
+`.env.example` 是本项落地后的**标准配置样板**（公开提交，**绝不能包含真实 Key**），让多 Key / 限速参数一栏可查，便于 CI/Docker/新用户快速参考。项目根新增：
+
+```dotenv
+# Agnes AI API Key（必填）
+# 从 https://platform.agnes-ai.com 获取免费 Key
+AGNES_API_KEY=your-api-key-here
+
+# 多 Key 轮询（可选，见 optimization_roadmap §1.3）
+# 每个 Key 的配额独立，总量 ≈ 20 × Key 数 / 分钟
+# AGNES_API_KEY_2=your-second-api-key
+# AGNES_API_KEY_3=your-third-api-key
+
+# 限速配额覆盖（次/分钟，默认 = 20 × Key 数 × 0.8 安全系数）
+# AGNES_RATE_LIMIT=160
+
+# 桶容量覆盖（默认 = 4 × Key 数；仅需调节突发并发时使用）
+# AGNES_RATE_BURST=32
+
+# 视频提交独立限速（次/分钟，默认 = 1 × Key 数；服务端为全局 1/min 时设 =1）
+# AGNES_VIDEO_RATE_LIMIT=8
+# AGNES_VIDEO_RATE_BURST=8
+
+# 可选端点/模型覆盖
+# AGNES_BASE_URL=https://apihub.agnes-ai.com/v1
+# AGNES_IMAGE_MODEL=agnes-image-2.1-flash
+# AGNES_VIDEO_MODEL=agnes-video-v2.0
+```
+
+要点：
+- `.env` 解析为可选能力（python-dotenv，见 1.9）；未引入 dotenv 时 `.env.example` 作为文档模板，实际 Key 经环境变量或 `POST /api/config/keys` 配置。
+- 在 `README.md` / `AGENTS.md` 的部署章节补充一句引用 + 多 Key 说明（指向 `optimization_roadmap.md §1`），保证新用户发现路径。
+- `.env.example` 不随业务加载，仅当用户复制为 `.env`（且引入 dotenv）才生效。
+
+### 1.9 涉及文件
 
 | 文件 | 改动 |
 |------|------|
-| `core/config.py` | 新增 `get_api_keys()` / `set_api_keys()` / `_dedup()` |
-| `core/api/rate_limiter.py` | 配额按 Key 数动态计算 |
-| `core/api/agnes_chat.py` | 多 Key 轮换 + 429 换 Key 重试 |
-| `core/api/agnes_image.py` | 同上 |
-| `core/api/agnes_video.py` | 同上 |
-| `server.py` / `web/routes/config_routes.py` | 可选：`GET /api/config/keys` 返回 Key 数量/来源，供 UI 显示 |
-| `static/index.html` | 可选：设置页支持粘贴多个 Key（逗号分隔或逐行） |
+| `core/config.py` | 新增 `get_api_keys()` / `set_api_keys()` / `get_api_keys_source()` / `_dedup()` |
+| `core/api/key_manager.py` | **新增**：`KeyRing` + `get_key_ring()` / `reset_key_ring()` |
+| `core/api/rate_limiter.py` | 双单例：共享桶（`get_rate_limiter`）×Key 数 + 视频提交桶（`get_video_submit_limiter`）1×Key 数；新增 `request_with_key_rotation()` helper |
+| `core/api/agnes_chat.py` | `_request_with_retry` 改走 helper；`_auth_headers()` |
+| `core/api/agnes_image.py` | 同上（含图片请求，走共享桶） |
+| `core/api/agnes_video.py` | 同上；`_submit_with_retry` 改走视频提交独立桶，上传/轮询保持共享桶 |
+| `web/routes/config_routes.py` | 新增 `GET/POST /api/config/keys` |
+| `static/index.html` | 设置页多 Key 编辑 + key_count 展示 |
+| `.env.example`（新增） | 配置模板（多 Key / 共享桶 / 视频提交桶限速参数样板） |
+| `README.md` / `AGENTS.md` | 部署章节引用 `.env.example` + 多 Key 说明 |
 
-### 1.6 依赖变化
+### 1.10 依赖变化
 
-无新增依赖（`python-dotenv` 仅为可选项，不引入时跳过 .env 读取即可）。
+无新增依赖（`python-dotenv` 仅为可选项，不引入时跳过 .env 读取即可；`AGNES_API_KEY_2..N` 经环境变量即可使用；`.env.example` 纯文档，不影响运行）。
 
-### 1.7 验收标准
+### 1.11 验收标准
 
-1. `AGNES_API_KEY` + `AGNES_API_KEY_2` 两个 Key 时，`get_api_keys()` 返回长度为 2 的列表、无重复。
-2. 配置文件旧字段 `api_key` 仍可被识别（回退逻辑生效）。
-3. `get_api_keys()` 为空（未配置）时各 API 模块行为与现状一致（抛 401 类错误）。
-4. 模拟 429 场景：先发 Key1 触发 429 → 自动换 Key2 成功返回，日志输出 Key 轮换记录。
-5. 两个 Key 下同时并发多个请求，限速器实际吞吐约等于 2× 原配额。
+1. `AGNES_API_KEY` + `AGNES_API_KEY_2` 两个 Key 时，`get_api_keys()` 返回长度为 2 的列表、无重复；`get_api_keys_source()` 返回 `env:2`。
+2. 配置文件旧字段 `api_key` 仍可被识别（回退逻辑生效）；`set_api_keys()` 后 `get_api_keys()` 立即返回新列表。
+3. 未配置任何 Key 时：`get_key_ring()` 抛 `RuntimeError`，API 模块行为与现状一致（401 类错误）。
+4. 模拟 429：先发 Key1 触发 429 → 日志出现 `[KeyRotation] HTTP 429, 换 Key 立即重试` → Key2 成功返回；单 Key 场景 429 走退避，行为与现状一致。
+5. 两个 Key 并发请求：`stats.effective_rate_per_min` ≈ 32；实际吞吐接近 2× 原配额。
+6. `set_api_keys()` 后（不经重启）新 Key 数即时反映到限速器 `stats.key_count` 与 `get_key_ring().__len__()`。
+7. `GET /api/config/keys` 返回 `key_count` 与 `source`，不含 Key 明文。
+8. `.env.example` 存在、无真实密钥，含 `AGNES_API_KEY_2..N` / `AGNES_RATE_LIMIT` / `AGNES_RATE_BURST` / `AGNES_VIDEO_RATE_LIMIT` / `AGNES_VIDEO_RATE_BURST` 注释样例；复制为 `.env` 填入两个 Key 后 `get_api_keys()` 正确识别（引入 dotenv 时）。
+9. `README.md` / `AGENTS.md` 部署章节出现 `.env.example` 引用与多 Key 说明。
+10. **分层限速**：`get_rate_limiter().stats` 与 `get_video_submit_limiter().stats` 为两个独立实例；`_submit_with_retry` 走视频独立桶（日志/统计可区分），上传与轮询仍走共享桶。
+11. 连续快速提交 2 个视频任务（单 Key）：第二个在视频提交桶被 `acquire()` 阻塞约 60s（日志 `[RateLimiter] 限速等待 ~60.0s`），期间 chat/image 请求不受影响（共享桶有令牌）。
+12. `AGNES_VIDEO_RATE_LIMIT=1` 时（模拟服务端全局 1/min 而非 per-Key）：`get_video_submit_limiter().stats.effective_rate_per_min == 1.0`，多 Key 下视频提交速率不随 Key 数放大。
 
 ---
 
@@ -597,58 +870,9 @@ REM 5) .venv\Scripts\python server.py 并自动打开浏览器（起服务后用
 
 ---
 
-## 7. `.env.example` 配置模板 🟢
-
-### 7.1 目标
-
-多 Key / 端点配置项目前仅存在于代码注释，用户不易发现。提供带注释的配置模板，随包分发出货，也便于 CI/Docker 等场景快速参考。
-
-### 7.2 实现方式
-
-项目根新增 `.env.example`（公开提交，**绝不能包含真实 Key**）：
-
-```dotenv
-# Agnes AI API Key（必填）
-# 从 https://platform.agnes-ai.com 获取免费 Key
-AGNES_API_KEY=your-api-key-here
-
-# 多 Key 轮询（可选，配合优化点 1）
-# AGNES_API_KEY_2=your-second-api-key
-# AGNES_API_KEY_3=your-third-api-key
-
-# 限速配额覆盖（次/分钟，默认 = 20 × Key 数）
-# AGNES_RATE_LIMIT=160
-
-# 可选端点/模型覆盖
-# AGNES_BASE_URL=https://apihub.agnes-ai.com/v1
-# AGNES_IMAGE_MODEL=agnes-image-2.1-flash
-# AGNES_VIDEO_MODEL=agnes-video-v2.0
-```
-
-在 `README`/`AGENTS.md` 的部署章节补充一句引用及多 Key 说明。
-
-### 7.3 涉及文件
-
-| 文件 | 改动 |
-|------|------|
-| `.env.example`（新增） | 配置模板 |
-| `README.md` / `AGENTS.md` | 简要引用 |
-
-### 7.4 依赖变化
-
-无（纯文档/模板；`.env` 解析为可选，见优化点 1）。
-
-### 7.5 验收标准
-
-1. `.env.example` 存在且无真实密钥。
-2. README 出现多 Key 配置说明。
-3. 将模板复制为 `.env` 并填入两个 Key，配合优化点 1 的 `get_api_keys()` 正确识别。
-
----
-
 ## 实施建议
 
 1. **第一梯队（🔴）做批次一**：1 → 4 → 3 → 2，均为独立小改动、低回归风险、收益直接（吞吐×N、失败率↓、磁盘回收、传输体积↓）。
 2. 每完成一项，在 `docs/regression_test_plan.md` 增加对应验收条目；涉及 API 模块的改动跑一遍 `scripts/regression_runner.py` 回归。
-3. 优化点 1 与 7 强相关（`.env.example` 提供多 Key 样例），可同批落地；优化点 2 是 5 的底层依赖，先做 2 再做 5。
+3. 优化点 1 已整合 `.env.example` 配置模板，落地时一并产出（见 §1.8）；优化点 2 是 5 的底层依赖，先做 2 再做 5。
 4. 优化点 5 贴近创意视频核心路径，改动面较大，建议作为独立小版本（v5.1.x）推进并对创意类型做专项回归。
