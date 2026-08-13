@@ -91,7 +91,7 @@ curl -X POST http://localhost:8765/api/tasks/manuscript -H "Content-Type: applic
 | 视频处理 | moviepy + ffmpeg |
 | TTS | edge_tts >= 6.1.0（免费，无需 API Key） |
 | 字幕 | srt >= 3.5.0 + moviepy（词级细粒度 + 多行换行） |
-| 前端 | 原生 HTML/CSS/JS + Tailwind CDN（单文件 `static/index.html`，多 Tab + 13 语言 i18n） |
+| 前端 | Vue 3 + Vite + TypeScript + Tailwind（PostCSS 构建期编译）— 源码在 `frontend/`，产物提交到 `static/`（多 Tab + 22 语言 i18n） |
 | LLM | Agnes Chat API (`agnes-2.0-flash`) — 免费 |
 | 图片模型 | `agnes-image-2.1-flash`（t2i / i2i 共用；i2i 默认同 t2i，可用 `AGNES_IMAGE_I2I_MODEL` 回退 2.0） |
 | 视频模型 | `agnes-video-v2.0` — 免费 |
@@ -158,7 +158,10 @@ agnes-video-generator/
 │   └── video.py                      # 视频下载
 │
 ├── resource/fonts/                   # 内置 CJK 字体（STHeitiMedium.ttc 默认，MicrosoftYaHeiNormal 备用）
-├── static/                           # index.html（多 Tab 前端，13 语言 i18n）
+├── static/                           # 前端构建产物（提交进仓库，供后端伺服，勿手工改）
+├── frontend/                         # 前端源码（Vue 3 + Vite + TS，build 产物输出到 static/）
+│   ├── vite.config.ts                #   outDir=../static、base=/static/、emptyOutDir=false
+│   └── src/                          #   components/composables/i18n/api/store
 ├── scripts/
 │   ├── regression_runner.py          # 大版本回归测试脚本（全量/续传/quick）
 │   ├── scene_runner.py               # 单场景/端点回归执行器

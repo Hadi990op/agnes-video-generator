@@ -22,5 +22,7 @@ docker-run.sh
 start.sh
 test_end.png
 test_ref.png
+# 前端源码（构建产物已在 static/ 中，npm 包无需携带源码与依赖）
+frontend
 *.md
 !README.md

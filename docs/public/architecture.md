@@ -8,8 +8,12 @@ agnes-video-generator/
 ├── docker-compose.yml                # Docker Compose with persisted volumes
 ├── docker-run.sh                     # One-command Docker launch (wrapper with bind mounts)
 ├── server.py                         # FastAPI server (REST + WebSocket)
-├── static/
-│   └── index.html                    # Frontend SPA — 5 task tabs, 13 languages (Tailwind CSS)
+├── static/                           # Frontend build artifacts (committed to git)
+│   ├── index.html                    # Built SPA entry (Vite output, base=/static/)
+│   └── assets/                       # Hashed JS/CSS bundles
+├── frontend/                         # Frontend source (Vue 3 + Vite + TypeScript)
+│   ├── vite.config.ts                # outDir=../static, base=/static/, emptyOutDir=false
+│   └── src/                          # Components / composables / i18n / api
 ├── core/
 │   ├── config.py                     # API key, font resolution, default configs
 │   ├── screenwriter.py               # Screenwriter Agent (LLM-powered story/script/narration)
@@ -50,7 +54,7 @@ agnes-video-generator/
 | Layer | Choice | Notes |
 |-------|--------|-------|
 | Backend | Python FastAPI | Async + WebSocket |
-| Frontend | HTML/CSS/JS + Tailwind CSS CDN | Zero build steps, single-file SPA |
+| Frontend | Vue 3 + Vite + TypeScript + Tailwind (PostCSS) | Build output committed to `static/`; zero runtime deps for end users |
 | LLM | Agnes Chat (`agnes-2.0-flash`) | Free — story, script, narration generation |
 | Image AI | `agnes-image-2.1-flash` (t2i) / `agnes-image-2.0-flash` (i2i) | Free — reference images, end frames, standalone image generation |
 | Video AI | `agnes-video-v2.0` | Free — text-to-video, image-to-video, keyframes |
