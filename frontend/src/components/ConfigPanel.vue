@@ -60,6 +60,8 @@ function toggleConfigPanel(section: string) {
 
 // API Key 输入
 const apiKeyInput = ref('')
+// 是否已有 Key（env 或 config）：有 Key 时输入框变「添加 Key」追加语义
+const hasApiKey = computed(() => apiKeyStatus.value !== 'none')
 
 async function onSaveApiKey() {
   const key = apiKeyInput.value.trim()
@@ -135,14 +137,14 @@ initCollapse()
         <textarea
           v-model="apiKeyInput"
           rows="2"
-          :placeholder="t('apiKeyPlaceholder')"
+          :placeholder="hasApiKey ? t('apiKeyAppendPlaceholder') : t('apiKeyPlaceholder')"
           class="flex-1 glass-input rounded-lg px-4 py-2.5 text-sm text-ink placeholder-muted resize-y"
         ></textarea>
         <button
           class="px-5 py-2.5 bg-accent text-accent-ink hover:bg-accent/90 rounded-lg text-sm font-medium transition whitespace-nowrap"
           @click="onSaveApiKey"
         >
-          {{ t('save') }}
+          {{ hasApiKey ? t('addKey') : t('save') }}
         </button>
         <button
           v-if="apiKeyStatus !== 'none'"
@@ -152,9 +154,12 @@ initCollapse()
           {{ t('clear') }}
         </button>
       </div>
-      <div v-if="keyCount > 0" class="mt-2">
+      <div v-if="keyCount > 0" class="mt-2 flex items-center gap-2 flex-wrap">
         <span class="text-xs px-2 py-0.5 rounded-full bg-green-900 text-green-300">
           {{ t('keyCountLabel') }}: {{ keyCount }} <span class="opacity-70">({{ keySource }})</span>
+        </span>
+        <span v-if="keyCount > 1" class="text-xs px-2 py-0.5 rounded-full bg-blue-900 text-blue-300">
+          {{ t('multiKeyActive') }}
         </span>
       </div>
       <div class="flex flex-wrap items-center gap-x-5 gap-y-1.5 mt-3 text-xs">

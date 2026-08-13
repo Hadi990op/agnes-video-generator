@@ -48,12 +48,20 @@ async function saveMultiKeys(keysText: string) {
     .split(/[\n,，;；\s]+/)
     .map((s) => s.trim())
     .filter(Boolean)
-  const r = await api.saveConfigKeys(parts)
+  if (parts.length === 0) return false
+  // 已有 Key 时自动切换「追加」模式：新 Key 与现有 Key 合并，无需重输旧 Key
+  const append = keyCount.value > 0
+  const r = await api.saveConfigKeys(parts, append)
   if (r.ok) {
-    trackEvent('config_action', { action: 'save_multi_api_keys', count: parts.length })
+    trackEvent('config_action', { action: append ? 'add_api_key' : 'save_multi_api_keys', count: parts.length })
     keyCount.value = r.key_count || 0
     keySource.value = r.source || ''
-    apiKeyStatus.value = keyCount.value > 0 ? 'configured' : 'none'
+    // source 以 'env' 开头（env:1 / mixed:...）→ env 优先；否则按 config 计
+    if (keyCount.value > 0) {
+      apiKeyStatus.value = keySource.value.startsWith('env') ? 'env' : 'configured'
+    } else {
+      apiKeyStatus.value = 'none'
+    }
     return true
   }
   return false

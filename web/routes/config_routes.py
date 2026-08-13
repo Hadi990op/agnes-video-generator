@@ -26,6 +26,7 @@ from core.config import (
     get_selected_models,
     get_watermark_config,
     get_workspaces,
+    load_config,
     set_agnes_domain,
     set_api_key,
     set_api_keys,
@@ -105,14 +106,19 @@ async def get_config_keys():
 
 
 @router.post("/api/config/keys")
-async def save_config_keys(keys_json: str = Form(...)):
+async def save_config_keys(keys_json: str = Form(""), append: bool = Form(False)):
     """设置多 API Key（JSON 数组或逗号/换行分隔文本）。
 
+    ``append=True`` 时：新 Key 追加到 config 现有 Key（api_keys / api_key）之后
+    合并去重保存——用于「已有 1 个 Key，再加 1 个自然变多 Key」的交互，
+    用户无需重输旧 Key。env 来源的 Key 不落盘，仍与 config Key 并存（get_api_keys 合并）。
+
     保存后立即重建 KeyRing 与限速器，使新 Key 数与配额即时生效（无需重启）。
-    空数组/空串则回退到 env 采集（移除配置文件中的 api_keys 字段）。
+    空输入不改动现有配置。
 
     Args:
         keys_json: JSON 数组字符串（如 '["k1","k2"]'）或普通逗号/换行分隔文本。
+        append: True 追加到现有 config Key；False 覆盖（旧行为）。
     """
     import json as _json
 
@@ -129,7 +135,34 @@ async def save_config_keys(keys_json: str = Form(...)):
             # 非 JSON：按逗号/换行/空白分隔拆分
             keys = [k.strip() for k in re.split(r"[\s,，;；]+", raw)]
     keys = [k for k in keys if k]
-    set_api_keys(keys)
+
+    if not keys:
+        if append:
+            # 追加模式空输入：不改动现有配置（避免误清空）
+            return {
+                "ok": True,
+                "key_count": len(get_api_keys()),
+                "source": get_api_keys_source(),
+            }
+        # 覆盖模式空输入 = 清空 config Key（回退 env / 无 Key）
+        set_api_keys([])
+        reset_key_ring()
+        reset_rate_limiter()
+        return {
+            "ok": True,
+            "key_count": len(get_api_keys()),
+            "source": get_api_keys_source(),
+        }
+
+    if append:
+        # 追加：config 现有 Key（api_keys / 旧 api_key）+ 新 Key → 合并去重
+        config = load_config()
+        existing = config.get("api_keys", []) or []
+        if not existing and config.get("api_key"):
+            existing = [config["api_key"]]
+        set_api_keys(existing + keys)
+    else:
+        set_api_keys(keys)
     # Key 数变化 → 重建 KeyRing 与限速器（共享桶 + 视频提交桶）
     reset_key_ring()
     reset_rate_limiter()

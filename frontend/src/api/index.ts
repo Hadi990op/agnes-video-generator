@@ -22,9 +22,10 @@ export function clearApiKey() {
 export function getConfigKeys() {
   return request('/api/config/keys')
 }
-export function saveConfigKeys(keys: string[]) {
+export function saveConfigKeys(keys: string[], append = false) {
   const form = new FormData()
   form.append('keys_json', JSON.stringify(keys))
+  if (append) form.append('append', 'true')
   return fetch('/api/config/keys', { method: 'POST', body: form }).then((r) => r.json())
 }
 export function saveDomain(domain: string) {

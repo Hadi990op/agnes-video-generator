@@ -6,6 +6,8 @@ export const T: Record<string, Record<string, string>> = {
     apiKeyTitle: 'API Key 配置', apiKeyNotConfigured: '未配置', apiKeyConfigured: '已配置',
     apiKeyPlaceholder: '输入 Agnes API Key（多个 Key 用换行或逗号分隔，配额自动叠加；在 platform.agnes-ai.com 免费获取）', apiKeyMasked: '已配置 (●●●)', save: '保存',
     keyCountLabel: '已配置 Key',
+    addKey: '添加 Key', multiKeyActive: '多 Key 轮询已启用',
+    apiKeyAppendPlaceholder: '粘贴新的 API Key（自动追加到现有 Key，无需重输旧 Key）',
     clear: '清除', clearConfirm: '确定要清除已配置的 API Key 吗？', apiKeyFromEnv: '已配置 (环境变量)',
     clearEnvHint: '当前 API Key 来自环境变量 AGNES_API_KEY，无法从界面清除。请取消环境变量后重试。',
     modelTitle: '模型选择', modelHint: '选择生成时使用的 Agnes 模型。图像与视频模型暂未开放，保留默认配置。',
