@@ -15,9 +15,10 @@
 | 3 | 删除任务端点 `DELETE /api/tasks/{id}` | 🔴 | 一键清理任务全目录，防磁盘膨胀 |
 | 4 | LLM JSON 输出容错（json_repair） | 🔴 | 修复 LLM 常见 JSON 语法错误，降编剧失败率 |
 | 5 | 用户上传分镜场景图 | 🟡 | 关键分镜可手工供给参考图，不再完全依赖 AI 生成 |
-| 6 | 角色一致性 + 对话（script）支持 | 🟡 | 增强长视频连续性与台词能力 |
-| 7 | `start.bat` Windows 一键启动 | 🟢 | Windows 用户开箱即用 |
-| 8 | `.env.example` 配置模板 | 🟢 | 多 Key / 端点可配置项一目了然 |
+| 6 | `start.bat` Windows 一键启动 | 🟢 | Windows 用户开箱即用 |
+| 7 | `.env.example` 配置模板 | 🟢 | 多 Key / 端点可配置项一目了然 |
+
+> 已抽离待调研项：**角色一致性增强 + 对话支持** → `docs/optimization-research/character_consistency_and_dialogue.md`
 
 ---
 
@@ -553,49 +554,13 @@ if repair_json is not None:
 
 ---
 
-## 6. 角色一致性 + 对话支持 🟡
+## 6. `start.bat` Windows 一键启动 🟢
 
 ### 6.1 目标
 
-提高创意/稿件长视频的叙事能力：
-- **角色一致性**：多场景同一角色保持外观稳定；
-- **对话支持**：分镜脚本中输出角色台词，旁白 TTS 与角色对白（可用不同音色/语气）区分。
-
-### 6.2 实现方式
-
-1. **角色一致性**：创意流水线已有"角色提取/尾帧/数字人 prompt"基础（`core/screenwriter/characters.py`）。增强为：首场景生成的角色形象图作为后续场景的常驻参考图透传（复用第 2 项通用归一化模块产物），并在每个场景的图片 prompt 末尾追加统一的角色外观描述串。角色外观串由 `Screenwriter` 首次调用时一次性产出、存进任务状态。
-2. **对话支持**：`core/screenwriter/story.py` 生成剧本时增加结构化对白段（`{"speaker": "...", "dialogue": "..."}`）。音频阶段（`core/pipelines/creative/steps_audio.py`）将对白与旁白分开走 TTS：对白使用 configured 的第二音色（或同音色不同 `rate`），合并进同一 SRT 时间线；影视感可加 `voice` 差异化（如男声旁白+女声对白）。
-
-### 6.3 涉及文件
-
-| 文件 | 改动 |
-|------|------|
-| `core/screenwriter/characters.py` | 角色外观描述统一串产出与透传 |
-| `core/screenwriter/story.py` | 剧本生成支持结构化对白 |
-| `core/pipelines/creative/steps_video.py` | 角色参考图跨场景透传 |
-| `core/pipelines/creative/steps_audio.py` | 旁白/对白分离 TTS + 合并时间线 |
-| `models/task.py` | 音色/对白配置字段 |
-| `static/index.html` | 可选音色配置项 |
-
-### 6.4 依赖变化
-
-无。
-
-### 6.5 验收标准
-
-1. 多场景创意视频中，指定角色在 ≥3 个场景外观基本一致（目测）。
-2. 剧本含对白时，SRT 同时包含旁白与对白且时间不冲突。
-3. 未配置对白/第二音色的任务与现状行为完全一致。
-
----
-
-## 7. `start.bat` Windows 一键启动 🟢
-
-### 7.1 目标
-
 目前仅 `start.sh`（Linux/macOS）。Windows 用户需手动建 venv、装依赖、确认 ffmpeg 存在。
 
-### 7.2 实现方式
+### 6.2 实现方式
 
 项目根目录新增 `start.bat`，逻辑与 `start.sh` 平行：
 
@@ -616,29 +581,29 @@ REM 5) .venv\Scripts\python server.py 并自动打开浏览器（起服务后用
 
 要点：`chcp 65001` 保证中文提示不乱码；venv 在 Windows 下解释器路径为 `.venv\Scripts\python.exe`；版本检查用 `python -c` 判断。注释/提示文案与 `start.sh` 保持一致（中文）。
 
-### 7.3 涉及文件
+### 6.3 涉及文件
 
 | 文件 | 改动 |
 |------|------|
 | `start.bat`（新增） | 一键启动脚本 |
 
-### 7.4 依赖变化
+### 6.4 依赖变化
 
 无。
 
-### 7.5 验收标准
+### 6.5 验收标准
 
 在 Windows 10/11 双击 `start.bat`：无 Python→明确报错；有 Python 无 ffmpeg→明确提示；环境齐全→自动建 venv、装依赖、起服务并打开 `http://localhost:8765`。
 
 ---
 
-## 8. `.env.example` 配置模板 🟢
+## 7. `.env.example` 配置模板 🟢
 
-### 8.1 目标
+### 7.1 目标
 
 多 Key / 端点配置项目前仅存在于代码注释，用户不易发现。提供带注释的配置模板，随包分发出货，也便于 CI/Docker 等场景快速参考。
 
-### 8.2 实现方式
+### 7.2 实现方式
 
 项目根新增 `.env.example`（公开提交，**绝不能包含真实 Key**）：
 
@@ -662,18 +627,18 @@ AGNES_API_KEY=your-api-key-here
 
 在 `README`/`AGENTS.md` 的部署章节补充一句引用及多 Key 说明。
 
-### 8.3 涉及文件
+### 7.3 涉及文件
 
 | 文件 | 改动 |
 |------|------|
 | `.env.example`（新增） | 配置模板 |
 | `README.md` / `AGENTS.md` | 简要引用 |
 
-### 8.4 依赖变化
+### 7.4 依赖变化
 
 无（纯文档/模板；`.env` 解析为可选，见优化点 1）。
 
-### 8.5 验收标准
+### 7.5 验收标准
 
 1. `.env.example` 存在且无真实密钥。
 2. README 出现多 Key 配置说明。
@@ -685,5 +650,5 @@ AGNES_API_KEY=your-api-key-here
 
 1. **第一梯队（🔴）做批次一**：1 → 4 → 3 → 2，均为独立小改动、低回归风险、收益直接（吞吐×N、失败率↓、磁盘回收、传输体积↓）。
 2. 每完成一项，在 `docs/regression_test_plan.md` 增加对应验收条目；涉及 API 模块的改动跑一遍 `scripts/regression_runner.py` 回归。
-3. 优化点 1 与 8 强相关（`.env.example` 提供多 Key 样例），可同批落地；优化点 2 是 5、6 的底层依赖，先做 2 再做 5/6。
-4. 优化点 5、6 贴近创意视频核心路径，改动面较大，建议作为独立小版本（v5.1.x）推进并对创意类型做专项回归。
+3. 优化点 1 与 7 强相关（`.env.example` 提供多 Key 样例），可同批落地；优化点 2 是 5 的底层依赖，先做 2 再做 5。
+4. 优化点 5 贴近创意视频核心路径，改动面较大，建议作为独立小版本（v5.1.x）推进并对创意类型做专项回归。

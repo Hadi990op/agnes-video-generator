@@ -2,7 +2,7 @@
 
 > **面向对象**：SoftwareCompany 团队（产品经理 / 架构师 / 工程师 / QA 工程师）及 AI Agent
 > **当前阶段**：🟢 **开发完成（v2.0） — 维护模式**
-> **配套文档**：`docs/regression_test_plan.md`（大版本回归）、`docs/plans-v1.0/system_design.md`（v1.0 原始设计）、`docs/plans-v5.0/refactor_plan.md`（工程化重构计划，重构唯一状态源）
+> **配套文档**：`docs/regression_test_plan.md`（大版本回归）、`docs/plans-v1.0/system_design.md`（v1.0 原始设计）、`docs/plans-v5.0/refactor_plan.md`（工程化重构计划，重构唯一状态源）、`docs/plans-v5.0/optimization_roadmap.md`（优化路线图）、`docs/optimization-research/`（长期待调研优化点存档）
 
 ---
 
@@ -259,6 +259,8 @@ Docker 镜像已声明 `VOLUME`，纯 `docker run -p 8765:8765 <镜像>` 会将�
 | **"Docker 部署" / "容器化部署"** | 按「0.5 Docker 部署」执行 | Docker 容器部署，无需 Python/FFmpeg |
 | **"验证项目" / "跑一下检查"** | 按「0.4 部署验证清单」执行 | 部署后验证 |
 | **"执行重构" / "推进重构批次"** | 按 `docs/plans-v5.0/refactor_plan.md` 执行对应批次任务 | 每完成一个任务须更新文档 §五 状态表 + §六 验证清单 |
+| **"执行优化批次" / 提到 `optimization_roadmap.md`** | 按 `docs/plans-v5.0/optimization_roadmap.md` 执行对应批次任务 | 每完成一项按文档验收标准自验 + 更新 `docs/regression_test_plan.md` 回归条目 |
+| **"待调研优化点" / "优化调研" / 提到 `optimization-research`** | 按 `docs/optimization-research/README.md` 索引与调研方法评估，转入可执行需移回 `optimization_roadmap.md` | 调研不充分/价值存疑的新点子先存档到该目录，不进批次 |
 
 ---
 
@@ -419,6 +421,8 @@ agnes-video-generator/
     ├── plans-v3.0/                   # v3.0 计划文档
     ├── plans-v4.0/                   # v4.0 计划（mock 回归设计、pipeline 重构）
     ├── plans-v5.0/                   # v5.0 计划（工程化重构：server 模块化、音频收敛、契约修复等）
+    │   └── optimization_roadmap.md   #   优化路线图（当前可执行优化点批次）
+    ├── optimization-research/        # 独立长期任务：待调研优化点存档（暂缓执行，见 README 流转规则）
     └── release-notes/                # v2.0 ~ v3.0 发布说明
 ```
 
