@@ -4,11 +4,15 @@ import { getStepsForType, isStepDoneInState } from '@/steps'
 import * as api from '@/api'
 import { t } from '@/i18n'
 import { useGa } from './useGa'
+import { useArtifacts } from './useArtifacts'
 import type { TaskState, StepDef } from '@/types'
 
 const POLL_INTERVAL = 30000
 
 const { trackTaskResultOnce } = useGa()
+
+// 产物刷新（模块级单例，与 ProgressPanel 共享状态）
+const { loadArtifacts, scheduleArtifactRefresh } = useArtifacts()
 
 // 进度展示状态
 const progressVisible = ref(false)
@@ -80,7 +84,9 @@ async function showProgress(taskId: string, dirName?: string | null) {
   const dirInfo = dirName ? `<br><span class="text-muted text-xs">${t('dir')}: <span class="font-mono">${dirName}</span></span>` : ''
   progressMessage.value = `<span class="text-accent animate-pulse">${t('taskStarting')}</span><br><span class="text-muted">${t('task_')}: ${taskId}</span>${dirInfo}`
 
+  // 加载已有中间产物（任务运行中也可查看）
   appState.currentArtifactsTaskId = taskId
+  loadArtifacts()
 }
 
 async function pollTaskProgress(taskId: string) {
@@ -101,10 +107,16 @@ async function pollTaskProgress(taskId: string) {
       markStep(step, 'running')
     }
 
+    // 步骤 running 或完成时刷新产物列表（running 期间产物逐步生成）
+    if (step) {
+      scheduleArtifactRefresh()
+    }
+
     if (state.status === 'completed') {
       trackTaskResultOnce('task_completed', taskId, { task_type: state.task_type || appState.currentTaskType })
       showResult(state.final_video_file, taskId)
       clearRunning()
+      scheduleArtifactRefresh()
     }
 
     if (state.status === 'failed' || (step === 'error' && status === 'failed')) {

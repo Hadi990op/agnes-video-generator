@@ -9,7 +9,7 @@ import type { TaskListItem, TaskState } from '@/types'
 
 const { showToast } = useToast()
 const { trackEvent } = useGa()
-const { setRunning, showProgress, startPolling } = useProgress()
+const { setRunning, showProgress, showResult, startPolling } = useProgress()
 
 const tasks = ref<TaskListItem[]>([])
 const loading = ref(false)
@@ -40,6 +40,9 @@ async function viewTask(taskId: string) {
   try {
     const state = await api.getTask(taskId)
     appState.currentTaskType = state.task_type || 'creative'
+    // 打开进度面板并加载已有中间产物（已完成任务同样可见）
+    await showProgress(taskId, state.dir_name)
+    if (state.final_video_file) showResult(state.final_video_file, taskId)
     return state
   } catch (e: any) {
     alert(t('failLoad') + ': ' + e.message)
@@ -51,7 +54,6 @@ async function viewRunningTask(taskId: string) {
   const state = await viewTask(taskId)
   if (!state) return
   setRunning(taskId)
-  await showProgress(taskId, null)
   await startPolling(taskId)
 }
 
