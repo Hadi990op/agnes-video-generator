@@ -6,7 +6,7 @@
 子类只需提供数据来源（_build_scenes / _build_reference_images / _composite_final），
 并可按需覆写通用步骤（_generate_videos / _generate_audio / _generate_subtitles）或钩子方法。
 
-设计原则（见 docs/plans-v4.0/pipeline_refactor.md）：
+设计原则（见 docs/plans/v4.0/pipeline_refactor.md）：
     - 差异只在"数据从哪来"，不在"流程怎么做"
     - 通用步骤操作 ``self._state.scenes: List[SceneTask]``，通过钩子读取每场景参数
     - 子类可整体覆写某步骤以保留其特有的（如链式/循环）视频生成逻辑

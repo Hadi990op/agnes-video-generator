@@ -96,12 +96,12 @@ To be honest, Agnes's video model isn't perfect yet. The generated frames are so
 
 ## 📚 Documentation
 
-- **[Features](docs/features.md)** — Creation modes, the completely free AI model chain, AI narration & smart subtitles, flexible creative controls, production-grade reliability, and the multilingual Web UI.
-- **[Getting Started](docs/getting-started.md)** — Install and deploy in 4 ways: Manual (`start.sh`), Docker, npm (`npx free-short-video`), or AI-Agent assisted.
-- **[Usage Guide](docs/usage.md)** — Configure your API key, pick a video mode, resume from checkpoints, the three chaining modes, and logs & output layout.
-- **[Architecture](docs/architecture.md)** — Project structure and tech stack.
-- **[API Reference](docs/api.md)** — Full REST + WebSocket endpoint list.
-- **[FAQ](docs/faq.md)** — Frequently asked questions.
-- **[About & License](docs/about.md)** — Acknowledgments and the MIT license.
+- **[Features](docs/public/features.md)** — Creation modes, the completely free AI model chain, AI narration & smart subtitles, flexible creative controls, production-grade reliability, and the multilingual Web UI.
+- **[Getting Started](docs/public/getting-started.md)** — Install and deploy in 4 ways: Manual (`start.sh`), Docker, npm (`npx free-short-video`), or AI-Agent assisted.
+- **[Usage Guide](docs/public/usage.md)** — Configure your API key, pick a video mode, resume from checkpoints, the three chaining modes, and logs & output layout.
+- **[Architecture](docs/public/architecture.md)** — Project structure and tech stack.
+- **[API Reference](docs/public/api.md)** — Full REST + WebSocket endpoint list.
+- **[FAQ](docs/public/faq.md)** — Frequently asked questions.
+- **[About & License](docs/public/about.md)** — Acknowledgments and the MIT license.
 
 **Keywords**: free AI video generator, AI video generation tool, text to video AI, free AI video maker, AI video creator, open source video generator, Agnes AI, text-to-video, image-to-video, keyframes video, AI narration, auto subtitles, multi-scene video, zero cost AI video, no subscription AI video tool, digital anchor, self-hosted AI video generator, open source alternative to Runway

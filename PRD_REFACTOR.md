@@ -1,7 +1,7 @@
 # Agnes Video Generator v2.0 大规模改造 PRD
 
 > **当前阶段**：📦 已归档 — v2.0 开发已全部完成
-> **配套文档**：`AGENTS.md`（开发规范）、`docs/system_design.md`（架构设计）
+> **配套文档**：`AGENTS.md`（开发规范）、`docs/plans/v1.0/system_design.md`（架构设计）
 
 ## 项目信息
 

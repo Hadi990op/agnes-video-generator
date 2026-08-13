@@ -4,7 +4,7 @@
 并内置跨语言兼容性矩阵与「文本脚本 → 兼容性」检测，供后端 /api/voices* 接口与
 任务创建时的 voice/text 校验复用。
 
-设计背景见 docs/voice_selector_design.md。核心结论：
+设计背景见 docs/plans/v4.0/voice_selector_design_DONE.md。核心结论：
 - 同一文字体系内互通，跨体系基本不通（CJK→en 是唯一例外）。
 - edge-tts 跨体系调用直接抛异常，无降级，因此必须前置校验。
 """
