@@ -23,10 +23,12 @@ from core.config import (
     get_api_key_source,
     get_api_keys,
     get_api_keys_source,
+    get_api_keys_with_sources,
     get_selected_models,
     get_watermark_config,
     get_workspaces,
     load_config,
+    remove_api_key_single,
     set_agnes_domain,
     set_api_key,
     set_api_keys,
@@ -92,16 +94,69 @@ async def clear_config():
 
 @router.get("/api/config/keys")
 async def get_config_keys():
-    """返回 Key 数量与来源（永不回传 Key 明文）。
+    """返回 Key 列表（去重后，含来源标记）与数量。
+
+    返回明文 Key 仅供用户本人配置界面展示；不写入日志。
+    env 与 config 中重复的 Key 只返回一次（标记 env，env 优先）。
 
     Returns:
-        {"ok": true, "key_count": int, "source": "env:N|config:N|mixed:...|none"}
+        {
+          "ok": true,
+          "key_count": int,            # 去重后总数
+          "source": "env:N|config:N|mixed:...|none",
+          "keys": [{"key": "sk-...", "source": "env"|"config"}, ...],
+        }
     """
-    keys = get_api_keys()
+    items = get_api_keys_with_sources()
     return {
         "ok": True,
-        "key_count": len(keys),
+        "key_count": len(items),
         "source": get_api_keys_source(),
+        "keys": items,
+    }
+
+
+@router.delete("/api/config/keys")
+async def remove_config_key(key: str = Form("")):
+    """移除单个 Key（仅针对 config 中保存的 Key；env 来源不可在此移除）。
+
+    Args:
+        key: 要移除的 Key 明文（Form 字段）。
+
+    Returns:
+        {"ok": true, "key_count": ..., "source": ..., "removed": 掩码, "still_active": bool}
+
+    Raises:
+        400: Key 来自环境变量，无法从界面移除；或 Key 不存在。
+    """
+    key = (key or "").strip()
+    if not key:
+        raise HTTPException(status_code=400, detail="Key 参数缺失")
+
+    items = get_api_keys_with_sources()
+    env_has = any(it["source"] == "env" and it["key"] == key for it in items)
+    config_has = any(it["source"] == "config" and it["key"] == key for it in items)
+    if not env_has and not config_has:
+        raise HTTPException(status_code=404, detail="Key 不存在")
+
+    changed, still_active = remove_api_key_single(key)
+    if not changed and env_has and not config_has:
+        # 该 Key 只来自 env（含与 config 重复但 env 优先去重的情况）
+        raise HTTPException(
+            status_code=400,
+            detail="该 Key 来自环境变量（含 .env），请在启动环境 / .env 中移除",
+        )
+    # 重建 KeyRing 与限速器，使移除即时生效
+    reset_key_ring()
+    reset_rate_limiter()
+    # 移除后 key_count 可能不变：Key 同时存在于 env 与 config 时，移除的是 config 副本
+    masked = f"{key[:6]}...{key[-4:]}" if len(key) > 12 else "***"
+    return {
+        "ok": True,
+        "key_count": len(get_api_keys()),
+        "source": get_api_keys_source(),
+        "removed": masked,
+        "still_active": still_active,
     }
 
 

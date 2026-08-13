@@ -28,6 +28,11 @@ export function saveConfigKeys(keys: string[], append = false) {
   if (append) form.append('append', 'true')
   return fetch('/api/config/keys', { method: 'POST', body: form }).then((r) => r.json())
 }
+export function removeConfigKey(key: string) {
+  const form = new FormData()
+  form.append('key', key)
+  return fetch('/api/config/keys', { method: 'DELETE', body: form }).then((r) => r.json())
+}
 export function saveDomain(domain: string) {
   const form = new FormData()
   form.append('domain', domain)

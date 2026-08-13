@@ -237,32 +237,81 @@ def set_api_keys(keys: list) -> None:
     save_config(config)
 
 
+def _collect_config_keys() -> list:
+    """采集配置文件中的 Key（api_keys 列表或旧 api_key 字段），去重、去空。"""
+    config = load_config()
+    cfg_keys = config.get("api_keys", []) or []
+    if not cfg_keys and config.get("api_key"):
+        cfg_keys = [config["api_key"]]
+    return _dedup([k for k in cfg_keys if k])
+
+
+def get_api_keys_with_sources() -> list:
+    """返回去重后的 Key 列表（env 优先），每个条目含来源标记。
+
+    Returns:
+        [{"key": "sk-...", "source": "env"|"config"}, ...]
+        同 Key 在 env 与 config 中重复时只保留一次，标记为 env。
+    """
+    env_keys = _dedup(_collect_env_keys())
+    cfg_keys = _collect_config_keys()
+    seen = set()
+    out = []
+    for k in env_keys:
+        if k and k not in seen:
+            seen.add(k)
+            out.append({"key": k, "source": "env"})
+    for k in cfg_keys:
+        if k and k not in seen:
+            seen.add(k)
+            out.append({"key": k, "source": "config"})
+    return out
+
+
+def remove_api_key_single(key: str) -> tuple:
+    """从配置文件移除单个 Key（不影响 env 来源）。
+
+    Args:
+        key: 要移除的 Key 明文。
+
+    Returns:
+        (changed, still_active): changed=是否移除了 config 副本；
+        still_active=该 Key 是否仍生效（env 中存在同 Key 时仍生效）。
+    """
+    config = load_config()
+    changed = False
+    # 1. 从 api_keys 列表移除
+    cfg_keys = config.get("api_keys", []) or []
+    if key in cfg_keys:
+        cfg_keys = [k for k in cfg_keys if k != key]
+        changed = True
+    # 2. 命中旧 api_key 字段
+    if config.get("api_key") == key:
+        config.pop("api_key", None)
+        changed = True
+    if changed:
+        if cfg_keys:
+            config["api_keys"] = cfg_keys
+        else:
+            config.pop("api_keys", None)
+        save_config(config)
+    still_active = key in _dedup(_collect_env_keys())
+    return changed, still_active
+
+
 def get_api_keys_source() -> str:
     """返回多 Key 采集来源描述，供 ``GET /api/config/keys`` 与日志展示。
 
     Returns:
         'env:N' / 'config:N' / 'mixed:envX+configY' / 'none'
+        （各来源计数均为各自去重后的数量；合并去重后的总数见 get_api_keys()）
     """
     keys = get_api_keys()
     if not keys:
         return "none"
 
-    env_keys = []
-    for i in range(1, 100):
-        var = "AGNES_API_KEY" if i == 1 else f"AGNES_API_KEY_{i}"
-        val = os.environ.get(var, "").strip() or _dotenv_value(var).strip()
-        if val:
-            env_keys.append(val)
-        elif i > 1:
-            break
-    env_keys = _dedup(env_keys)
-
-    config = load_config()
-    cfg_keys = _dedup([k for k in config.get("api_keys", []) if k])
-    if not config.get("api_keys"):
-        single = config.get("api_key", "")
-        if single:
-            cfg_keys = [single]
+    env_keys = _dedup(_collect_env_keys())
+    cfg_keys = _collect_config_keys()
 
     if env_keys and cfg_keys:
         return f"mixed:env{len(env_keys)}+config{len(cfg_keys)}"

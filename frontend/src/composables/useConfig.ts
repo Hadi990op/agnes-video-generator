@@ -10,9 +10,10 @@ const { trackEvent } = useGa()
 
 // ── API Key ──
 const apiKeyStatus = ref<'none' | 'configured' | 'env'>('none')
-// 多 Key（v5.0 优化）：当前 Key 数 + 采集来源
+// 多 Key（v5.0 优化）：当前 Key 数 + 采集来源 + 去重后的 Key 列表（含来源标记）
 const keyCount = ref(0)
 const keySource = ref('')
+const keyList = ref<{ key: string; source: string }[]>([])
 
 function isApiKeyConfigured() {
   return apiKeyStatus.value !== 'none'
@@ -32,6 +33,7 @@ async function loadKeyInfo() {
     const d = await api.getConfigKeys()
     keyCount.value = d.key_count || 0
     keySource.value = d.source || ''
+    keyList.value = d.keys || []
     // 同步 Key 状态：source 以 'env' 开头（env:1 / mixed:...）→ env；有 Key → configured
     if (keyCount.value > 0) {
       apiKeyStatus.value = keySource.value.startsWith('env') ? 'env' : 'configured'
@@ -41,6 +43,35 @@ async function loadKeyInfo() {
   } catch (e) {
     console.error('load /api/config/keys failed:', e)
   }
+}
+
+async function removeKey(key: string) {
+  if (!confirm(t('removeKeyConfirm'))) return false
+  const r = await api.removeConfigKey(key)
+  if (r.ok) {
+    trackEvent('config_action', { action: 'remove_api_key' })
+    if (r.still_active) {
+      showToast(t('keyStillActive') + ': ' + r.removed, 3500)
+    } else {
+      showToast(t('removedKey') + ': ' + r.removed, 3000)
+    }
+    keyCount.value = r.key_count || 0
+    keySource.value = r.source || ''
+    keyList.value = (await api.getConfigKeys()).keys || []
+    if (keyCount.value > 0) {
+      apiKeyStatus.value = keySource.value.startsWith('env') ? 'env' : 'configured'
+    } else {
+      apiKeyStatus.value = 'none'
+    }
+    return true
+  }
+  alert(r.detail || t('failRemoveKey'))
+  return false
+}
+
+function maskKey(key: string): string {
+  if (key.length <= 12) return key
+  return key.slice(0, 6) + '••••' + key.slice(-4)
 }
 
 async function saveMultiKeys(keysText: string) {
@@ -258,10 +289,13 @@ export function useConfig() {
     apiKeyStatus,
     keyCount,
     keySource,
+    keyList,
+    maskKey,
     isApiKeyConfigured,
     saveApiKey,
     saveMultiKeys,
     loadKeyInfo,
+    removeKey,
     clearApiKey,
     modelSyncStatus,
     modelSaveStatus,

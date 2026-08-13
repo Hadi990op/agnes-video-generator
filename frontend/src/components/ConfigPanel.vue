@@ -11,8 +11,11 @@ const {
   apiKeyStatus,
   keyCount,
   keySource,
+  keyList,
+  maskKey,
   saveMultiKeys,
   loadKeyInfo,
+  removeKey,
   clearApiKey,
   modelSyncStatus,
   modelSaveStatus,
@@ -161,6 +164,29 @@ initCollapse()
         <span v-if="keyCount > 1" class="text-xs px-2 py-0.5 rounded-full bg-blue-900 text-blue-300">
           {{ t('multiKeyActive') }}
         </span>
+      </div>
+      <!-- Key 列表：掩码展示 + 来源 + 单个移除 -->
+      <div v-if="keyList.length > 0" class="mt-3 space-y-1.5">
+        <div
+          v-for="(item, idx) in keyList"
+          :key="item.key + idx"
+          class="flex items-center gap-2 rounded-lg px-3 py-1.5 bg-paper-3/70 text-xs"
+        >
+          <code class="flex-1 font-mono text-ink-2 truncate">{{ maskKey(item.key) }}</code>
+          <span
+            class="px-1.5 py-0.5 rounded text-[10px] uppercase"
+            :class="item.source === 'env' ? 'bg-amber-900/60 text-amber-300' : 'bg-paper-3 text-muted'"
+          >{{ item.source === 'env' ? t('keySrcEnv') : t('keySrcConfig') }}</span>
+          <button
+            v-if="item.source !== 'env'"
+            class="text-red-300 hover:text-red-200 transition"
+            title="移除该 Key"
+            @click="removeKey(item.key)"
+          >
+            ✕
+          </button>
+          <span v-else class="text-muted/50" :title="t('keySrcEnvHint')">•</span>
+        </div>
       </div>
       <div class="flex flex-wrap items-center gap-x-5 gap-y-1.5 mt-3 text-xs">
         <a href="https://platform.agnes-ai.com" target="_blank" rel="noopener" class="text-accent hover:text-ink transition-colors">🚀 {{ t('apiKeyGetLink') }}</a>
