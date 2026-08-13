@@ -4,7 +4,7 @@
 
 ## Overview
 
-v4.6.0 is a **minor version** that introduces the **Poetry Video (诗词视频)** task type — ancient poems are split into scenes by the LLM, each line is read aloud by TTS and aligned to video subtitles — and refactors the long-video pipelines onto a shared **MultiScenePipeline** base.
+v4.6.0 is a **minor version** that introduces the **Poetry Video** task type — ancient poems are split into scenes by the LLM, each line is read aloud by TTS and aligned to video subtitles — and refactors the long-video pipelines onto a shared **MultiScenePipeline** base.
 
 ## Usage
 
@@ -20,7 +20,7 @@ git pull
 
 ### Features & Improvements
 
-- **Poetry Video (诗词视频) task type** — new `POST /api/tasks/poetry`: the LLM splits a poem into scenes (original line | visual description format), each line is rendered by TTS narration, scenes are generated as t2v clips, and subtitles are time-aligned to the narration and concatenated.
+- **Poetry Video task type** — new `POST /api/tasks/poetry`: the LLM splits a poem into scenes (original line | visual description format), each line is rendered by TTS narration, scenes are generated as t2v clips, and subtitles are time-aligned to the narration and concatenated.
 - **Poetry scene config aligned with creative video** — per-scene duration model and duration-extraction mode; scene count / watermark / narration speed options.
 - **Two-phase poetry generation** — scenes are submitted in a batch and awaited in parallel for faster completion.
 

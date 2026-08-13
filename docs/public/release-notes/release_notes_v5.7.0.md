@@ -22,7 +22,7 @@ No breaking changes or data migration required. New environment variables (optio
 
 ### Features & Improvements
 
-- **Multi-API-Key rotation & throughput boost** — configure multiple Agnes API keys (env + config, auto-dedup); requests rotate across keys via a `KeyRing`, and a **429 换 Key 立即重试** mechanism instantly switches to the next key on rate-limit instead of backing off. Layered rate limiting gives video submissions a dedicated `1×Key/min` bucket alongside the shared `20×Key×0.8/min` bucket, roughly doubling achievable throughput with 2 keys.
+- **Multi-API-Key rotation & throughput boost** — configure multiple Agnes API keys (env + config, auto-dedup); requests rotate across keys via a `KeyRing`, and an **instant retry on 429 key-switch** mechanism immediately switches to the next key on rate-limit instead of backing off. Layered rate limiting gives video submissions a dedicated `1×Key/min` bucket alongside the shared `20×Key×0.8/min` bucket, roughly doubling achievable throughput with 2 keys.
 - **User-supplied scene reference images (creative)** — in creative long-video mode you can now upload a reference image per scene; the pipeline uses your image instead of AI-generated storyboard frames for that scene.
 - **Task deletion (UI + API)** — delete completed task folders from the task list or via `DELETE /api/tasks/{id}`; running tasks are protected with a clear error. The whole `.working_dir` stays clean.
 - **API-key list & per-key removal** — the settings panel now lists all configured keys with source badges (env/config); config-sourced keys can be removed individually without clearing everything.

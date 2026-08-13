@@ -133,16 +133,16 @@ jobs:
           RELEASE_VERSION: ${{ github.ref_name }}
         run: python3 .github/scripts/update_dockerhub_overview.py
 
-      # ── 组装 GitHub Release body：使用方式（原有）+ 新增内容（新增） ──
-      # 使用方式 = 各 release 包（Docker / npm）获取与运行方法
-      # 新增内容 = 读取 docs/public/release-notes/release_notes_vX.Y.Z.md 的「新增内容」章节
-      # 规范见 docs/dev/release_process.md（版本号规则 + 新增内容红线：不写文档整理/SEO/引流）
+      # ── Assemble GitHub Release body: Usage (existing) + What's New (new) ──
+      # Usage = how to get/run each release package (Docker / npm)
+      # What's New = read from the release notes doc (docs/public/release-notes/)
+      # Spec: docs/dev/release_process.md — all release body sections are in English.
       - name: Prepare GitHub Release body
         run: |
           VERSION="${GITHUB_REF_NAME#v}"
           BODY=/tmp/release_body.md
           cat > "$BODY" <<'EOF'
-          ## 使用方式
+          ## Usage
           
           ### Docker Image
           
@@ -213,13 +213,13 @@ jobs:
           > Requires Python 3.10+ and ffmpeg on your system.
           > On first run, a Python virtual environment is auto-created and dependencies are installed.
           EOF
-          # 追加「新增内容 / What's New」（release notes 文档中对应章节起）
+          # Append the What's New section (from the release notes doc onward)
           NOTES="docs/public/release-notes/release_notes_v${VERSION}.md"
           if [ -f "$NOTES" ]; then
             printf '%s\n' '' '---' '' >> "$BODY"
             awk '/^## What.s New/{f=1} f' "$NOTES" >> "$BODY"
           else
-            echo "::warning::缺少 release notes 文档 $NOTES，GitHub Release 将只有「使用方式」。"
+            echo "::warning::Missing release notes doc $NOTES; GitHub Release will only contain Usage."
           fi
 
       - name: Create GitHub Release
@@ -255,7 +255,7 @@ jobs:
           VERSION="${GITHUB_REF_NAME#v}"
           cp README.md /tmp/README.orig.md
           printf '## Quick Start (npm)\n\n```bash\nnpx free-short-video\n```\n\nOr install globally:\n\n```bash\nnpm install -g free-short-video\nfree-short-video\n```\n\n> Requires Python 3.10+ and ffmpeg.\n\n' > /tmp/npm-header.md
-          # 前部追加 release 新增内容（What's New 章节起）
+          # Prepend the release's What's New section at the front of the npm README
           NOTES="docs/public/release-notes/release_notes_v${VERSION}.md"
           if [ -f "$NOTES" ]; then
             printf '%s\n' '---' '' "# What's New in v${VERSION}" '' > /tmp/npm-rel.md
@@ -263,7 +263,7 @@ jobs:
             printf '%s\n' '' '---' '' >> /tmp/npm-rel.md
             cat /tmp/npm-rel.md /tmp/npm-header.md /tmp/README.orig.md > README.md
           else
-            echo "::warning::缺少 release notes 文档 $NOTES，npm README 将只有 Quick Start。"
+            echo "::warning::Missing release notes doc $NOTES; npm README will only contain Quick Start."
             cat /tmp/npm-header.md /tmp/README.orig.md > README.md
           fi
 
