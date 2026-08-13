@@ -119,8 +119,14 @@ const modelSyncStatus = ref<'idle' | 'syncing' | 'ok' | 'error'>('idle')
 const modelSaveStatus = ref<'idle' | 'ok' | 'error'>('idle')
 const modelErrorMsg = ref('')
 
+// 2.5-flash 已正式上线（无内测标记）；pro 系列为付费模型
 function isBetaModel(m: string): boolean {
-  return typeof m === 'string' && (m === 'agnes-2.5-flash' || /2\.5/.test(m))
+  // 保留通用性：仍匹配任何带 "beta" 字样的模型（未来若有新 beta 模型）
+  return typeof m === 'string' && /beta/i.test(m)
+}
+
+function isPaidModel(m: string): boolean {
+  return typeof m === 'string' && /agnes-2\.5-pro|agnes-2\.5-pro-alpha/.test(m)
 }
 
 const betaHintVisible = computed(() => {
@@ -302,6 +308,7 @@ export function useConfig() {
     modelErrorMsg,
     betaHintVisible,
     isBetaModel,
+    isPaidModel,
     loadModels,
     syncModels,
     saveModels,

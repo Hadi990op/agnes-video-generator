@@ -22,6 +22,7 @@ const {
   modelErrorMsg,
   betaHintVisible,
   isBetaModel,
+  isPaidModel,
   syncModels,
   saveModels,
   domainSaveStatus,
@@ -65,6 +66,13 @@ function toggleConfigPanel(section: string) {
 const apiKeyInput = ref('')
 // 是否已有 Key（env 或 config）：有 Key 时输入框变「添加 Key」追加语义
 const hasApiKey = computed(() => apiKeyStatus.value !== 'none')
+
+// 模型下拉展示：付费模型 → "名称（付费）"；beta 模型 → "名称（内测）"；其余 → 名称
+function modelDisplayLabel(m: string): string {
+  if (isPaidModel(m)) return m + t('modelPaidTag')
+  if (isBetaModel(m)) return m + t('modelBetaTag')
+  return m
+}
 
 async function onSaveApiKey() {
   const key = apiKeyInput.value.trim()
@@ -232,13 +240,14 @@ initCollapse()
           <label class="block text-xs text-muted mb-1">{{ t('modelTextLabel') }}</label>
           <div class="flex gap-3">
             <select v-model="appState.models.text" class="flex-1 glass-input rounded-lg px-3 py-2.5 text-sm text-ink">
-              <option v-for="m in appState.modelListCache.text" :key="m" :value="m">{{ isBetaModel(m) ? m + t('modelBetaTag') : m }}</option>
+              <option v-for="m in appState.modelListCache.text" :key="m" :value="m">{{ modelDisplayLabel(m) }}</option>
             </select>
             <button class="px-4 py-2.5 bg-paper-3 hover:bg-paper-3 rounded-lg text-sm font-medium transition whitespace-nowrap" @click="syncModels">
               {{ t('modelSync') }}
             </button>
           </div>
           <p v-if="betaHintVisible" class="text-xs text-accent mt-1.5">{{ t('modelBetaHint') }}</p>
+          <p v-if="isPaidModel(appState.models.text)" class="text-xs text-amber-400 mt-1.5">{{ t('modelPaidHint') }}</p>
         </div>
         <div>
           <label class="block text-xs text-muted mb-1">{{ t('modelImageLabel') }}</label>
