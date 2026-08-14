@@ -6,18 +6,22 @@ import logging
 import os
 import shutil
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, UploadFile, File, Form
 from fastapi.responses import FileResponse
 
 from core.artifacts import (
     apply_cascade_plan,
+    build_checkpoint_manifest,
     get_cascade_plan,
     list_artifacts,
     resolve_artifact,
+    write_checkpoint_manifest,
 )
 from core.config import get_working_dir
+from core.dependency_graph import get_dependency_graph
 from core.path_security import UnsafePathError, safe_join
 from core.task_manager import TaskManager
+from models.task import StepStatus, TaskType
 
 from web import app_state, helpers
 
@@ -308,3 +312,255 @@ def _task_exists(task_id: str) -> bool:
         if t["task_id"] == task_id:
             return True
     return False
+
+
+# ═══════════════════════════════════════════════════════════════
+# v6.0 手动模式：检查点 + 影响预计算 + 产物回填 + 确认/重生成
+# ═══════════════════════════════════════════════════════════════
+
+
+@router.get("/api/tasks/{task_id}/checkpoints")
+async def list_task_checkpoints(task_id: str):
+    """返回任务按检查点分组的产物清单（checkpoint.json 数据）。
+
+    供手动模式检查点等待页使用；若 checkpoint.json 未落盘则现场构建。
+    """
+    dir_name = helpers.find_dir_name(task_id)
+    tm = TaskManager(task_id, dir_name=dir_name)
+    state = tm.load()
+    if not state:
+        raise HTTPException(status_code=404, detail="Task not found")
+
+    ckpt_path = os.path.join(tm.task_dir, "checkpoint.json")
+    if not os.path.exists(ckpt_path):
+        write_checkpoint_manifest(state, tm.task_dir)
+    try:
+        with open(ckpt_path, "r", encoding="utf-8") as f:
+            data = json.load(f)
+    except (OSError, ValueError):
+        data = build_checkpoint_manifest(state, tm.task_dir)
+
+    # 补充当前检查点（实时读取状态，避免 checkpoint.json 过期）
+    mc = getattr(state, "manual_config", None)
+    data["current_checkpoint"] = (mc.current_checkpoint if mc else "") or ""
+    return {"ok": True, **data}
+
+
+@router.get("/api/tasks/{task_id}/checkpoints/{checkpoint}")
+async def get_task_checkpoint(task_id: str, checkpoint: str):
+    """返回单个检查点的产物列表与状态。"""
+    dir_name = helpers.find_dir_name(task_id)
+    tm = TaskManager(task_id, dir_name=dir_name)
+    state = tm.load()
+    if not state:
+        raise HTTPException(status_code=404, detail="Task not found")
+
+    data = build_checkpoint_manifest(state, tm.task_dir)
+    groups = data.get("checkpoints", {})
+    if checkpoint not in groups:
+        raise HTTPException(status_code=404, detail=f"Checkpoint '{checkpoint}' not found")
+
+    return {"ok": True, "checkpoint": checkpoint, **groups[checkpoint]}
+
+
+@router.get("/api/tasks/{task_id}/checkpoints/{checkpoint}/impact")
+async def preview_checkpoint_impact(
+    task_id: str,
+    checkpoint: str,
+    modified_artifact_ids: str = "",
+    param_updates: str = "",
+):
+    """影响预计算（PRD §4.5 / §5.2）：只计算不落盘。
+
+    query 参数（JSON 字符串）：
+        modified_artifact_ids: ["creative:script:scene_prompt"] 或 ["creative:video:2"]
+        param_updates: {"resolution": "768x1152"}
+
+    返回 ImpactPlan{affected, retained, steps_to_reset, affected_checkpoints}，
+    供前端「修改前提示」弹窗展示将删除重跑的产物。
+    """
+    dir_name = helpers.find_dir_name(task_id)
+    tm = TaskManager(task_id, dir_name=dir_name)
+    state = tm.load()
+    if not state:
+        raise HTTPException(status_code=404, detail="Task not found")
+
+    try:
+        modified = json.loads(modified_artifact_ids) if modified_artifact_ids else []
+        params = json.loads(param_updates) if param_updates else None
+    except ValueError:
+        raise HTTPException(status_code=422, detail="modified_artifact_ids / param_updates 必须为 JSON")
+
+    if not isinstance(modified, list):
+        raise HTTPException(status_code=422, detail="modified_artifact_ids 必须为 JSON 数组")
+
+    graph = get_dependency_graph(state.task_type)
+    plan = graph.compute_impact(state, modified, params)
+    return {"ok": True, "checkpoint": checkpoint, **plan.to_dict()}
+
+
+@router.post("/api/tasks/{task_id}/artifacts/{artifact_id}/upload")
+async def upload_task_artifact(
+    task_id: str,
+    artifact_id: str,
+    file: UploadFile = File(...),
+):
+    """覆盖回填产物（PRD §4.4 / 通道2）。
+
+    仅允许在任务暂停（PENDING + current_checkpoint）或未运行时回填；
+    写入前校验路径穿越 + 覆盖后落盘 manifest / checkpoint。
+    """
+    # 运行中保护
+    if task_id in app_state.active_pipelines:
+        pipeline = app_state.active_pipelines[task_id]
+        if not pipeline._stop_event.is_set():
+            raise HTTPException(status_code=409, detail="Task is running, please stop/pause it first")
+
+    dir_name = helpers.find_dir_name(task_id)
+    tm = TaskManager(task_id, dir_name=dir_name)
+    state = tm.load()
+    if not state:
+        raise HTTPException(status_code=404, detail="Task not found")
+
+    artifact = resolve_artifact(artifact_id, state, tm.task_dir)
+    if not artifact or not artifact.file_relpath:
+        raise HTTPException(status_code=404, detail="Artifact not found")
+    if not artifact.deletable:
+        raise HTTPException(status_code=400, detail="Artifact is not editable")
+
+    # 路径穿越防护
+    real_task_dir = os.path.realpath(tm.task_dir)
+    abs_path = os.path.join(tm.task_dir, artifact.file_relpath)
+    real_abs_path = os.path.realpath(abs_path)
+    if not real_abs_path.startswith(real_task_dir + os.sep):
+        raise HTTPException(status_code=403, detail="Access denied")
+
+    os.makedirs(os.path.dirname(real_abs_path), exist_ok=True)
+    content = await file.read()
+    with open(real_abs_path, "wb") as f:
+        f.write(content)
+
+    # 标记脏：记录回填产物 id（手动模式）
+    mc = getattr(state, "manual_config", None)
+    if mc is not None:
+        if artifact_id not in mc.modified_artifacts:
+            mc.modified_artifacts.append(artifact_id)
+        tm.update_state(manual_config=mc)
+
+    # 刷新清单
+    write_checkpoint_manifest(state, tm.task_dir)
+
+    logger.info("[Artifacts] Uploaded %s for task %s (%d bytes)", artifact_id, task_id, len(content))
+    return {"ok": True, "artifact_id": artifact_id, "size": len(content)}
+
+
+@router.post("/api/tasks/{task_id}/checkpoints/{checkpoint}/approve")
+async def approve_checkpoint(task_id: str, checkpoint: str,
+                             modified_artifact_ids: str = Form(""),
+                             param_updates: str = Form(""),
+                             confirmed: bool = Form(False)):
+    """确认产物并继续（PRD §5.2）。
+
+    - 不传 ``confirmed``（或 false）：仅计算影响计划返回，不落盘（等价 impact 预计算）。
+    - ``confirmed=true``：落盘删除受影响产物 + 重置步骤 + 标记检查点已确认，
+      然后走现有 resume 恢复执行。
+    """
+    dir_name = helpers.find_dir_name(task_id)
+    tm = TaskManager(task_id, dir_name=dir_name)
+    state = tm.load()
+    if not state:
+        raise HTTPException(status_code=404, detail="Task not found")
+
+    try:
+        modified = json.loads(modified_artifact_ids) if modified_artifact_ids else []
+        params = json.loads(param_updates) if param_updates else None
+    except ValueError:
+        raise HTTPException(status_code=422, detail="modified_artifact_ids / param_updates 必须为 JSON")
+
+    graph = get_dependency_graph(state.task_type)
+    plan = graph.compute_impact(state, modified, params)
+
+    if not confirmed:
+        # 仅预计算返回，不落盘（前端可据此展示"修改前提示"弹窗）
+        return {"ok": True, "checkpoint": checkpoint, "confirmed": False, **plan.to_dict()}
+
+    # ── 确认落盘 ──
+    # 1. 删除受影响产物文件 + 应用级联计划到 state
+    deleted_files: list[str] = []
+    real_task_dir = os.path.realpath(tm.task_dir)
+    for aid in plan.affected:
+        artifact = resolve_artifact(aid, state, tm.task_dir)
+        if artifact and artifact.file_relpath:
+            abs_path = os.path.join(tm.task_dir, artifact.file_relpath)
+            real_abs_path = os.path.realpath(abs_path)
+            if real_abs_path.startswith(real_task_dir + os.sep) and os.path.exists(abs_path) and os.path.isfile(abs_path):
+                try:
+                    os.remove(abs_path)
+                    deleted_files.append(artifact.file_relpath)
+                except OSError as e:
+                    logger.warning("[Artifacts] Failed to delete %s: %s", artifact.file_relpath, e)
+
+    # 2. 重置受影响步骤状态 + 任务置 PENDING
+    update_kwargs: dict = {}
+    for step_field in plan.steps_to_reset:
+        if hasattr(state, step_field):
+            setattr(state, step_field, StepStatus.PENDING)
+            update_kwargs[step_field] = StepStatus.PENDING
+
+    # 3. 标记检查点已确认 + 清空 current_checkpoint
+    mc = getattr(state, "manual_config", None)
+    if mc is not None:
+        if checkpoint not in mc.approved_checkpoints:
+            mc.approved_checkpoints.append(checkpoint)
+        mc.current_checkpoint = ""
+        if modified:
+            for m in modified:
+                if m not in mc.modified_artifacts:
+                    mc.modified_artifacts.append(m)
+        update_kwargs["manual_config"] = mc
+    update_kwargs["status"] = StepStatus.PENDING
+    state.status = StepStatus.PENDING
+
+    # 4. 持久化
+    tm.update_state(**update_kwargs)
+
+    # 5. 刷新清单
+    write_checkpoint_manifest(state, tm.task_dir)
+
+    logger.info(
+        "[Approve] Task %s checkpoint '%s' approved, deleted=%d, reset=%s",
+        task_id, checkpoint, len(deleted_files), plan.steps_to_reset,
+    )
+
+    # 6. 走现有 resume 恢复执行
+    from web.routes.task_routes import resume_task
+
+    return await resume_task(task_id)
+
+
+@router.post("/api/tasks/{task_id}/checkpoints/{checkpoint}/regen")
+async def regen_checkpoint(task_id: str, checkpoint: str):
+    """重新生成当前检查点（PRD §5.2）。
+
+    等价于 approve(modified_artifact_ids=[该检查点全部产物], confirmed=true)：
+    重置本检查点全部产物 + 下游，然后 resume 重新生成。
+    """
+    dir_name = helpers.find_dir_name(task_id)
+    tm = TaskManager(task_id, dir_name=dir_name)
+    state = tm.load()
+    if not state:
+        raise HTTPException(status_code=404, detail="Task not found")
+
+    data = build_checkpoint_manifest(state, tm.task_dir)
+    groups = data.get("checkpoints", {})
+    if checkpoint not in groups:
+        raise HTTPException(status_code=404, detail=f"Checkpoint '{checkpoint}' not found")
+
+    # 该检查点全部产物 id
+    modified = [a["artifact_id"] for a in groups[checkpoint]["artifacts"]]
+    return await approve_checkpoint(
+        task_id, checkpoint,
+        modified_artifact_ids=json.dumps(modified),
+        param_updates="",
+        confirmed=True,
+    )

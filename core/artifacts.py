@@ -698,7 +698,139 @@ def sweep_stale_tasks(age_days: int = 7,
 # ═══════════════════════════════════════════════════════════════
 
 # 清单自身文件名（扫描文件树时排除）
-_MANIFEST_FILES = {"manifest.json", "MANIFEST.md", "task_state.json"}
+_MANIFEST_FILES = {"manifest.json", "MANIFEST.md", "task_state.json", "checkpoint.json"}
+
+
+# ═══════════════════════════════════════════════════════════════
+# v6.0 检查点分组（PRD §4.3 产物矩阵）
+# ═══════════════════════════════════════════════════════════════
+
+# 产物 type → 检查点名（与 dependency_graph._TYPE_TO_CHECKPOINT 语义一致）
+_ARTIFACT_TO_CHECKPOINT: dict[str, str] = {
+    "story": "scenes",
+    "script": "scenes",
+    "end_frame_prompts": "scenes",
+    "character_ref": "references",
+    "end_frame": "references",
+    "video": "videos",
+    "audio": "audio",
+    "subtitle": "subtitle",
+    "final_video": "final",
+    "scene_prompts": "scenes",
+    "anchor_image": "references",
+    "clip_prompts": "scenes",
+    "clip": "videos",
+}
+
+# 检查点展示顺序
+_CHECKPOINT_ORDER = ["scenes", "references", "videos", "audio", "subtitle", "final"]
+
+
+def checkpoint_for_artifact(artifact_id: str) -> str:
+    """返回产物 id 所属检查点名（未知产物 → "other"）。"""
+    parts = artifact_id.split(":")
+    if len(parts) >= 2:
+        return _ARTIFACT_TO_CHECKPOINT.get(parts[1], "other")
+    return "other"
+
+
+def build_checkpoint_manifest(state: BaseTaskState, task_dir: str) -> dict:
+    """构建检查点级产物清单（checkpoint.json 数据）。
+
+    按检查点分组展示产物（PRD §4.3 / §4.8），供手动模式检查点等待页
+    与外部 Agent 使用。每组含该检查点的产物列表（复用 manifest 的产物条目）。
+
+    Returns:
+        {
+          "format_version": "1.0",
+          "task_id": ...,
+          "task_type": ...,
+          "current_checkpoint": ...,
+          "checkpoints": {
+              "scenes":  { "artifacts": [ ...产物条目... ], "status": "completed|pending" },
+              "videos":  { "artifacts": [ ... ], "status": ... },
+              ...
+          }
+        }
+    """
+    task_dir = safe_join(get_working_dir(), task_dir)
+    manifest = build_manifest(state, task_dir)
+
+    groups: dict[str, dict] = {cp: {"artifacts": []} for cp in _CHECKPOINT_ORDER}
+    for a in manifest.get("artifacts", []):
+        cp = checkpoint_for_artifact(a["artifact_id"])
+        if cp in groups:
+            groups[cp]["artifacts"].append(a)
+
+    # 状态：检查点对应的 step 字段状态（复用 step 状态）
+    for cp in _CHECKPOINT_ORDER:
+        step_field = _checkpoint_to_step_field(cp, state)
+        status = "pending"
+        if step_field:
+            val = getattr(state, step_field, None)
+            if val is not None:
+                status = val.value
+        groups[cp]["status"] = status
+
+    current = ""
+    manual_cfg = getattr(state, "manual_config", None)
+    if manual_cfg is not None:
+        current = manual_cfg.current_checkpoint or ""
+
+    return {
+        "format_version": "1.0",
+        "task_id": state.task_id,
+        "task_type": state.task_type.value,
+        "current_checkpoint": current,
+        "checkpoints": groups,
+    }
+
+
+def _checkpoint_to_step_field(checkpoint: str, state: BaseTaskState) -> Optional[str]:
+    """检查点名 → 步骤字段名（按任务类型）。"""
+    if isinstance(state, CreativeVideoTask):
+        mapping = {
+            "scenes": "step_script",       # creative 的 scenes 合并了多个细步骤，取 script 为代表
+            "references": "step_end_frame_generation",
+            "videos": "step_video_generation",
+            "audio": "step_audio",
+            "subtitle": "step_subtitle",
+            "final": "step_concatenation",
+        }
+        return mapping.get(checkpoint)
+    if isinstance(state, ManuscriptVideoTask):
+        mapping = {
+            "scenes": "step_scene_prompts",
+            "videos": "step_video_generation",
+            "audio": "step_audio",
+            "subtitle": "step_subtitle",
+            "final": "step_concatenation",
+        }
+        return mapping.get(checkpoint)
+    if isinstance(state, AnchorVideoTask):
+        mapping = {
+            "scenes": "step_generate_anchor",
+            "references": "step_generate_anchor",
+            "videos": "step_clip_generation",
+            "audio": "step_audio",
+            "subtitle": "step_subtitle",
+            "final": "step_concatenation",
+        }
+        return mapping.get(checkpoint)
+    return None
+
+
+def write_checkpoint_manifest(state: BaseTaskState, task_dir: str) -> str:
+    """将检查点清单落盘为 ``checkpoint.json``，返回路径；失败返回空串。"""
+    try:
+        manifest = build_checkpoint_manifest(state, task_dir)
+        path = os.path.join(task_dir, "checkpoint.json")
+        with open(path, "w", encoding="utf-8") as f:
+            json.dump(manifest, f, ensure_ascii=False, indent=2)
+        return path
+    except Exception as e:
+        logger.warning("[Artifacts] failed to write checkpoint.json: %s", e)
+        return ""
 
 
 def _scan_task_files(task_dir: str) -> list[dict]:
