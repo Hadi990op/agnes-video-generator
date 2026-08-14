@@ -51,7 +51,7 @@
 | P1 | 产物规范 | `checkpoint.json` 清单 + artifacts 预览/上传 + `impact` 预计算 + approve/regen 端点 | P0 | 🟢 已完成（2026-08-14，CI 异步确认中） |
 | P2 | 前端闭环 | 创建面板模式选择 + 检查点详情页三卡片 + diff 预览 + 协作 prompt 复制 | P0/P1 | 🟢 已完成（2026-08-14，CI 异步确认中） |
 | P3 | 推广全流水线 | manuscript / poetry / anchor 统一检查点；simple 产物清单 | P1 | 🟢 已完成（2026-08-14，CI 异步确认中） |
-| P4 | 交付打磨 | 协作 prompt 库整理 + 示例视频教程 + 回归测试补充 | P3 | 🟡 规划 |
+| P4 | 交付打磨 | 协作 prompt 库整理 + 示例视频教程 + 回归测试补充 | P3 | 🟢 已完成（2026-08-14） |
 
 ---
 
@@ -234,7 +234,9 @@ manuscript / poetry / anchor 继承同一检查点机制；simple / simple_image
 > - ✅ **P3 推广全流水线**：manuscript / poetry / anchor 统一检查点 + simple 产物清单（提交 `ab97d44`）
 >   - 改动：`_get_pausable_steps`（manuscript/poetry 去 references，anchor model 去 audio/subtitle）+ poetry 逐场景产物定义 + dependency_graph 场景级传播 + checkpoint manifest 补 files 树
 >   - 本地自检：新增测试全绿（54）+ 核心套件 139 用例不破
-> - ⏳ **P4 交付打磨**（下一个）：协作 prompt 库整理 + 示例视频教程 + 回归测试补充
+> - ✅ **P4 交付打磨**：协作 prompt 库 + 回归测试 + 测试覆盖报告 + 使用指南（提交 `6002874`）
+>   - `docs/public/manual_mode_guide.md`（新建）、usage.md 手动模式章节、regression_test_plan §九、test_coverage_and_ci 增量、AGENTS.md 索引
+> - 🏁 **v6.0 手动模式全阶段（P0-P4）已完成**。CI 结果异步确认中；大版本回归（8 场景 + 手动模式 M1/M2/M3）待专项执行。
 >
 > 推进方式：
 > 1. 按 P0 → P4 顺序实施；
