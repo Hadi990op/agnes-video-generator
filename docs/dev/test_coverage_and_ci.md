@@ -1,9 +1,13 @@
 # 单元测试覆盖度评估 & GitHub Actions 适配性
 
-> 最近更新：2026-07-27
-> 测试套件：**128 个用例全部通过**（含 `tests/test_core.py` 单元、`tests/mock_regression/` 五管线 mock 回归、以及新增 `test_path_security.py` / `test_artifacts.py` / `test_cue_aware_srt.py` / `test_narration_cleaning.py`）
-> 总体覆盖率：**58%**（7476 语句 / 3170 未覆盖；含 coverage 工具注入的 `sitecustomize.py` 401 行，实际项目约 7075 行）
+> 最近更新：2026-08-14
+> 测试套件：**247 个用例全部通过**（含 `tests/test_core.py` 单元、`tests/mock_regression/` 五管线 mock 回归、
+> `test_path_security.py` / `test_artifacts.py` / `test_cue_aware_srt.py` / `test_narration_cleaning.py`，
+> 以及 **v6.0 手动模式新增** `test_manual_pause.py`（33 用例）+ `test_dependency_graph.py`（21 用例））
+> 总体覆盖率：**58%+**（v6.0 新增 `core/dependency_graph.py` 依赖图模块由 21 用例独立覆盖）
 > 运行环境：本地 `.venv`（Python 3.13，moviepy / edge_tts / fastapi 已装）
+>
+> **v6.0 增量**：手动模式（P0 暂停机制 / P1 依赖图 / P3 全流水线）测试独立成组，不改变自动模式回归基线。
 
 ---
 
@@ -47,6 +51,7 @@
 |------|------|------|
 | `core/path_security.py` | 100% | **本轮新增**安全模块（路径穿越防护），纯逻辑 |
 | `core/artifacts.py` | 91% | **本轮补测**级联删除/清理逻辑（19%→91%） |
+| `core/dependency_graph.py` | 高 | **v6.0 新增**产物依赖图模块（21 用例独立成组：字段级/场景级/参数级/健壮性） |
 | `models/task.py` | 98% | 任务状态机，业务逻辑基石 |
 | `tests/test_artifacts.py` | 100% | 本轮新增 |
 | `tests/test_path_security.py` | 100% | 本轮新增 |
@@ -120,6 +125,9 @@
 
 > 本轮补测后总覆盖率从 55%→58%（代码量因新增已扩到 ~7075 行，补测仍把比率拉高）。
 > 按上表补完 P0+P1，预计可到 **65%+**，且补齐的是「最容易出生产事故」的逻辑。
+>
+> **v6.0 手动模式**：`test_manual_pause.py`（模型/暂停判定/检查点推断/mode 端点/可暂停步骤/poetry 场景级）
+> 与 `test_dependency_graph.py`（依赖图）独立成组，`--cov-fail-under=55` 门禁不受影响。
 
 ---
 

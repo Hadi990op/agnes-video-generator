@@ -4,6 +4,7 @@
 > **当前阶段**：🟢 **维护模式**
 > **配套文档**：
 > - 部署/使用：`docs/public/getting-started.md`（四种部署方式）、`docs/public/usage.md`、`docs/public/faq.md`
+> - 手动模式（v6.0）：`docs/public/manual_mode_guide.md`（用户指南）+ `docs/plans/v6.0/manual_mode_PRD.md`（方案）+ `docs/plans/v6.0/implementation_plan.md`（实施路线图，含分阶段状态）
 > - 架构/技术栈：`docs/public/architecture.md`
 > - API 端点：`docs/public/api.md`
 > - 流水线产物逻辑：`docs/dev/pipeline_products.md`（权威参考）

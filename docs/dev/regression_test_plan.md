@@ -346,6 +346,39 @@ for name, color in [('test_ref.png', (100,150,200)), ('test_end.png', (200,150,1
 | C1 | `/api/tasks/creative` | chaining_mode=keyframes, ref | 120m |
 | C2 | `/api/tasks/creative` | keyframes+end_frame_from_ref | 120m |
 | C3 | `/api/tasks/creative` | keyframes, audio+subtitle | 120m |
+
+---
+
+## 九、v6.0 手动模式回归（增量）
+
+> 新增于 v6.0（实施路线图 P4）。手动模式场景**不进入** S1/A1-A2 权重计算，
+> 作为 v6.0 专项在 CI 或本地手动执行，验证手动模式核心链路与自动模式回归不冲突。
+
+### 9.1 手动模式场景矩阵（3 场景）
+
+| ID | 类型 | 场景 | 验证要点 |
+|----|------|------|---------|
+| M1 | 手动·创建暂停 | creative + `execution_mode=manual` + 暂停点 `scenes` | 任务创建后流水线在 `scenes` 检查点暂停：状态 `PENDING` + `current_checkpoint=scenes` + `awaiting_user` 徽标 |
+| M2 | 手动·确认继续 | 对暂停中的任务 `POST .../checkpoints/scenes/approve` | 恢复执行、`approved_checkpoints` 记录 `scenes`、`current_checkpoint` 清空、流水线继续到下一检查点或完成 |
+| M3 | 手动·运行时切换 | 自动任务运行中 `POST /api/tasks/{id}/mode` `mode=manual` | 任务挂起为 `PENDING` + `current_checkpoint` 非空；再 `mode=auto` 立即 resume 继续跑完（**切换即继续**） |
+
+> 校验方式：与 8 场景相同，`POST` 后轮询任务状态断言关键字段；产物校验复用 F1-F7。
+
+### 9.2 端点验证补充
+
+| 端点 | 验证内容 |
+|------|---------|
+| `POST /api/tasks/{id}/mode` | 双向切换 + simple 类型 400 + 幂等 |
+| `GET /api/tasks/{id}/checkpoints` | 返回按检查点分组的产物清单（含 `files`） |
+| `GET /api/tasks/{id}/checkpoints/{name}/impact` | 预计算只算不落盘，返回 affected/retained |
+| `POST /api/tasks/{id}/checkpoints/{name}/approve` | `confirmed=false` 仅返回影响清单；`confirmed=true` 落盘 + resume |
+| `POST /api/tasks/{id}/checkpoints/{name}/regen` | 等价 approve 全产物 |
+| `POST /api/tasks/{id}/artifacts/{id}/upload` | 回填产物 + 运行中 409 + 路径穿越 403 |
+
+### 9.3 自动模式回归不变
+
+8 场景（S1/C1-C3/M1-M2/A1-A2）回归路径与 v5.x 完全一致；
+`execution_mode` 缺省 `auto` 时 `_maybe_pause` 不生效（`pause_points` 为空），行为零变化。
 | M1 | `/api/tasks/manuscript` | 8句稿件, audio_enabled | 60m |
 | M2 | `/api/tasks/manuscript` | 自定义字幕样式 | 60m |
 | A1 | `/api/tasks/anchor` | audio_source=post_stitch | 60m |

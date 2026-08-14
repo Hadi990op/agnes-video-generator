@@ -69,6 +69,25 @@ The progress panel shows real-time generation status for each step. For Creative
 
 If the server is interrupted, restart it and find the incomplete task in the "Task List" tab. Click "Resume" to continue from the last checkpoint. Running tasks can also be stopped and resumed later.
 
+## 5. Manual Mode (v6.0)
+
+> Full guide: [`manual_mode_guide.md`](./manual_mode_guide.md)
+
+Manual mode pauses the pipeline at checkpoints so you can review or refine artifacts before continuing:
+
+```
+scenes → references → videos → audio → subtitle → final
+```
+
+- **Create**: choose "✋ Manual" at the top of the create panel and tick the pause points (defaults pre-filled per task type).
+- **Switch anytime**: the "切回自动 / 切为手动" toggle on the task card. Auto→Manual suspends at the next safe point; Manual→Auto clears pause points and runs to completion immediately.
+- **Three ways to handle artifacts** at a paused checkpoint:
+  - 🤖 **AI Modify**: type a request, the system rewrites the artifact (text via chat / image via i2i / video via ffmpeg command).
+  - ✏️ **Edit yourself**: copy the artifact path, edit locally, then click "I've modified, continue".
+  - 🤝 **External Agent**: copy `cd <dir> && opencode` + prompt template, process, then confirm.
+- **Change anything**: artifacts **and** task params (resolution / voice / duration / scene count) can be edited while paused. The system previews which artifacts will be deleted & re-run vs kept before you confirm (dependency graph).
+- Not supported: simple / simple-image types (read-only artifact list after completion).
+
 ## ⚠️ Important Notes
 
 This project is in early stage — corner cases may not be fully handled. Recommended workflow:
