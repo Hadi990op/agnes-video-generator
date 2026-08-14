@@ -3,7 +3,7 @@ import { ref, reactive, computed } from 'vue'
 import { t } from '@/i18n'
 import { appState } from '@/store'
 import { useGa } from '@/composables/useGa'
-import { useProgress } from '@/composables/useProgress'
+import { useNavigation } from '@/composables/useNavigation'
 import { useToast } from '@/composables/useToast'
 import { useVoice } from '@/composables/useVoice'
 import * as api from '@/api'
@@ -11,7 +11,7 @@ import WatermarkToggle from '@/components/shared/WatermarkToggle.vue'
 import SubtitleConfig from '@/components/shared/SubtitleConfig.vue'
 
 const { trackEvent } = useGa()
-const { setRunning, showProgress, startPolling } = useProgress()
+const { goProgress } = useNavigation()
 const { showToast } = useToast()
 const { voiceSelections } = useVoice()
 
@@ -78,10 +78,8 @@ async function submitManuscript() {
       subtitle: sc?.subtitleEnabled ? 'on' : 'off',
     })
     appState.currentTaskType = 'manuscript'
-    setRunning(d.task_id)
     appState.currentDirName = d.dir_name
-    await showProgress(d.task_id, d.dir_name)
-    await startPolling(d.task_id)
+    goProgress(d.task_id, 'create')
     showToast(t('submitted'), 5000)
   } catch (e: any) {
     trackEvent('create_task_failed', { task_type: 'manuscript', error: (e.message || '').slice(0, 120) })

@@ -9,7 +9,7 @@ import { useProgress } from '@/composables/useProgress'
 const props = defineProps<{ taskId: string; checkpoint: string }>()
 
 const { switchMode, loadTaskList } = useTasks()
-const { startPolling, setRunning, showProgress } = useProgress()
+const { startPolling, setRunning } = useProgress()
 
 // 三卡片选择
 const activeCard = ref<'ai' | 'self' | 'agent'>('ai')
@@ -28,6 +28,7 @@ const checkpointLabel = computed(() => {
   return t(map[props.checkpoint] || props.checkpoint)
 })
 
+// 拉取检查点产物元数据（驱动 AI 修改目标与"自己改"路径清单）
 async function loadCheckpoint() {
   loadingData.value = true
   try {
@@ -40,15 +41,6 @@ async function loadCheckpoint() {
   }
 }
 loadCheckpoint()
-
-function artifactFileUrl(art: any): string {
-  return api.getArtifactFileUrl(props.taskId, art.artifact_id)
-}
-
-function artifactIcon(art: any): string {
-  const icons: Record<string, string> = { text: '📄', image: '🖼️', video: '🎬', audio: '🔊', json: '📋', subtitle: '💬' }
-  return icons[art.category] || '📄'
-}
 
 // ── 通道 1：AI 帮我改（P1 已实现后端；ai-modify 为 P1.5，此处先做前端调用适配）──
 async function runAiModify() {
@@ -88,7 +80,6 @@ async function doApprove(modifiedIds: string[], paramUpdates: Record<string, any
   try {
     const d = await api.approveCheckpoint(props.taskId, props.checkpoint, modifiedIds, paramUpdates, true)
     if (!d.ok) throw new Error(d.detail || t('failContinue'))
-    showToastMsg(t('continued'))
     // 恢复执行
     setRunning(props.taskId)
     await startPolling(props.taskId)
@@ -100,25 +91,17 @@ async function doApprove(modifiedIds: string[], paramUpdates: Record<string, any
   }
 }
 
-function showToastMsg(msg: string) {
-  // 轻量提示：复用全局 alert 避免额外依赖
-  console.log('[CheckpointDetail]', msg)
-}
-
 async function copyText(text: string) {
   if (!text) return
   try {
     await navigator.clipboard.writeText(text)
-    showToastMsg(t('copied'))
   } catch {
-    // 旧浏览器回退：select 方式
     const ta = document.createElement('textarea')
     ta.value = text
     document.body.appendChild(ta)
     ta.select()
     document.execCommand('copy')
     document.body.removeChild(ta)
-    showToastMsg(t('copied'))
   }
 }
 
@@ -149,9 +132,9 @@ async function regen() {
 </script>
 
 <template>
-  <div class="mt-4 p-4 bg-paper/30 rounded-xl border border-rule/60">
+  <div class="mt-4 p-4 bg-paper/30 rounded-2xl border border-amber-500/30">
     <div class="flex items-center justify-between mb-3">
-      <h3 class="text-sm font-semibold text-accent">
+      <h3 class="text-sm font-semibold text-amber-400">
         ⏸ {{ t('awaitingUser') }} · {{ t('checkpointTitle') }}: {{ checkpointLabel }}
       </h3>
       <div class="flex gap-2">
@@ -165,22 +148,6 @@ async function regen() {
     </div>
 
     <p class="text-xs text-muted mb-3">{{ t('awaitingUserTip') }}</p>
-
-    <!-- 产物区 -->
-    <div v-if="checkpointData" class="space-y-2 mb-4">
-      <div v-for="art in checkpointData.artifacts || []" :key="art.artifact_id" class="artifact-card flex items-start gap-2 p-2 bg-paper-2/30 rounded">
-        <span class="text-sm mt-0.5">{{ artifactIcon(art) }}</span>
-        <div class="flex-1 min-w-0">
-          <div class="flex items-center gap-2 mb-1">
-            <span class="text-xs text-ink-2">{{ art.label_key || art.artifact_id }}</span>
-            <span class="text-xs text-muted">{{ (art.size || 0) > 1048576 ? ((art.size || 0) / 1048576).toFixed(1) + ' MB' : ((art.size || 0) / 1024).toFixed(0) + ' KB' }}</span>
-          </div>
-          <img v-if="art.category === 'image'" :src="artifactFileUrl(art)" class="max-h-32 rounded border border-rule/50" loading="lazy" />
-          <video v-else-if="art.category === 'video'" :src="artifactFileUrl(art)" controls playsinline preload="metadata" class="w-full rounded border border-rule/50 bg-black" style="max-height: 260px"></video>
-          <audio v-else-if="art.category === 'audio'" :src="artifactFileUrl(art)" controls class="w-full" preload="metadata"></audio>
-        </div>
-      </div>
-    </div>
 
     <!-- 三卡片 -->
     <div class="grid grid-cols-1 md:grid-cols-3 gap-3 mb-4">

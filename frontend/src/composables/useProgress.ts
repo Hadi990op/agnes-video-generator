@@ -11,7 +11,7 @@ const POLL_INTERVAL = 30000
 
 const { trackTaskResultOnce } = useGa()
 
-// 产物刷新（模块级单例，与 ProgressPanel 共享状态）
+// 产物刷新（模块级单例，进度页共享状态）
 const { loadArtifacts, scheduleArtifactRefresh } = useArtifacts()
 
 // 进度展示状态
@@ -57,7 +57,7 @@ const currentRunningStep = computed(() => {
   return steps.value.find((s) => stepStates.value[s.key] === 'running')
 })
 
-async function showProgress(taskId: string, dirName?: string | null) {
+async function showProgress(taskId: string, dirName?: string | null): Promise<TaskState | null> {
   progressVisible.value = true
   taskFailed.value = false
   resultVideoVisible.value = false
@@ -89,6 +89,42 @@ async function showProgress(taskId: string, dirName?: string | null) {
   // 加载已有中间产物（任务运行中也可查看）
   appState.currentArtifactsTaskId = taskId
   loadArtifacts()
+  return state
+}
+
+// 进度页挂载：加载任务 + 按状态决定轮询/结果/暂停审查
+async function mountProgressPage(taskId: string, dirName?: string | null) {
+  const state = await showProgress(taskId, dirName)
+  if (!state) return
+  appState.currentTaskType = state.task_type || appState.currentTaskType
+  appState.currentDirName = state.dir_name || dirName || taskId
+  const st = state.status
+  if (st === 'running' || st === 'queued') {
+    setRunning(taskId)
+    startPolling(taskId)
+  } else if (st === 'completed') {
+    if (state.final_video_file) showResult(state.final_video_file, taskId)
+    clearRunning()
+  } else if (st === 'failed') {
+    taskFailed.value = true
+    failedMessage.value = state.current_message || t('genFailedMsg')
+    clearRunning()
+  } else if (st === 'pending' && state.current_status === 'awaiting_user') {
+    // 暂停等待用户操作：释放并发槽位，不轮询
+    const cp = (state as any).manual_config?.current_checkpoint || ''
+    if (cp) awaitingCheckpoint.value = cp
+    appState.isTaskRunning = false
+  }
+}
+
+// 进度页卸载：停止一切轮询与临时状态
+function unmountProgressPage() {
+  stopPolling()
+  appState.isTaskRunning = false
+  appState.currentTaskId = null
+  appState.currentArtifactsTaskId = null
+  awaitingCheckpoint.value = ''
+  taskFailed.value = false
 }
 
 async function pollTaskProgress(taskId: string) {
@@ -196,6 +232,8 @@ export function useProgress() {
     failedMessage,
     awaitingCheckpoint,
     showProgress,
+    mountProgressPage,
+    unmountProgressPage,
     pollTaskProgress,
     startPolling,
     stopPolling,

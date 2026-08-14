@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, onMounted, computed } from 'vue'
+import { ref, onMounted } from 'vue'
 import { t, LANGS, useI18n } from '@/i18n'
 import { useTheme } from '@/composables/useTheme'
 import { useToast } from '@/composables/useToast'
@@ -7,11 +7,12 @@ import { useConfig } from '@/composables/useConfig'
 import { useVoice } from '@/composables/useVoice'
 import { useTasks } from '@/composables/useTasks'
 import { useProgress } from '@/composables/useProgress'
+import { useNavigation } from '@/composables/useNavigation'
 import { appState } from '@/store'
 import ConfigPanel from '@/components/ConfigPanel.vue'
 import CreatePanel from '@/components/CreatePanel.vue'
 import TaskListPanel from '@/components/TaskListPanel.vue'
-import ProgressPanel from '@/components/ProgressPanel.vue'
+import ProgressPage from '@/components/ProgressPage.vue'
 import VoicePickerModal from '@/components/VoicePickerModal.vue'
 import Toast from '@/components/Toast.vue'
 
@@ -21,12 +22,11 @@ const { visible: toastVisible, message: toastMessage } = useToast()
 const { loadModels, renderWorkspaces } = useConfig()
 const { initVoiceSelector } = useVoice()
 const { loadTaskList, startTaskListTimer, stopTaskListTimer } = useTasks()
-const { showProgress, setRunning, startPolling } = useProgress()
-
-const mainTab = ref<'create' | 'list'>('create')
+const { parseHash } = useNavigation()
 
 function switchMainTab(tab: 'create' | 'list') {
-  mainTab.value = tab
+  appState.view = tab
+  location.hash = tab === 'list' ? '#/list' : '#/create'
   if (tab === 'list') {
     loadTaskList()
     startTaskListTimer()
@@ -38,6 +38,17 @@ function switchMainTab(tab: 'create' | 'list') {
 const isConfigLoaded = ref(false)
 
 onMounted(async () => {
+  // 解析 hash：直达进度页 / 列表页（刷新保留视图）
+  const parsed = parseHash()
+  if (parsed.view === 'progress' && parsed.taskId) {
+    appState.view = 'progress'
+    appState.progressTaskId = parsed.taskId
+    appState.currentTaskId = parsed.taskId
+    // 其余恢复逻辑由 ProgressPage 挂载时统一处理
+  } else {
+    appState.view = parsed.view
+  }
+
   try {
     const cfg = await fetch('/api/config').then((r) => r.json())
     if (cfg.api_key) {
@@ -62,8 +73,10 @@ onMounted(async () => {
     console.error('init voice selector error:', e)
   }
 
-  // 自动重连运行中的任务
-  autoReconnectRunningTask()
+  // 自动重连运行中的任务（已在进度页时跳过，由 ProgressPage 恢复）
+  if (appState.view !== 'progress') {
+    autoReconnectRunningTask()
+  }
 })
 
 async function autoReconnectRunningTask() {
@@ -72,10 +85,11 @@ async function autoReconnectRunningTask() {
     const running = (d.tasks || []).find((t: any) => t.status === 'running' || t.status === 'queued')
     if (running) {
       appState.currentTaskType = running.task_type || 'creative'
-      setRunning(running.task_id)
       appState.currentDirName = running.dir_name || running.task_id
-      await showProgress(running.task_id, appState.currentDirName)
-      await startPolling(running.task_id)
+      appState.progressTaskId = running.task_id
+      appState.progressOrigin = 'create'
+      appState.view = 'progress'
+      location.hash = '#/progress/' + encodeURIComponent(running.task_id)
     }
   } catch {
     /* ignore */
@@ -84,7 +98,9 @@ async function autoReconnectRunningTask() {
 </script>
 
 <template>
-  <div class="flex justify-center gap-3 px-4">
+  <ProgressPage v-if="appState.view === 'progress'" />
+
+  <div v-else class="flex justify-center gap-3 px-4">
     <!-- Left sidebar -->
     <aside class="hidden lg:block sticky top-[120px] self-start w-[130px] shrink-0 mt-8">
       <div class="sidebar-card">
@@ -147,14 +163,14 @@ async function autoReconnectRunningTask() {
       <div class="flex gap-2 mb-6">
         <button
           class="px-5 py-2.5 rounded-lg text-sm font-medium transition"
-          :class="mainTab === 'create' ? 'tab-active' : 'tab-inactive'"
+          :class="appState.view === 'create' ? 'tab-active' : 'tab-inactive'"
           @click="switchMainTab('create')"
         >
           {{ t('tabCreate') }}
         </button>
         <button
           class="px-5 py-2.5 rounded-lg text-sm font-medium transition"
-          :class="mainTab === 'list' ? 'tab-active' : 'tab-inactive'"
+          :class="appState.view === 'list' ? 'tab-active' : 'tab-inactive'"
           @click="switchMainTab('list')"
         >
           {{ t('tabList') }}
@@ -162,17 +178,14 @@ async function autoReconnectRunningTask() {
       </div>
 
       <!-- Create Panel -->
-      <div v-show="mainTab === 'create'">
+      <div v-show="appState.view === 'create'">
         <CreatePanel />
       </div>
 
       <!-- List Panel -->
-      <div v-show="mainTab === 'list'">
+      <div v-show="appState.view === 'list'">
         <TaskListPanel />
       </div>
-
-      <!-- Progress Panel -->
-      <ProgressPanel />
 
       <!-- Footer -->
       <footer class="text-center pb-8">

@@ -4,12 +4,14 @@ import * as api from '@/api'
 import { t } from '@/i18n'
 import { useToast } from './useToast'
 import { useGa } from './useGa'
-import { useProgress } from './useProgress'
+import { useArtifacts } from './useArtifacts'
+import { useNavigation } from './useNavigation'
 import type { TaskListItem, TaskState } from '@/types'
 
 const { showToast } = useToast()
 const { trackEvent } = useGa()
-const { setRunning, showProgress, showResult, startPolling } = useProgress()
+const { loadArtifacts } = useArtifacts()
+const { goProgress } = useNavigation()
 
 const tasks = ref<TaskListItem[]>([])
 const loading = ref(false)
@@ -36,13 +38,13 @@ function stopTaskListTimer() {
   }
 }
 
+// 统一入口：跳转进度页（任务加载/轮询/暂停审查由 ProgressPage 挂载时统一处理）
 async function viewTask(taskId: string) {
   try {
     const state = await api.getTask(taskId)
     appState.currentTaskType = state.task_type || 'creative'
-    // 打开进度面板并加载已有中间产物（已完成任务同样可见）
-    await showProgress(taskId, state.dir_name)
-    if (state.final_video_file) showResult(state.final_video_file, taskId)
+    appState.currentDirName = state.dir_name || taskId
+    goProgress(taskId, 'list')
     return state
   } catch (e: any) {
     alert(t('failLoad') + ': ' + e.message)
@@ -51,10 +53,7 @@ async function viewTask(taskId: string) {
 }
 
 async function viewRunningTask(taskId: string) {
-  const state = await viewTask(taskId)
-  if (!state) return
-  setRunning(taskId)
-  await startPolling(taskId)
+  return viewTask(taskId)
 }
 
 async function resumeTask(taskId: string) {
@@ -69,10 +68,8 @@ async function resumeTask(taskId: string) {
       /* ignore */
     }
     appState.currentTaskType = taskType
-    setRunning(taskId)
-    appState.currentDirName = d.dir_name
-    await showProgress(taskId, d.dir_name)
-    await startPolling(taskId)
+    appState.currentDirName = d.dir_name || taskId
+    goProgress(taskId, 'list')
     showToast(t('resumed'), 5000)
   } catch (e: any) {
     alert(t('failResume') + ': ' + e.message)
@@ -126,8 +123,7 @@ async function switchMode(taskId: string, mode: 'auto' | 'manual') {
 async function loadArtifactsFor(taskId: string) {
   try {
     appState.currentArtifactsTaskId = taskId
-    const { useArtifacts } = await import('./useArtifacts')
-    useArtifacts().loadArtifacts()
+    loadArtifacts()
   } catch {
     /* ignore */
   }
