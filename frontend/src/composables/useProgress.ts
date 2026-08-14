@@ -24,6 +24,8 @@ const steps = ref<StepDef[]>([])
 const stepStates = ref<Record<string, 'done' | 'running' | 'pending'>>({})
 const failedMessage = ref('')
 const taskFailed = ref(false)
+// v6.0 手动模式：当前检查点（暂停等待用户操作时非空）
+const awaitingCheckpoint = ref('')
 
 let pollTimer: ReturnType<typeof setInterval> | null = null
 
@@ -133,6 +135,19 @@ async function pollTaskProgress(taskId: string) {
       taskFailed.value = true
       failedMessage.value = state.current_message || t('genFailedMsg')
     }
+
+    // v6.0 手动模式：检测暂停等待（PENDING + current_checkpoint）
+    const mc = (state as any).manual_config
+    const cp = mc?.current_checkpoint || ''
+    if (state.status === 'pending' && state.current_status === 'awaiting_user' && cp) {
+      awaitingCheckpoint.value = cp
+      // 暂停时不视为运行中（释放并发槽位后前端也停止轮询视为等待）
+      appState.isTaskRunning = false
+      scheduleArtifactRefresh()
+    } else if (awaitingCheckpoint.value) {
+      // 恢复后清除
+      if (state.status === 'running') awaitingCheckpoint.value = ''
+    }
   } catch {
     // 网络错误静默，下次轮询重试
   }
@@ -179,6 +194,7 @@ export function useProgress() {
     stepStates,
     taskFailed,
     failedMessage,
+    awaitingCheckpoint,
     showProgress,
     pollTaskProgress,
     startPolling,

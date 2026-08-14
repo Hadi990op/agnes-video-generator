@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref } from 'vue'
+import { ref, computed } from 'vue'
 import { t } from '@/i18n'
 import { appState } from '@/store'
 import { useGa } from '@/composables/useGa'
@@ -19,14 +19,91 @@ const taskTypes = [
   { key: 'poetry', icon: '📜', label: 'ttPoetry' },
 ]
 
+// v6.0 手动模式：暂停点选项（PRD §4.3 顺序）
+const pausePointOptions = [
+  { key: 'scenes', label: 'cpScenes' },
+  { key: 'references', label: 'cpReferences' },
+  { key: 'videos', label: 'cpVideos' },
+  { key: 'audio', label: 'cpAudio' },
+  { key: 'subtitle', label: 'cpSubtitle' },
+  { key: 'final', label: 'cpFinal' },
+]
+
+// 手动模式支持的任务类型（simple/simple_image 不支持暂停，PRD §4.3）
+const manualSupported = computed(() => !['simple', 'image'].includes(appState.currentTaskType))
+
+// 默认暂停点（PRD §4.8 预填，用户可增删）
+const defaultPausePoints: Record<string, string[]> = {
+  creative: ['scenes', 'references', 'videos', 'subtitle'],
+  manuscript: ['scenes', 'videos', 'subtitle'],
+  poetry: ['scenes', 'videos', 'subtitle'],
+  anchor: ['scenes', 'videos'],
+}
+
 function switchTaskType(type: string) {
   trackEvent('ui_action', { action: 'switch_task_type', type })
   appState.currentTaskType = type
+  // 切换任务类型时按 PRD §4.8 预填默认暂停点
+  appState.pausePoints = [...(defaultPausePoints[type] || [])]
+}
+
+function togglePausePoint(key: string) {
+  const i = appState.pausePoints.indexOf(key)
+  if (i >= 0) appState.pausePoints.splice(i, 1)
+  else appState.pausePoints.push(key)
+}
+
+function selectExecMode(mode: 'auto' | 'manual') {
+  if (mode === 'manual' && !manualSupported.value) return
+  appState.execMode = mode
+  if (mode === 'manual' && appState.pausePoints.length === 0) {
+    appState.pausePoints = [...(defaultPausePoints[appState.currentTaskType] || [])]
+  }
 }
 </script>
 
 <template>
   <div>
+    <!-- v6.0 执行模式条（创建面板全局，PRD §6.1） -->
+    <div class="glass-card rounded-2xl p-4 mb-4">
+      <div class="flex flex-wrap items-center gap-x-6 gap-y-2">
+        <span class="text-sm font-medium text-accent">{{ t('execMode') }}</span>
+        <div class="flex gap-2">
+          <button
+            class="px-4 py-2 rounded-lg text-sm font-medium transition border"
+            :class="appState.execMode === 'auto' ? 'bg-accent text-accent-ink border-accent' : 'bg-paper-2/50 border-rule text-ink-2 hover:border-accent/40'"
+            @click="selectExecMode('auto')"
+          >
+            {{ t('execAuto') }}
+          </button>
+          <button
+            class="px-4 py-2 rounded-lg text-sm font-medium transition border"
+            :class="appState.execMode === 'manual' ? 'bg-accent text-accent-ink border-accent' : 'bg-paper-2/50 border-rule text-ink-2 hover:border-accent/40'"
+            :disabled="!manualSupported"
+            :title="!manualSupported ? t('manualUnsupported') : ''"
+            @click="selectExecMode('manual')"
+          >
+            {{ t('execManual') }}
+          </button>
+        </div>
+        <span class="text-xs text-muted">{{ t('execModeHint') }}</span>
+      </div>
+
+      <!-- 手动模式：暂停点多选（PRD §6.1） -->
+      <div v-if="appState.execMode === 'manual' && manualSupported" class="mt-3 flex flex-wrap items-center gap-x-4 gap-y-2">
+        <span class="text-xs text-muted">{{ t('pausePoints') }}:</span>
+        <label v-for="p in pausePointOptions" :key="p.key" class="flex items-center gap-1.5 text-sm text-ink-2 cursor-pointer">
+          <input type="checkbox" class="rounded bg-paper-2 border-rule" :checked="appState.pausePoints.includes(p.key)" @change="togglePausePoint(p.key)" />
+          <span>{{ t(p.label) }}</span>
+        </label>
+        <span class="text-xs text-muted">{{ t('pausePointsHint') }}</span>
+      </div>
+      <!-- 不支持的类型提示 -->
+      <div v-else-if="appState.execMode === 'manual'" class="mt-3 text-xs text-amber-400">
+        {{ t('manualUnsupported') }}
+      </div>
+    </div>
+
     <!-- Task Type Tabs -->
     <div class="flex gap-2 mb-4">
       <button

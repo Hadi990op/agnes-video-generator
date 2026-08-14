@@ -144,3 +144,59 @@ export function submitPoetry(form: FormData) {
 export function submitImage(form: FormData) {
   return fetch('/api/image/generate', { method: 'POST', body: form }).then((r) => r.json())
 }
+
+// ── v6.0 手动模式 ──
+export function switchTaskMode(taskId: string, mode: 'auto' | 'manual') {
+  const form = new FormData()
+  form.append('mode', mode)
+  return fetch('/api/tasks/' + taskId + '/mode', { method: 'POST', body: form }).then((r) => r.json())
+}
+export function getCheckpoints(taskId: string) {
+  return request('/api/tasks/' + taskId + '/checkpoints')
+}
+export function getCheckpoint(taskId: string, checkpoint: string) {
+  return request('/api/tasks/' + taskId + '/checkpoints/' + encodeURIComponent(checkpoint))
+}
+export function getImpact(
+  taskId: string,
+  checkpoint: string,
+  modifiedArtifactIds: string[],
+  paramUpdates?: Record<string, any>,
+) {
+  const qs = new URLSearchParams({
+    modified_artifact_ids: JSON.stringify(modifiedArtifactIds),
+    param_updates: JSON.stringify(paramUpdates || {}),
+  })
+  return request(
+    '/api/tasks/' + taskId + '/checkpoints/' + encodeURIComponent(checkpoint) + '/impact?' + qs.toString(),
+  )
+}
+export function approveCheckpoint(
+  taskId: string,
+  checkpoint: string,
+  modifiedArtifactIds: string[],
+  paramUpdates: Record<string, any>,
+  confirmed: boolean,
+) {
+  const form = new FormData()
+  form.append('modified_artifact_ids', JSON.stringify(modifiedArtifactIds))
+  form.append('param_updates', JSON.stringify(paramUpdates))
+  form.append('confirmed', String(confirmed))
+  return fetch('/api/tasks/' + taskId + '/checkpoints/' + encodeURIComponent(checkpoint) + '/approve', {
+    method: 'POST',
+    body: form,
+  }).then((r) => r.json())
+}
+export function regenCheckpoint(taskId: string, checkpoint: string) {
+  return fetch('/api/tasks/' + taskId + '/checkpoints/' + encodeURIComponent(checkpoint) + '/regen', {
+    method: 'POST',
+  }).then((r) => r.json())
+}
+export function uploadArtifact(taskId: string, artifactId: string, file: File) {
+  const form = new FormData()
+  form.append('file', file)
+  return fetch('/api/tasks/' + taskId + '/artifacts/' + encodeURIComponent(artifactId) + '/upload', {
+    method: 'POST',
+    body: form,
+  }).then((r) => r.json())
+}

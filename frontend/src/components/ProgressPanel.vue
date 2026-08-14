@@ -5,6 +5,7 @@ import { appState } from '@/store'
 import { useProgress } from '@/composables/useProgress'
 import { useArtifacts } from '@/composables/useArtifacts'
 import { useTasks } from '@/composables/useTasks'
+import CheckpointDetail from './CheckpointDetail.vue'
 
 const {
   progressVisible,
@@ -16,6 +17,7 @@ const {
   stepStates,
   taskFailed,
   failedMessage,
+  awaitingCheckpoint,
   clearRunning,
 } = useProgress()
 
@@ -84,6 +86,13 @@ function stepIcon(status: string): string {
     <div class="w-full bg-paper-2/50 rounded-full h-2.5 mb-6 overflow-hidden">
       <div class="bg-accent h-2.5 rounded-full transition-all duration-500" :style="{ width: progressPct + '%' }"></div>
     </div>
+
+    <!-- v6.0 手动模式：检查点等待用户操作 -->
+    <CheckpointDetail
+      v-if="awaitingCheckpoint && appState.currentTaskId"
+      :task-id="appState.currentTaskId"
+      :checkpoint="awaitingCheckpoint"
+    />
 
     <div class="space-y-2">
       <div v-for="s in steps" :key="s.key" class="step-item flex items-center gap-3 text-sm">

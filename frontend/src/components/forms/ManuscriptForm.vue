@@ -63,6 +63,10 @@ async function submitManuscript() {
     fd.append('subtitle_bg_color', sc.style.bg_color)
   }
 
+  // v6.0 手动模式：执行模式 + 暂停点
+  fd.append('execution_mode', appState.execMode)
+  fd.append('pause_points', JSON.stringify(appState.execMode === 'manual' ? appState.pausePoints : []))
+
   try {
     const d = await api.submitManuscript(fd)
     if (!d.ok) throw new Error(d.detail || t('failCreate'))

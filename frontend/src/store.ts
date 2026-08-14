@@ -23,6 +23,9 @@ export const appState = reactive({
   // 音色目录
   voiceCatalog: null as VoiceCatalog | null,
   voiceIndex: {} as Record<string, any>,
+  // v6.0 手动模式：创建时的执行模式与暂停点（写入表单提交）
+  execMode: 'auto' as 'auto' | 'manual',
+  pausePoints: [] as string[],
 })
 
 // 折叠偏好

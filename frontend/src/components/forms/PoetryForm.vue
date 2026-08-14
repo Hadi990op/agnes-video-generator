@@ -146,6 +146,10 @@ async function submitPoetry() {
     fd.append('subtitle_enabled', String(sc.subtitleEnabled))
   }
 
+  // v6.0 手动模式：执行模式 + 暂停点
+  fd.append('execution_mode', appState.execMode)
+  fd.append('pause_points', JSON.stringify(appState.execMode === 'manual' ? appState.pausePoints : []))
+
   try {
     const d = await api.submitPoetry(fd)
     if (!d.ok) throw new Error(d.detail || t('failCreate'))

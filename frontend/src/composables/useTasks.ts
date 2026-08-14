@@ -105,6 +105,34 @@ async function deleteTaskById(taskId: string) {
   }
 }
 
+// v6.0 手动模式：运行时切换执行模式
+async function switchMode(taskId: string, mode: 'auto' | 'manual') {
+  try {
+    const d = await api.switchTaskMode(taskId, mode)
+    if (!d.ok) throw new Error(d.detail || t('failSwitchMode'))
+    showToast(t('modeSwitched'), 3000)
+    loadTaskList()
+    // 若正展示该任务进度，刷新
+    if (appState.currentTaskId === taskId) {
+      await loadArtifactsFor(taskId)
+    }
+    return d
+  } catch (e: any) {
+    alert(t('failSwitchMode') + ': ' + e.message)
+    return null
+  }
+}
+
+async function loadArtifactsFor(taskId: string) {
+  try {
+    appState.currentArtifactsTaskId = taskId
+    const { useArtifacts } = await import('./useArtifacts')
+    useArtifacts().loadArtifacts()
+  } catch {
+    /* ignore */
+  }
+}
+
 // 详情展示（由组件消费）
 const detailState = ref<TaskState | null>(null)
 
@@ -125,6 +153,7 @@ export function useTasks() {
     resumeTask,
     stopTaskById,
     deleteTaskById,
+    switchMode,
     showTaskDetail,
   }
 }

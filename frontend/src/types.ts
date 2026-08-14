@@ -35,6 +35,10 @@ export interface TaskListItem {
   scene_count?: number
   paragraph_count?: number
   dir_name?: string
+  // v6.0 手动模式
+  current_mode?: 'auto' | 'manual'
+  current_checkpoint?: string
+  awaiting_user?: boolean
 }
 
 export interface StepDef {

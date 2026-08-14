@@ -4,7 +4,24 @@ import { t } from '@/i18n'
 import { useTasks } from '@/composables/useTasks'
 import type { TaskListItem } from '@/types'
 
-const { tasks, loading, viewTask, viewRunningTask, resumeTask, stopTaskById, deleteTaskById } = useTasks()
+const { tasks, loading, viewTask, viewRunningTask, resumeTask, stopTaskById, deleteTaskById, switchMode } = useTasks()
+
+async function toggleMode(task: TaskListItem) {
+  const target = task.current_mode === 'manual' ? 'auto' : 'manual'
+  if (!confirm(target === 'auto' ? t('switchToAutoConfirm') : t('switchToManualConfirm'))) return
+  const d = await switchMode(task.task_id, target as 'auto' | 'manual')
+  if (d && task.awaiting_user && target === 'auto') {
+    // 手动→自动：切换即继续（后端已 resume），刷新列表
+    loadList()
+  }
+}
+
+function loadList() {
+  // useTasks 内部轮询 5s；此处立即刷新一次
+  void fetch('/api/tasks').then((r) => r.json()).then((d) => {
+    tasks.value = d.tasks || []
+  })
+}
 
 const statusColors: Record<string, string> = {
   completed: 'text-emerald-400',
@@ -76,6 +93,13 @@ function onMainBtn(task: TaskListItem) {
             {{ t(typeLabelKey[task.task_type || ''] || '') || task.task_type }}
           </span>
           <p class="text-sm font-medium truncate">{{ task.creative_name || task.task_id }}</p>
+          <!-- v6.0 模式徽标 -->
+          <span v-if="task.awaiting_user" class="text-xs px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-400">
+            {{ t('awaitingUser') }}
+          </span>
+          <span v-else-if="task.current_mode === 'manual'" class="text-xs px-2 py-0.5 rounded-full bg-purple-500/20 text-purple-400">
+            ✋ {{ t('execManual') }}
+          </span>
         </div>
         <p class="text-xs text-muted mt-0.5">{{ task.task_id }}{{ taskExtra(task) }}</p>
         <p v-if="taskDesc(task)" class="text-xs text-muted mt-1 truncate max-w-xs">{{ taskDesc(task) }}</p>
@@ -84,6 +108,15 @@ function onMainBtn(task: TaskListItem) {
         <span class="text-xs" :class="statusColors[task.status || ''] || 'text-muted'">
           {{ t(statusLabelKey[task.status || ''] || '') || task.status }}
         </span>
+        <!-- v6.0 运行时切换 -->
+        <button
+          v-if="task.current_mode && task.task_type !== 'simple' && task.task_type !== 'image'"
+          class="text-xs px-2.5 py-1.5 rounded-lg transition border border-rule text-ink-2 hover:border-accent/40"
+          :title="t(task.current_mode === 'manual' ? 'switchToAuto' : 'switchToManual')"
+          @click="toggleMode(task)"
+        >
+          {{ task.current_mode === 'manual' ? t('switchToAuto') : t('switchToManual') }}
+        </button>
         <button
           v-if="!isCompleted(task) && !isRunning(task)"
           class="text-xs px-3 py-1.5 bg-paper-3 hover:bg-paper-3 rounded-lg transition"
