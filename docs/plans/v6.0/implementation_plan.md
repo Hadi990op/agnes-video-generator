@@ -48,7 +48,7 @@
 | 阶段 | 名称 | 内容摘要 | 依赖 | 状态 |
 |------|------|---------|------|------|
 | P0 | 后端暂停机制 | `ManualConfig` + `_maybe_pause` 钩子 + 暂停态复用 `PENDING` + `mode` 端点（approve/regen 属 P1 产物级） | 现有 resume/stop | 🟢 已完成（2026-08-14，CI 异步确认中） |
-| P1 | 产物规范 | `checkpoint.json` 清单 + artifacts 预览/上传 + `impact` 预计算 + approve/regen 端点 | P0 | 🟡 规划 |
+| P1 | 产物规范 | `checkpoint.json` 清单 + artifacts 预览/上传 + `impact` 预计算 + approve/regen 端点 | P0 | 🟢 已完成（2026-08-14，CI 异步确认中） |
 | P2 | 前端闭环 | 创建面板模式选择 + 检查点详情页三卡片 + diff 预览 + 协作 prompt 复制 | P0/P1 | 🟡 规划 |
 | P3 | 推广全流水线 | manuscript / poetry / anchor 统一检查点；simple 产物清单 | P1 | 🟡 规划 |
 | P4 | 交付打磨 | 协作 prompt 库整理 + 示例视频教程 + 回归测试补充 | P3 | 🟡 规划 |
@@ -223,7 +223,11 @@ manuscript / poetry / anchor 继承同一检查点机制；simple / simple_image
 > - ✅ **P0 后端暂停机制**：`ManualConfig` + `_maybe_pause` + `CheckpointPause` + `compute_current_checkpoint` + `POST /api/tasks/{id}/mode` 运行时双向切换（提交 `6f4eac0`）
 >   - 本地自检：py_compile + 关键模块 import + 新增单测 25 用例全绿 + mock 回归 28 用例不破（自动模式行为未变）
 >   - CI：push 已触发 GitHub Action 异步执行（`pytest tests/ --cov`），结果返回后确认；如失败按 §十 风险处理
-> - ⏳ **P1 产物规范**（下一个）：`checkpoint.json` 清单 + artifacts 预览/上传 + `impact` 预计算 + approve/regen 端点 + `core/dependency_graph.py`
+> - ✅ **P1 产物规范**：`core/dependency_graph.py` 独立依赖图模块（提交 `8140650`）
+>   - 改动：dependency_graph（字段级/场景级/参数级边表 + ImpactPlan）+ checkpoint.json 分组清单 + checkpoints 列表/详情 + upload 回填 + impact 预计算 + approve/regen 端点
+>   - 本地自检：py_compile + import + 新增单测 21 用例全绿 + 核心套件 179 用例不破
+>   - 注：本地 mock 回归受 CodeBuddy safe-delete 防护干扰（turn 内删除计数 ≥50 拦截 MoviePy 临时文件删除），该环境特性不影响业务代码，mock 回归改由 CI 异步验证（CI 无此防护）
+> - ⏳ **P2 前端闭环**（下一个）：创建面板模式选择 + 检查点详情页三卡片 + diff 预览 + 协作 prompt 复制
 >
 > 推进方式：
 > 1. 按 P0 → P4 顺序实施；
