@@ -103,7 +103,7 @@ class CreativeVideoPipeline(
     # ------------------------------------------------------------------
 
     async def _build_scenes(self) -> None:
-        """LLM 编剧：场景配置 → 图片分析 → 故事 → 角色参考 → 脚本 → 旁白。"""
+        """LLM 编剧：场景配置 → 图片分析 → 故事 → 脚本 → 旁白。"""
         await self._step_resolve_scene_config()
         image_context = await self._step_image_analysis(
             self._state.reference_image, self._state.end_frame_images
@@ -111,19 +111,19 @@ class CreativeVideoPipeline(
         self._check_shutdown()
         self._story = await self._step_story(image_context)
         self._check_shutdown()
-        self._character_ref_path = await self._step_character_reference(self._story)
-        self._check_shutdown()
         self._scenes = await self._step_script(self._story)
         self._check_shutdown()
         await self._step_generate_narrations(self._story, self._scenes)
         self._check_shutdown()
 
     # ------------------------------------------------------------------
-    # 数据来源：参考图（尾帧 prompt + 预生成，仅 keyframes 模式）
+    # 数据来源：参考图（角色参考 + 尾帧 prompt + 预生成，仅 keyframes 模式）
     # ------------------------------------------------------------------
 
     async def _build_reference_images(self) -> None:
-        """参考图生成：尾帧 prompt → 预生成（keyframes 模式）。"""
+        """参考图生成：角色参考 → 尾帧 prompt → 预生成（keyframes 模式）。"""
+        self._character_ref_path = await self._step_character_reference(self._story)
+        self._check_shutdown()
         self._end_frame_prompts = await self._step_end_frame_prompts(
             self._story, self._scenes
         )

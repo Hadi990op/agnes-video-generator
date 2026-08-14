@@ -147,15 +147,15 @@
 
 | # | checkpoint | 触发时机 | 核心产物（creative 示例） | 产物格式 |
 |---|-----------|---------|---------|---------|
-| 1 | `scenes` | 分镜/剧本/旁白构建完成 | `story.txt`、`script.json`、`prompts.json`、`character_reference.png`、`end_frame_prompts.json` | TXT / JSON / PNG |
-| 2 | `references` | 参考图/尾帧图生成完成 | `character_reference.png`、`pregenerated_end_frames/`、`scene_{i}/ref*.png` | PNG |
+| 1 | `scenes` | 分镜/剧本/旁白构建完成 | `story.txt`、`script.json`、`prompts.json` | TXT / JSON |
+| 2 | `references` | 参考图/尾帧图生成完成 | `character_reference.png`、`character_ref_prompt.txt`、`end_frame_prompts.json`、`pregenerated_end_frames/`、`scene_{i}/ref*.png` | PNG / TXT / JSON |
 | 3 | `videos` | 全部视频片段生成完成 | `scene_{i}/video.mp4`（+ `task.json`、`curl.sh`） | MP4 / JSON |
 | 4 | `audio` | 配音生成完成 | `combined_narration.mp3`、`combined_narration.txt`（旁白纯文本导出） | MP3 / TXT |
 | 5 | `subtitle` | 字幕生成完成 | `combined_narration.srt`、`subtitle_styles.json` | SRT / JSON |
 | 6 | `final` | 合成完成 | `final_video.mp4` | MP4 |
 
 > 说明：
-> - creative 内部细粒度步骤（`step_story` / `step_character_ref` / `step_script` / `step_end_frame_prompts`）第一期**合并为 `scenes` 一个检查点**，避免检查点过多。
+> - creative 内部细粒度步骤（`step_story` / `step_script`）合并为 `scenes` 检查点；角色参考图与尾帧相关步骤（`step_character_ref` / `step_end_frame_prompts`）归入 `references` 检查点，保证"分镜确认时参考图尚未生成"。
 > - **暂停点按任务类型动态推导**：各类型在每个检查点的产物文件不同，`references` 在 manuscript / poetry 为空实现（无参考图，跳过），anchor 的 `audio`/`subtitle` 在 `model` 音频模式下无意义（自动过滤）。**具体产物映射见 §4.8 矩阵**。
 > - simple / simple_image 仅 1~2 步，第一期**不做暂停**，但支持"完成后展示产物清单"（只读展示 final 产物，无 approve）。
 

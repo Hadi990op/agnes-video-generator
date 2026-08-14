@@ -152,6 +152,8 @@ def test_creative_steps_progress_constants():
     assert _PROGRESS_END_FRAME_PREGEN_DONE == 0.35
 
     # steps_script 编剧阶段线性推进 0.0 → 0.25（含 scene_config 分支）
+    # 分镜阶段（image_analysis → story → script）0.0 → 0.15，
+    # 角色参考图归入参考图阶段（0.15 → 0.2，位于尾帧 prompt 之前）
     script_starts = [
         _PROGRESS_IMAGE_ANALYSIS_START,
         _PROGRESS_IMAGE_ANALYSIS_DONE,
@@ -166,7 +168,7 @@ def test_creative_steps_progress_constants():
         _PROGRESS_END_FRAME_PROMPTS_START,
         _PROGRESS_END_FRAME_PROMPTS_DONE,
     ]
-    assert script_starts == [0.0, 0.05, 0.01, 0.05, 0.1, 0.1, 0.12, 0.15, 0.15, 0.2, 0.2, 0.25]
+    assert script_starts == [0.0, 0.05, 0.01, 0.05, 0.1, 0.15, 0.17, 0.2, 0.1, 0.15, 0.2, 0.25]
     assert _PROGRESS_SCENE_CONFIG_DONE == 0.02
     assert _PROGRESS_SCENE_CONFIG_FAILED == 0.0
 
@@ -179,7 +181,7 @@ def test_creative_steps_progress_constants():
         _PROGRESS_SUBTITLE_DONE,
         _PROGRESS_CONCAT_START,
         _PROGRESS_CONCAT_DONE,
-    ) == (0.12, 0.82, 0.86, 0.86, 0.9, 0.92, 0.95)
+    ) == (0.15, 0.82, 0.86, 0.86, 0.9, 0.92, 0.95)
 
 
 def test_poetry_progress_constants():

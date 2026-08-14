@@ -63,7 +63,7 @@ Long-form text to narrated video:
 
 ## 3. Click "Start Generating"
 
-The progress panel shows real-time generation status for each step. For Creative Video: Init → Image Analysis → Story → Character Reference → Script → Narration → End Frame Prompts → End Frame Generation → Video Generation → Audio & Subtitles → Concatenation.
+The progress panel shows real-time generation status for each step. For Creative Video: Init → Image Analysis → Story → Script → Narration → Character Reference → End Frame Prompts → End Frame Generation → Video Generation → Audio & Subtitles → Concatenation.
 
 ## 4. Checkpoint Resume & Task Management
 
