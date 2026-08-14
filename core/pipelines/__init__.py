@@ -14,7 +14,7 @@ from typing import Callable, List, Optional
 from core.compositor.watermark import add_watermark, detect_language
 from core.config import get_watermark_config
 from core.task_manager import TaskManager
-from models.task import AudioConfig, BaseTaskState, SubtitleConfig, SubtitleStyle
+from models.task import AudioConfig, BaseTaskState, StepStatus, SubtitleConfig, SubtitleStyle
 
 logger = logging.getLogger(__name__)
 
@@ -22,6 +22,74 @@ logger = logging.getLogger(__name__)
 class PipelineShutdown(Exception):
     """流水线中断异常。"""
     pass
+
+
+class CheckpointPause(Exception):
+    """手动模式检查点暂停（v6.0）。
+
+    非失败、非中断：流水线在某个检查点正常暂停，等待用户确认产物后
+    通过 resume 恢复执行。携带暂停的检查点名，供 run() 捕获后返回。
+    """
+
+    def __init__(self, checkpoint: str, message: str = ""):
+        self.checkpoint = checkpoint
+        self.message = message or f"等待用户在检查点 '{checkpoint}' 确认产物"
+        super().__init__(self.message)
+
+
+# 检查点定义（v6.0，PRD §4.3）：步骤名 → 检查点名
+CHECKPOINT_SCENES = "scenes"
+CHECKPOINT_REFERENCES = "references"
+CHECKPOINT_VIDEOS = "videos"
+CHECKPOINT_AUDIO = "audio"
+CHECKPOINT_SUBTITLE = "subtitle"
+CHECKPOINT_FINAL = "final"
+
+# 手动模式下全部可选暂停点（与 PRD §4.3 顺序一致）
+ALL_CHECKPOINTS = [
+    CHECKPOINT_SCENES,
+    CHECKPOINT_REFERENCES,
+    CHECKPOINT_VIDEOS,
+    CHECKPOINT_AUDIO,
+    CHECKPOINT_SUBTITLE,
+    CHECKPOINT_FINAL,
+]
+
+# 步骤字段名 → 检查点名（_execute_step 完成后调用 _maybe_pause 时映射）
+_STEP_TO_CHECKPOINT = {
+    "step_build_scenes": CHECKPOINT_SCENES,
+    "step_reference_images": CHECKPOINT_REFERENCES,
+    "step_video_generation": CHECKPOINT_VIDEOS,
+    "step_audio": CHECKPOINT_AUDIO,
+    "step_subtitle": CHECKPOINT_SUBTITLE,
+    "step_concatenation": CHECKPOINT_FINAL,
+}
+
+
+def compute_current_checkpoint(state) -> str:
+    """推断任务当前所处检查点（最近一个已完成的步骤对应的检查点，v6.0）。
+
+    自动变手动时用于确定展示边界（PRD §4.1）：中断可能发生在步骤中间
+    （如生成到 scene_3/5），取最后一个步骤字段为 COMPLETED 的检查点作为
+    current_checkpoint；无任何已完成步骤时返回空串。
+
+    Args:
+        state: 任务状态对象（含 step_* 字段）。
+
+    Returns:
+        检查点名（scenes/references/videos/audio/subtitle/final）或空串。
+    """
+    if not state:
+        return ""
+    for cp in reversed(ALL_CHECKPOINTS):
+        step_field = None
+        for name, c in _STEP_TO_CHECKPOINT.items():
+            if c == cp:
+                step_field = name
+                break
+        if step_field and getattr(state, step_field, None) == StepStatus.COMPLETED:
+            return cp
+    return ""
 
 
 class BasePipeline(ABC):
@@ -92,6 +160,53 @@ class BasePipeline(ABC):
     def stop(self):
         """请求流水线在下一个检查点停止。"""
         self._stop_event.set()
+
+    async def _maybe_pause(self, step_name: str) -> bool:
+        """手动模式检查点暂停判定（v6.0）。
+
+        在步骤完成后调用。命中手动暂停点时落盘暂停态（PENDING + current_checkpoint），
+        抛 ``CheckpointPause`` 使流水线正常返回（非失败）；未命中返回 False 继续执行。
+
+        命中条件（PRD §4.1）：
+            manual_config.enabled 且 pause_points 非空
+            且 step 对应检查点在 pause_points 中
+            且尚未在 approved_checkpoints 中
+
+        Args:
+            step_name: 步骤字段名（如 ``step_build_scenes``），经 _STEP_TO_CHECKPOINT 映射。
+
+        Returns:
+            False（未暂停）；命中时抛出 CheckpointPause。
+        """
+        state = self._state
+        mc = getattr(state, "manual_config", None)
+        if not mc or not mc.enabled or not mc.pause_points:
+            return False
+
+        checkpoint = _STEP_TO_CHECKPOINT.get(step_name)
+        if not checkpoint:
+            return False
+        if checkpoint not in mc.pause_points:
+            return False
+        if checkpoint in mc.approved_checkpoints:
+            return False
+
+        # 落盘暂停态：复用 PENDING + current_checkpoint 表达"等待用户"（PRD §4.2）
+        mc.current_checkpoint = checkpoint
+        state.status = StepStatus.PENDING
+        self.task_manager.update_state(
+            status=StepStatus.PENDING,
+            manual_config=mc,
+            current_step=checkpoint,
+            current_status="awaiting_user",
+            current_message=f"等待你在检查点 '{checkpoint}' 确认或修改产物",
+            current_progress=1.0,
+        )
+        logger.info(
+            "[Pipeline] Task %s paused at checkpoint '%s' (manual mode)",
+            self.task_id, checkpoint,
+        )
+        raise CheckpointPause(checkpoint)
 
     @property
     def state(self) -> Optional[BaseTaskState]:

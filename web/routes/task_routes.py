@@ -5,7 +5,10 @@ import logging
 
 from fastapi import APIRouter, HTTPException
 
+from fastapi import Form
+
 from core.config import API_KEY_MISSING_MSG, get_api_key
+from core.pipelines import ALL_CHECKPOINTS, compute_current_checkpoint
 from core.task_manager import TaskManager
 from models.task import (
     AnchorVideoTask,
@@ -15,6 +18,7 @@ from models.task import (
     SimpleImageTask,
     SimpleVideoTask,
     StepStatus,
+    TaskType,
 )
 
 from web import app_state, deps, helpers
@@ -58,6 +62,16 @@ async def list_tasks():
             elif isinstance(state, SimpleImageTask):
                 t["prompt"] = state.prompt[:100] if state.prompt else ""
                 t["size"] = state.size
+
+            # v6.0 手动模式：列表徽标判断（PENDING + current_checkpoint 非空 = 等待你操作）
+            mc = getattr(state, "manual_config", None)
+            t["current_mode"] = "manual" if (mc and mc.enabled) else "auto"
+            t["current_checkpoint"] = (mc.current_checkpoint if mc else "") or ""
+            t["awaiting_user"] = bool(
+                t["current_mode"] == "manual"
+                and state.status == StepStatus.PENDING
+                and t["current_checkpoint"]
+            )
     return {"tasks": tasks}
 
 
@@ -129,6 +143,91 @@ async def stop_task(task_id: str):
 
     logger.info(f"[Stop] Task {task_id} stop requested")
     return {"ok": True, "task_id": task_id}
+
+
+@router.post("/api/tasks/{task_id}/mode")
+async def switch_task_mode(task_id: str, mode: str = Form(...)):
+    """运行时切换执行模式（v6.0 手动模式）。
+
+    ``mode=manual``（自动变手动）：
+        - simple / simple_image 无检查点，返回 400；
+        - 复用现有 stop 链路挂起流水线（pipeline.stop() → 下一安全点
+          PipelineShutdown 正常落盘），落盘 ``enabled=true`` +
+          ``current_checkpoint=最近完成边界`` + ``status=PENDING``；
+        - 恢复后保持手动模式，在下一个命中检查点再次暂停（不主动切回则一直是手动）。
+
+    ``mode=auto``（手动变自动，**切换即继续**）：
+        - 清空 ``pause_points``（永不暂停）；
+        - 若任务正暂停在检查点 → 立即走现有 resume 继续跑完。
+
+    Args:
+        mode: "auto" | "manual"。
+    """
+    if mode not in ("auto", "manual"):
+        raise HTTPException(status_code=422, detail="mode 必须为 auto 或 manual")
+
+    dir_name = helpers.find_dir_name(task_id)
+    tm = TaskManager(task_id, dir_name=dir_name)
+    state = tm.load()
+    if not state:
+        raise HTTPException(status_code=404, detail="Task not found")
+
+    mc = state.manual_config
+
+    if mode == "manual":
+        # simple / simple_image 无检查点，不支持手动模式（PRD §4.3）
+        if state.task_type in (TaskType.SIMPLE, TaskType.IMAGE):
+            raise HTTPException(status_code=400, detail="该任务类型不支持手动模式")
+
+        # 幂等：已是手动模式且处于暂停态 → 直接返回
+        if mc.enabled and state.status == StepStatus.PENDING and mc.current_checkpoint:
+            return {"ok": True, "task_id": task_id, "mode": "manual",
+                    "current_checkpoint": mc.current_checkpoint, "changed": False}
+
+        # 复用 stop 链路挂起流水线（若正在运行/排队）
+        if task_id in app_state.active_pipelines:
+            app_state.active_pipelines[task_id].stop()
+        elif task_id in app_state._queued_tasks:
+            logger.info(f"[Mode] Task {task_id} queued, will skip on slot acquire")
+        else:
+            logger.info(f"[Mode] Task {task_id} not running, marking manual only")
+
+        # 计算当前检查点边界 + 落盘
+        checkpoint = compute_current_checkpoint(state)
+        mc.enabled = True
+        if not mc.pause_points:
+            mc.pause_points = list(ALL_CHECKPOINTS)  # 默认全部检查点暂停
+        mc.current_checkpoint = checkpoint
+        tm.update_state(
+            status=StepStatus.PENDING,
+            manual_config=mc,
+            current_step=checkpoint or state.current_step,
+            current_status="awaiting_user",
+            current_message=(
+                f"已切换为手动模式，等待你在检查点 '{checkpoint}' 确认或修改产物"
+                if checkpoint else "已切换为手动模式"
+            ),
+        )
+        logger.info(f"[Mode] Task {task_id} switched to manual (checkpoint={checkpoint})")
+        return {"ok": True, "task_id": task_id, "mode": "manual",
+                "current_checkpoint": checkpoint, "changed": True}
+
+    # ── mode == "auto"：手动变自动，切换即继续 ──
+    was_paused = mc.enabled and state.status == StepStatus.PENDING and bool(mc.current_checkpoint)
+    mc.pause_points = []
+    mc.current_checkpoint = ""
+    tm.update_state(
+        manual_config=mc,
+        current_status="resumed",
+        current_message="已切换为自动模式",
+    )
+    logger.info(f"[Mode] Task {task_id} switched to auto (was_paused={was_paused})")
+
+    if was_paused:
+        # 切换即继续：立即走现有 resume 逻辑跑完
+        return await resume_task(task_id)
+
+    return {"ok": True, "task_id": task_id, "mode": "auto", "changed": True}
 
 
 @router.post("/api/tasks/sweep")

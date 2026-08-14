@@ -11,6 +11,7 @@ from typing import List, Optional
 from fastapi import APIRouter, File, Form, HTTPException, UploadFile
 
 from core.config import API_KEY_MISSING_MSG, DURATION_FRAME_MAP, get_api_key
+from core.pipelines import ALL_CHECKPOINTS
 from core.pipelines.poetry_video import POETRY_SUBTITLE_STYLE
 from core.screenwriter import build_poetry_scene_prompt
 from core.task_manager import TaskManager
@@ -18,6 +19,7 @@ from models.task import (
     AnchorVideoTask,
     AudioConfig,
     CreativeVideoTask,
+    ManualConfig,
     ManuscriptVideoTask,
     PoetryVideoTask,
     SimpleVideoTask,
@@ -46,6 +48,39 @@ def _parse_scene_durations_json(scene_durations_json: str) -> list:
         if not isinstance(d, (int, float)) or d < 2 or d > 30:
             raise HTTPException(status_code=422, detail=f"场景 {i+1} 时长范围 2-30 秒")
     return scene_durations
+
+
+def _build_manual_config(execution_mode: str, pause_points: str) -> ManualConfig:
+    """构建手动模式配置（v6.0）。
+
+    Args:
+        execution_mode: "auto"（默认）或 "manual"。
+        pause_points: JSON 数组字符串（可选暂停点集合）；空/缺省且 manual 时 = 全部检查点。
+
+    Raises:
+        HTTPException: execution_mode 非法或 pause_points 含非法值。
+    """
+    if execution_mode not in ("auto", "manual"):
+        raise HTTPException(status_code=422, detail="execution_mode 必须为 auto 或 manual")
+    if execution_mode == "auto":
+        return ManualConfig()
+
+    try:
+        points = json.loads(pause_points) if pause_points else []
+    except Exception:
+        raise HTTPException(status_code=422, detail="pause_points 必须为 JSON 数组")
+    if not isinstance(points, list):
+        raise HTTPException(status_code=422, detail="pause_points 必须为 JSON 数组")
+
+    valid = set(ALL_CHECKPOINTS)
+    invalid = [p for p in points if p not in valid]
+    if invalid:
+        raise HTTPException(
+            status_code=422,
+            detail=f"非法暂停点: {invalid}，可选: {ALL_CHECKPOINTS}",
+        )
+    # 空 = 全部检查点暂停（PRD §4.3）
+    return ManualConfig(enabled=True, pause_points=points or list(ALL_CHECKPOINTS))
 
 
 def _build_subtitle_config(
@@ -196,6 +231,9 @@ async def create_creative_task(
     subtitle_stroke_color: str = Form("black"),
     subtitle_stroke_width: int = Form(2),
     subtitle_bg_color: str = Form("black@0.5"),
+    # v6.0 手动模式
+    execution_mode: str = Form("auto"),
+    pause_points: str = Form(""),
 ):
     """创建创意长视频任务（类型 2）。"""
     api_key = get_api_key()
@@ -252,11 +290,13 @@ async def create_creative_task(
         generate_end_frames_from_ref=generate_end_frames_from_ref,
         audio_config=audio_config,
         subtitle_config=subtitle_config,
+        manual_config=_build_manual_config(execution_mode, pause_points),
     )
 
     logger.info(
         f"[Pipeline] Scene config: source={duration_source}, "
-        f"scenes={scene_count}, durations={scene_durations}, uniform={uniform_duration}"
+        f"scenes={scene_count}, durations={scene_durations}, uniform={uniform_duration}, "
+        f"manual={execution_mode}"
     )
 
     upload_dir = helpers.get_upload_dir()
@@ -317,6 +357,9 @@ async def create_manuscript_task(
     subtitle_stroke_color: str = Form("black"),
     subtitle_stroke_width: int = Form(2),
     subtitle_bg_color: str = Form("black@0.5"),
+    # v6.0 手动模式
+    execution_mode: str = Form("auto"),
+    pause_points: str = Form(""),
 ):
     """创建稿件长视频任务（类型 3）。"""
     api_key = get_api_key()
@@ -359,6 +402,7 @@ async def create_manuscript_task(
         video_duration=video_duration,
         audio_config=audio_config,
         subtitle_config=subtitle_config,
+        manual_config=_build_manual_config(execution_mode, pause_points),
     )
 
     pipeline = deps.create_pipeline_for_type(TaskType.MANUSCRIPT, api_key, task_id, dir_name)
@@ -392,6 +436,9 @@ async def create_poetry_task(
     audio_lang: str = Form(""),  # 页面语言，用于音色兼容性校验
     # 字幕配置（默认开启，固定诗歌样式，用户仅开关）
     subtitle_enabled: bool = Form(True),
+    # v6.0 手动模式
+    execution_mode: str = Form("auto"),
+    pause_points: str = Form(""),
 ):
     """创建诗词视频任务（类型 6）。"""
     api_key = get_api_key()
@@ -456,6 +503,7 @@ async def create_poetry_task(
         scene_durations=scene_durations,
         audio_config=audio_config,
         subtitle_config=subtitle_config,
+        manual_config=_build_manual_config(execution_mode, pause_points),
     )
 
     pipeline = deps.create_pipeline_for_type(TaskType.POETRY, api_key, task_id, dir_name)
@@ -490,6 +538,9 @@ async def create_anchor_task(
     subtitle_stroke_color: str = Form("black"),
     subtitle_stroke_width: int = Form(2),
     subtitle_bg_color: str = Form("black@0.5"),
+    # v6.0 手动模式
+    execution_mode: str = Form("auto"),
+    pause_points: str = Form(""),
 ):
     """创建数字人口播任务（类型 4 / Phase 3）。"""
     api_key = get_api_key()
@@ -533,6 +584,7 @@ async def create_anchor_task(
         video_height=video_height,
         audio_config=audio_config,
         subtitle_config=subtitle_config,
+        manual_config=_build_manual_config(execution_mode, pause_points),
     )
 
     pipeline = deps.create_pipeline_for_type(TaskType.ANCHOR, api_key, task_id, dir_name)
@@ -597,6 +649,9 @@ async def create_task_legacy(
         subtitle_stroke_color="black",
         subtitle_stroke_width=2,
         subtitle_bg_color="black@0.5",
+        # v6.0 手动模式：旧端点语义为自动模式
+        execution_mode="auto",
+        pause_points="",
     )
 
 

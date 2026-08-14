@@ -19,7 +19,7 @@ from abc import abstractmethod
 from dataclasses import dataclass
 from typing import Callable, List, Optional
 
-from core.pipelines import BasePipeline, PipelineShutdown
+from core.pipelines import BasePipeline, CheckpointPause, PipelineShutdown
 from models.task import SceneTask, StepStatus
 
 logger = logging.getLogger(__name__)
@@ -143,6 +143,11 @@ class MultiScenePipeline(BasePipeline):
             )
             return final_video
 
+        except CheckpointPause as e:
+            # 手动模式暂停：状态已在 _maybe_pause 落盘为 PENDING + current_checkpoint，
+            # 这里正常返回（非失败、非中断），等待用户确认后 resume 继续。
+            logger.info("[MultiScene] Task %s paused: %s", self.task_id, e.message)
+            return ""
         except PipelineShutdown:
             await self._emit("error", "failed", "任务已被中断，可从任务列表续传", _PROGRESS_FAILED)
             raise
@@ -180,6 +185,9 @@ class MultiScenePipeline(BasePipeline):
 
         self.task_manager.update_step(step_name, StepStatus.COMPLETED)
         await self._emit(step_name, "completed", completed_msg, progress_end)
+
+        # v6.0 手动模式：步骤完成后检查是否命中暂停点（coarse_skip 跳过的不触发）
+        await self._maybe_pause(step_name)
         return result
 
     # ==================================================================

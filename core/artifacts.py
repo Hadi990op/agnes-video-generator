@@ -759,11 +759,24 @@ def build_manifest(state: BaseTaskState, task_dir: str) -> dict:
             ),
         })
 
+    # v6.0 手动模式：暴露执行模式与当前检查点（供前端判断暂停态 / 渲染依赖图）
+    manual_cfg = getattr(state, "manual_config", None)
+    current_checkpoint = ""
+    current_mode = "auto"
+    if manual_cfg is not None:
+        current_mode = "manual" if manual_cfg.enabled else "auto"
+        current_checkpoint = manual_cfg.current_checkpoint or ""
+
     return {
         "format_version": "1.0",
         "task_id": state.task_id,
         "task_type": state.task_type.value,
         "task_status": state.status.value if state.status else "pending",
+        "current_mode": current_mode,
+        "current_checkpoint": current_checkpoint,
+        "manual_config": (
+            manual_cfg.model_dump() if manual_cfg is not None else {}
+        ),
         "dir_name": os.path.basename(task_dir.rstrip(os.sep)),
         "working_dir": task_dir,
         "artifacts": artifacts,

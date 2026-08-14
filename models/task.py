@@ -101,6 +101,28 @@ class AudioConfig(BaseModel):
     rate: str = "+0%"
 
 
+class ManualConfig(BaseModel):
+    """手动模式配置（v6.0）。
+
+    enabled 时流水线在 pause_points 指定的检查点暂停，等待用户确认产物。
+    运行中可随时在自动/手动间切换（POST /api/tasks/{id}/mode）：
+    - 切手动：复用 stop 链路挂起，enabled=true + current_checkpoint 落盘；
+    - 切自动：清空 pause_points（= 永不暂停），暂停中切自动立即继续跑完。
+    """
+
+    enabled: bool = False                 # 是否手动模式
+    pause_points: list[str] = []          # 空 = 全部检查点暂停；清空 = 切回自动
+    approved_checkpoints: list[str] = []  # 已确认的检查点（恢复执行时跳过暂停）
+    modified_artifacts: list[str] = []    # 最近一次回填的产物 id（脏标记）
+    current_checkpoint: str = ""          # 当前暂停/待展示的检查点（空 = 无暂停）
+    timeout_minutes: int = 0              # 0 = 不超时
+
+    @property
+    def is_manual(self) -> bool:
+        """手动模式 = enabled 且存在暂停点（pause_points 非空）。"""
+        return self.enabled and bool(self.pause_points)
+
+
 # ═══════════════════════════════════════════════════
 # 子结构模型
 # ═══════════════════════════════════════════════════
@@ -168,6 +190,9 @@ class BaseTaskState(BaseModel):
     # multi_scene.py 中的 hasattr 探测。旧 JSON 缺字段时自动取默认值（向后兼容）。
     audio_config: AudioConfig = Field(default_factory=AudioConfig)
     subtitle_config: SubtitleConfig = Field(default_factory=SubtitleConfig)
+
+    # ── v6.0：手动模式配置（默认自动模式，向后兼容）──
+    manual_config: ManualConfig = Field(default_factory=ManualConfig)
 
 
 class SimpleVideoTask(BaseTaskState):
