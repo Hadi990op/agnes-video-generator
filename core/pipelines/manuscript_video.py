@@ -125,6 +125,14 @@ class ManuscriptVideoPipeline(MultiScenePipeline):
         """稿件视频无参考图阶段，空实现跳过。"""
         return
 
+    # v6.0 P3：稿件无参考图 → references 检查点不可暂停
+    def _get_pausable_steps(self) -> set:
+        from core.pipelines import _STEP_TO_CHECKPOINT
+
+        steps = set(_STEP_TO_CHECKPOINT.keys())
+        steps.discard("step_reference_images")
+        return steps
+
     # ------------------------------------------------------------------
     # 步骤实现（覆写通用实现以保留稿件特有逻辑）
     # ------------------------------------------------------------------

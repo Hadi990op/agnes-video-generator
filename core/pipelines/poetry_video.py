@@ -242,6 +242,14 @@ class PoetryVideoPipeline(MultiScenePipeline):
         """诗词视频不需参考图，跳过。"""
         pass
 
+    # v6.0 P3：诗词无参考图 → references 检查点不可暂停
+    def _get_pausable_steps(self) -> set:
+        from core.pipelines import _STEP_TO_CHECKPOINT
+
+        steps = set(_STEP_TO_CHECKPOINT.keys())
+        steps.discard("step_reference_images")
+        return steps
+
     # ------------------------------------------------------------------
     # Phase 4: 配音（逐场景 TTS narration_text）
     # ------------------------------------------------------------------

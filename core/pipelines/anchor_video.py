@@ -258,6 +258,17 @@ class AnchorPipeline(MultiScenePipeline):
     # 音频生成（覆写通用实现）
     # ------------------------------------------------------------------
 
+    # v6.0 P3：model 音频模式下 audio/subtitle 步骤无实际产物（直接 return），
+    # 手动模式不应在无产物的检查点上暂停；post_stitch 模式全部可暂停。
+    def _get_pausable_steps(self) -> set:
+        from core.pipelines import _STEP_TO_CHECKPOINT
+
+        steps = set(_STEP_TO_CHECKPOINT.keys())
+        if (self._state.audio_source or "post_stitch") == "model":
+            steps.discard("step_audio")
+            steps.discard("step_subtitle")
+        return steps
+
     async def _generate_audio(self) -> object:
         """生成整段 TTS 音频（post_stitch 模式）；model 模式返回 None。"""
         audio_source = self._state.audio_source or "post_stitch"

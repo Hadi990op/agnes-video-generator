@@ -161,6 +161,18 @@ class BasePipeline(ABC):
         """请求流水线在下一个检查点停止。"""
         self._stop_event.set()
 
+    def _get_pausable_steps(self) -> set[str]:
+        """当前任务实际可暂停的步骤（v6.0 P3）。
+
+        子类按实际产物覆写：空实现步骤（如 manuscript/poetry 的 references、
+        anchor 的 model 模式 audio/subtitle）不在集合中，手动模式不会在
+        无实际产物的步骤上暂停。默认返回全部标准步骤。
+
+        Returns:
+            步骤字段名集合（如 {"step_build_scenes", "step_video_generation", ...}）。
+        """
+        return set(_STEP_TO_CHECKPOINT.keys())
+
     async def _maybe_pause(self, step_name: str) -> bool:
         """手动模式检查点暂停判定（v6.0）。
 
@@ -171,6 +183,7 @@ class BasePipeline(ABC):
             manual_config.enabled 且 pause_points 非空
             且 step 对应检查点在 pause_points 中
             且尚未在 approved_checkpoints 中
+            且该步骤在本流水线实际可暂停（P3：空实现步骤自动跳过）
 
         Args:
             step_name: 步骤字段名（如 ``step_build_scenes``），经 _STEP_TO_CHECKPOINT 映射。
@@ -181,6 +194,11 @@ class BasePipeline(ABC):
         state = self._state
         mc = getattr(state, "manual_config", None)
         if not mc or not mc.enabled or not mc.pause_points:
+            return False
+
+        # P3：步骤实际不可暂停（空实现/无产物）→ 跳过
+        if step_name not in self._get_pausable_steps():
+            logger.info("[Pipeline] Task %s step %s is not pausable, skipping pause", self.task_id, step_name)
             return False
 
         checkpoint = _STEP_TO_CHECKPOINT.get(step_name)

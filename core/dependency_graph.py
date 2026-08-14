@@ -27,7 +27,7 @@ import logging
 from dataclasses import dataclass, field
 from typing import Optional
 
-from models.task import BaseTaskState, CreativeVideoTask, TaskType
+from models.task import BaseTaskState, CreativeVideoTask, PoetryVideoTask, TaskType
 
 logger = logging.getLogger(__name__)
 
@@ -245,9 +245,9 @@ class DependencyGraph:
         # 1. 展开所有产物 id（含场景级）
         all_ids = self._expand_all_artifact_ids(state)
 
-        # 2. 解析 modified → 受影响产物类型集合
-        affected_types: set[str] = set()
-        modified_ids: set[str] = set()
+        # 2. 解析 modified → 受影响产物 id 集合（含场景级传播）
+        affected_ids: set[str] = set()
+        affected_types: set[str] = set()  # 参数级类型（非场景关联）
 
         for mid in modified_artifact_ids:
             base_type, field, index = self._parse_artifact_id(mid, state)
@@ -256,27 +256,26 @@ class DependencyGraph:
             # 未知产物类型（不在任何边表中）→ 忽略
             if not self._known_type(base_type):
                 continue
+            # 自身加入 affected
             if index is not None:
-                # 场景级 id（如 creative:video:2）→ 仅该场景
-                modified_ids.add(self._normalize_id(base_type, index))
+                affected_ids.add(self._normalize_id(base_type, index))
             elif self._is_scoped(base_type, state):
-                # 产物级 id 但为场景级产物（如 creative:video）→ 全部场景
-                modified_ids.update(self._expand_type(base_type, state))
+                affected_ids.update(self._expand_type(base_type, state))
             else:
-                # 普通产物级 id
-                modified_ids.add(self._normalize_id(base_type, index))
+                affected_ids.add(self._normalize_id(base_type, None))
             # 下游（字段级精确命中 / 产物级并集）
-            affected_types.update(self._downstream(base_type, field, index))
+            for t in self._downstream(base_type, field, index):
+                if index is not None and self._is_scoped(t, state):
+                    # 场景级修改 → 同类型下游只影响该场景
+                    affected_ids.add(self._normalize_id(t, index))
+                else:
+                    affected_ids.update(self._expand_type(t, state))
 
-        # 3. 参数修改 → 受影响产物类型
+        # 3. 参数修改 → 受影响产物类型（无场景关联，全部展开）
         if param_updates:
             for param, _val in param_updates.items():
-                affected_types.update(self.param_edges.get(param, set()))
-
-        # 4. 汇总 affected 产物 id（modified 自身 + 受影响类型展开）
-        affected_ids: set[str] = set(modified_ids)
-        for t in affected_types:
-            affected_ids.update(self._expand_type(t, state))
+                for t in self.param_edges.get(param, set()):
+                    affected_ids.update(self._expand_type(t, state))
 
         # 5. 计算 retained 与 steps_to_reset
         retained_ids = [aid for aid in all_ids if aid not in affected_ids]
@@ -382,6 +381,9 @@ class DependencyGraph:
             return True
         if base_type == T_END_FRAME and self.task_type == TaskType.CREATIVE:
             return True
+        # poetry：audio/subtitle 为逐场景产物（scene_{i}/narration.mp3、scene_{i}/subtitle.srt）
+        if base_type in (T_AUDIO, T_SUBTITLE) and self.task_type == TaskType.POETRY:
+            return True
         return False
 
     def _known_type(self, base_type: str) -> bool:
@@ -397,7 +399,9 @@ class DependencyGraph:
     def _scope_count(self, state: BaseTaskState) -> int:
         if isinstance(state, CreativeVideoTask):
             return len(state.scenes)
-        # Manuscript / Poetry 用 paragraphs；Anchor 单段
+        if isinstance(state, PoetryVideoTask):
+            return len(state.scenes)
+        # Manuscript / Anchor 用 paragraphs；Anchor 单段
         return len(getattr(state, "paragraphs", []) or [])
 
     # ── 步骤映射 ──

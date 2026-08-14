@@ -392,3 +392,141 @@ class TestModeSwitchEndpoint:
         body = resp.json()
         assert body["changed"] is False
         assert body["current_checkpoint"] == "scenes"
+
+
+# ═══════════════════════════════════════════════════
+# 7. P3：各流水线可暂停步骤（_get_pausable_steps）
+# ═══════════════════════════════════════════════════
+
+class TestPausableStepsP3:
+    def _make_pipeline(self, pipeline_cls, state):
+        """构造子流水线实例（不触真实 API），并注入 state。"""
+        pipeline = pipeline_cls(api_key="test", task_id="t_p3", dir_name="d_p3")
+        pipeline._state = state
+        return pipeline
+
+    def test_creative_all_steps_pausable(self):
+        from core.pipelines.creative.pipeline import CreativeVideoPipeline
+        from models.task import CreativeVideoTask, TaskType
+
+        state = CreativeVideoTask(task_id="t", creative_name="t", task_type=TaskType.CREATIVE)
+        pipeline = self._make_pipeline(CreativeVideoPipeline, state)
+        steps = pipeline._get_pausable_steps()
+        # creative 全部 6 个步骤可暂停
+        assert "step_build_scenes" in steps
+        assert "step_reference_images" in steps
+        assert "step_audio" in steps
+        assert "step_concatenation" in steps
+
+    def test_manuscript_skips_references(self):
+        from core.pipelines.manuscript_video import ManuscriptVideoPipeline
+        from models.task import ManuscriptVideoTask, TaskType
+
+        state = ManuscriptVideoTask(task_id="t", creative_name="t", task_type=TaskType.MANUSCRIPT)
+        pipeline = self._make_pipeline(ManuscriptVideoPipeline, state)
+        steps = pipeline._get_pausable_steps()
+        assert "step_reference_images" not in steps  # 无参考图
+        assert "step_build_scenes" in steps
+        assert "step_video_generation" in steps
+
+    def test_poetry_skips_references(self):
+        from core.pipelines.poetry_video import PoetryVideoPipeline
+        from models.task import PoetryVideoTask, TaskType
+
+        state = PoetryVideoTask(task_id="t", creative_name="t", task_type=TaskType.POETRY)
+        pipeline = self._make_pipeline(PoetryVideoPipeline, state)
+        steps = pipeline._get_pausable_steps()
+        assert "step_reference_images" not in steps
+        assert "step_audio" in steps
+        assert "step_subtitle" in steps
+
+    def test_anchor_model_skips_audio_subtitle(self):
+        from core.pipelines.anchor_video import AnchorPipeline
+        from models.task import AnchorVideoTask, TaskType
+
+        state = AnchorVideoTask(
+            task_id="t", creative_name="t", task_type=TaskType.ANCHOR,
+            audio_source="model",
+        )
+        pipeline = self._make_pipeline(AnchorPipeline, state)
+        steps = pipeline._get_pausable_steps()
+        assert "step_audio" not in steps
+        assert "step_subtitle" not in steps
+        assert "step_build_scenes" in steps
+        assert "step_concatenation" in steps
+
+    def test_anchor_post_stitch_all_pausable(self):
+        from core.pipelines.anchor_video import AnchorPipeline
+        from models.task import AnchorVideoTask, TaskType
+
+        state = AnchorVideoTask(
+            task_id="t", creative_name="t", task_type=TaskType.ANCHOR,
+            audio_source="post_stitch",
+        )
+        pipeline = self._make_pipeline(AnchorPipeline, state)
+        steps = pipeline._get_pausable_steps()
+        assert "step_audio" in steps
+        assert "step_subtitle" in steps
+
+    def test_maybe_pause_skips_non_pausable(self, monkeypatch):
+        """手动模式暂停点含 references，但 manuscript 无 references → 不暂停。"""
+        from core.pipelines import BasePipeline
+        from core.pipelines.manuscript_video import ManuscriptVideoPipeline
+        from models.task import ManuscriptVideoTask, ManualConfig, StepStatus, TaskType
+
+        state = ManuscriptVideoTask(task_id="t", creative_name="t", task_type=TaskType.MANUSCRIPT)
+        state.manual_config = ManualConfig(
+            enabled=True,
+            pause_points=["scenes", "references", "videos"],
+        )
+        pipeline = self._make_pipeline(ManuscriptVideoPipeline, state)
+        pipeline._state = state
+
+        # references 步骤不可暂停 → 不抛异常、不置 checkpoint
+        result = asyncio.run(pipeline._maybe_pause("step_reference_images"))
+        assert result is False
+        assert state.manual_config.current_checkpoint == ""
+
+        # scenes 步骤可暂停 → 命中
+        with pytest.raises(Exception) as exc_info:
+            asyncio.run(pipeline._maybe_pause("step_build_scenes"))
+        from core.pipelines import CheckpointPause
+        assert isinstance(exc_info.value, CheckpointPause)
+        assert exc_info.value.checkpoint == "scenes"
+
+
+# ═══════════════════════════════════════════════════
+# 8. P3：poetry 逐场景产物依赖图（场景级 audio/subtitle）
+# ═══════════════════════════════════════════════════
+
+class TestPoetryScopedArtifacts:
+    def test_poetry_audio_is_scoped(self):
+        from core.dependency_graph import get_dependency_graph
+        from models.task import PoetryVideoTask, SceneTask, TaskType
+
+        state = PoetryVideoTask(task_id="t", creative_name="t", task_type=TaskType.POETRY)
+        state.scenes = [SceneTask(index=i, narration_text=f"句{i}", scene_prompt=f"画{i}") for i in range(3)]
+
+        graph = get_dependency_graph(TaskType.POETRY)
+        # 改场景 2 的音频 → 仅该场景音频 + 全局成片受影响
+        plan = graph.compute_impact(state, ["poetry:audio:2"])
+        assert "poetry:audio:2" in plan.affected
+        assert "poetry:final_video" in plan.affected
+        # 其他场景音频保留
+        assert "poetry:audio:0" in plan.retained
+        assert "poetry:audio:1" in plan.retained
+
+    def test_poetry_video_scoped(self):
+        from core.dependency_graph import get_dependency_graph
+        from models.task import PoetryVideoTask, SceneTask, TaskType
+
+        state = PoetryVideoTask(task_id="t", creative_name="t", task_type=TaskType.POETRY)
+        state.scenes = [SceneTask(index=i, narration_text=f"句{i}", scene_prompt=f"画{i}") for i in range(2)]
+
+        graph = get_dependency_graph(TaskType.POETRY)
+        plan = graph.compute_impact(state, ["poetry:video:1"])
+        assert "poetry:video:1" in plan.affected
+        assert "poetry:audio:1" in plan.affected  # 场景级音频受影响
+        assert "poetry:subtitle:1" in plan.affected  # 场景级字幕受影响
+        assert "poetry:final_video" in plan.affected
+        assert "poetry:video:0" in plan.retained
