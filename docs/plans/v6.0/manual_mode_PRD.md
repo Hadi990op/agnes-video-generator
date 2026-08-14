@@ -1,7 +1,7 @@
 # v6.0「手动模式」初步方案（PRD 草案）
 
 > **状态**：🟡 初步方案（PRD 草案），待评审确认后细化
-> **版本**：v0.6（2026-08）
+> **版本**：v0.7（2026-08）
 > **关联文档**：`AGENTS.md` · `docs/dev/pipeline_products.md`（产物逻辑权威参考）· `docs/dev/architecture.md` · `docs/dev/artifact_standard.md`（产物规范权威参考，v5.x 先行落地）· `docs/plans/v4.0/pipeline_refactor.md`（模板方法来源）
 > **定位**：本文档为 6.0 大型更新的**需求与方案草案**。按项目流程，评审通过后进入 `system_design.md` 增量设计再实施。
 >
@@ -742,6 +742,7 @@ class ManualConfig(BaseModel):
 
 ## 十三、后续步骤
 
-1. 本草案评审（确认检查点集合、依赖图、默认暂停点、开放问题取舍）。
-2. 输出 `docs/plans/v6.0/system_design.md` 增量设计（模型/路由/流水线改动清单 + 迁移说明）。
-3. 按 Phase 1 → 5 分期实施，每期按 `AGENTS.md` 验证清单自验。
+1. ✅ 本草案评审（检查点集合、依赖图、默认暂停点、开放问题取舍均已完成）。
+2. ✅ 输出实施方案与路线图 → `docs/plans/v6.0/implementation_plan.md`（阶段划分、验证方式、状态跟踪、CI 异步测试约定）。
+3. 按 `implementation_plan.md` P0 → P4 分期实施；单测提交后走 GitHub Action 异步执行，不在本地阻塞开发；每阶段完成更新实施文档状态表。
+4. 进入 `system_design.md` 增量设计（模型/路由/流水线改动清单）作为 P0 开工的代码级依据。
