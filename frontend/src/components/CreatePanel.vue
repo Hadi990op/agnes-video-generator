@@ -19,22 +19,54 @@ const taskTypes = [
   { key: 'poetry', icon: '📜', label: 'ttPoetry' },
 ]
 
-// v6.0 手动模式：暂停点选项（PRD §4.3 顺序）
-const pausePointOptions = [
-  { key: 'scenes', label: 'cpScenes' },
-  { key: 'references', label: 'cpReferences' },
-  { key: 'videos', label: 'cpVideos' },
-  { key: 'audio', label: 'cpAudio' },
-  { key: 'subtitle', label: 'cpSubtitle' },
-  { key: 'final', label: 'cpFinal' },
-]
+// v6.0/6.1 手动模式：暂停点选项（按任务类型）
+// creative 细粒度（每个有产物的环节独立，v6.1）；其余粗粒度（PRD §4.3 顺序）
+const pausePointOptions: Record<string, { key: string; label: string }[]> = {
+  creative: [
+    { key: 'image_analysis', label: 'cpImageAnalysis' },
+    { key: 'story', label: 'cpStory' },
+    { key: 'script', label: 'cpScript' },
+    { key: 'character_ref', label: 'cpCharacterRef' },
+    { key: 'end_frame_prompts', label: 'cpEndFramePrompts' },
+    { key: 'end_frame_gen', label: 'cpEndFrameGen' },
+    { key: 'videos', label: 'cpVideos' },
+    { key: 'audio', label: 'cpAudio' },
+    { key: 'subtitle', label: 'cpSubtitle' },
+    { key: 'final', label: 'cpFinal' },
+  ],
+  manuscript: [
+    { key: 'scenes', label: 'cpScenes' },
+    { key: 'videos', label: 'cpVideos' },
+    { key: 'audio', label: 'cpAudio' },
+    { key: 'subtitle', label: 'cpSubtitle' },
+    { key: 'final', label: 'cpFinal' },
+  ],
+  poetry: [
+    { key: 'scenes', label: 'cpScenes' },
+    { key: 'videos', label: 'cpVideos' },
+    { key: 'audio', label: 'cpAudio' },
+    { key: 'subtitle', label: 'cpSubtitle' },
+    { key: 'final', label: 'cpFinal' },
+  ],
+  anchor: [
+    { key: 'scenes', label: 'cpScenes' },
+    { key: 'references', label: 'cpReferences' },
+    { key: 'videos', label: 'cpVideos' },
+    { key: 'audio', label: 'cpAudio' },
+    { key: 'subtitle', label: 'cpSubtitle' },
+    { key: 'final', label: 'cpFinal' },
+  ],
+}
 
 // 手动模式支持的任务类型（simple/simple_image 不支持暂停，PRD §4.3）
 const manualSupported = computed(() => !['simple', 'image'].includes(appState.currentTaskType))
 
+// 当前任务类型可选的暂停点
+const currentPausePoints = computed(() => pausePointOptions[appState.currentTaskType] || [])
+
 // 默认暂停点（PRD §4.8 预填，用户可增删）
 const defaultPausePoints: Record<string, string[]> = {
-  creative: ['scenes', 'references', 'videos', 'subtitle'],
+  creative: ['story', 'script', 'character_ref', 'videos', 'subtitle'],
   manuscript: ['scenes', 'videos', 'subtitle'],
   poetry: ['scenes', 'videos', 'subtitle'],
   anchor: ['scenes', 'videos'],
@@ -92,7 +124,7 @@ function selectExecMode(mode: 'auto' | 'manual') {
       <!-- 手动模式：暂停点多选（PRD §6.1） -->
       <div v-if="appState.execMode === 'manual' && manualSupported" class="mt-3 flex flex-wrap items-center gap-x-4 gap-y-2">
         <span class="text-xs text-muted">{{ t('pausePoints') }}:</span>
-        <label v-for="p in pausePointOptions" :key="p.key" class="flex items-center gap-1.5 text-sm text-ink-2 cursor-pointer">
+        <label v-for="p in currentPausePoints" :key="p.key" class="flex items-center gap-1.5 text-sm text-ink-2 cursor-pointer">
           <input type="checkbox" class="rounded bg-paper-2 border-rule" :checked="appState.pausePoints.includes(p.key)" @change="togglePausePoint(p.key)" />
           <span>{{ t(p.label) }}</span>
         </label>

@@ -24,7 +24,13 @@ const impactLoading = ref(false)
 const confirming = ref(false)
 
 const checkpointLabel = computed(() => {
-  const map: Record<string, string> = { scenes: 'cpScenes', references: 'cpReferences', videos: 'cpVideos', audio: 'cpAudio', subtitle: 'cpSubtitle', final: 'cpFinal' }
+  const map: Record<string, string> = {
+    image_analysis: 'cpImageAnalysis', story: 'cpStory', script: 'cpScript',
+    character_ref: 'cpCharacterRef', end_frame_prompts: 'cpEndFramePrompts',
+    end_frame_gen: 'cpEndFrameGen',
+    scenes: 'cpScenes', references: 'cpReferences', videos: 'cpVideos',
+    audio: 'cpAudio', subtitle: 'cpSubtitle', final: 'cpFinal',
+  }
   return t(map[props.checkpoint] || props.checkpoint)
 })
 

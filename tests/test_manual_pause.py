@@ -412,9 +412,15 @@ class TestPausableStepsP3:
         state = CreativeVideoTask(task_id="t", creative_name="t", task_type=TaskType.CREATIVE)
         pipeline = self._make_pipeline(CreativeVideoPipeline, state)
         steps = pipeline._get_pausable_steps()
-        # creative 全部 6 个步骤可暂停
-        assert "step_build_scenes" in steps
-        assert "step_reference_images" in steps
+        # v6.1：creative 每个有产物的细粒度环节均可暂停，
+        # 粗粒度合并步骤（build_scenes/reference_images）内部细粒度暂停，不再单独触发
+        assert "step_build_scenes" not in steps
+        assert "step_reference_images" not in steps
+        assert "step_story" in steps
+        assert "step_character_ref" in steps
+        assert "step_script" in steps
+        assert "step_end_frame_prompts" in steps
+        assert "step_end_frame_generation" in steps
         assert "step_audio" in steps
         assert "step_concatenation" in steps
 

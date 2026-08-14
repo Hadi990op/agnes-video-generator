@@ -45,8 +45,22 @@ CHECKPOINT_AUDIO = "audio"
 CHECKPOINT_SUBTITLE = "subtitle"
 CHECKPOINT_FINAL = "final"
 
-# 手动模式下全部可选暂停点（与 PRD §4.3 顺序一致）
+# 细粒度检查点（v6.1：所有有产物的环节均可暂停）
+CHECKPOINT_IMAGE_ANALYSIS = "image_analysis"
+CHECKPOINT_STORY = "story"
+CHECKPOINT_SCRIPT = "script"
+CHECKPOINT_CHARACTER_REF = "character_ref"
+CHECKPOINT_END_FRAME_PROMPTS = "end_frame_prompts"
+CHECKPOINT_END_FRAME_GEN = "end_frame_gen"
+
+# 手动模式下全部可选暂停点（creative 用细粒度集合，其余任务类型用粗粒度）
 ALL_CHECKPOINTS = [
+    CHECKPOINT_IMAGE_ANALYSIS,
+    CHECKPOINT_STORY,
+    CHECKPOINT_SCRIPT,
+    CHECKPOINT_CHARACTER_REF,
+    CHECKPOINT_END_FRAME_PROMPTS,
+    CHECKPOINT_END_FRAME_GEN,
     CHECKPOINT_SCENES,
     CHECKPOINT_REFERENCES,
     CHECKPOINT_VIDEOS,
@@ -58,6 +72,12 @@ ALL_CHECKPOINTS = [
 # 步骤字段名 → 检查点名（_execute_step 完成后调用 _maybe_pause 时映射）
 _STEP_TO_CHECKPOINT = {
     "step_build_scenes": CHECKPOINT_SCENES,
+    "step_image_analysis": CHECKPOINT_IMAGE_ANALYSIS,
+    "step_story": CHECKPOINT_STORY,
+    "step_character_ref": CHECKPOINT_CHARACTER_REF,
+    "step_script": CHECKPOINT_SCRIPT,
+    "step_end_frame_prompts": CHECKPOINT_END_FRAME_PROMPTS,
+    "step_end_frame_generation": CHECKPOINT_END_FRAME_GEN,
     "step_reference_images": CHECKPOINT_REFERENCES,
     "step_video_generation": CHECKPOINT_VIDEOS,
     "step_audio": CHECKPOINT_AUDIO,

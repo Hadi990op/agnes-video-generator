@@ -441,6 +441,10 @@ python scripts/scene_runner.py --endpoints         # 端点验证
 - 改动完成后运行：`.venv/bin/python -m py_compile <改动文件>`；涉及流水线跑 `./scripts/run_mock_regression.sh`
 - 新增功能按「四、AI Agent 触发词」→「新增功能」流程：需求分析 → 增量 PRD → `docs/plans/vX.Y/system_design.md` 增量 → 实现
 
+### 🚫 铁律（不可违背）
+
+> **Commit message 必须用英文书写**（标题 + 正文，含 `feat:` / `fix:` 等 Conventional Commits 前缀与正文说明）。任何中文 commit message 一律禁止，违反视为未完成的提交，需 `--amend` 改正后方可推送。
+
 ---
 
-*文档版本：v7.2 | 更新日期：2026-08-13 | 阶段：🟢 维护模式（六种任务类型 + artifacts/水印/多工作区/13 语言音色）*
+*文档版本：v7.3 | 更新日期：2026-08-14 | 阶段：🟢 维护模式（六种任务类型 + artifacts/水印/多工作区/13 语言音色）*

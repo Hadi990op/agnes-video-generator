@@ -99,39 +99,80 @@ class CreativeVideoPipeline(
         return self._state.idea
 
     # ------------------------------------------------------------------
+    # v6.1：creative 有产物的环节全部可暂停（细粒度检查点）
+    # 排除 step_build_scenes / step_reference_images 两个粗粒度合并步骤，
+    # 暂停在内部细粒度步骤完成后触发（见下方 _build_scenes / _build_reference_images）。
+    # ------------------------------------------------------------------
+
+    def _get_pausable_steps(self) -> set:
+        steps = {
+            "step_image_analysis",
+            "step_story",
+            "step_character_ref",
+            "step_script",
+            "step_end_frame_prompts",
+            "step_end_frame_generation",
+            "step_video_generation",
+            "step_audio",
+            "step_subtitle",
+            "step_concatenation",
+        }
+        state = self._state
+        if state is not None:
+            # 无参考图/尾帧 → 图片分析无实际产物，不暂停
+            if not state.reference_image and not state.end_frame_images:
+                steps.discard("step_image_analysis")
+            # 用户已提供参考图 → 角色参考图直接复用，不生成新图，不暂停
+            if state.reference_image:
+                steps.discard("step_character_ref")
+        return steps
+
+    # ------------------------------------------------------------------
     # 数据来源：分镜（编剧 → story → script → narrations）
     # ------------------------------------------------------------------
 
     async def _build_scenes(self) -> None:
-        """LLM 编剧：场景配置 → 图片分析 → 故事 → 脚本 → 旁白。"""
+        """LLM 编剧：场景配置 → 图片分析 → 故事 → 脚本 → 旁白。
+
+        每个有产物的细粒度环节完成后检查手动暂停点（v6.1）。
+        """
         await self._step_resolve_scene_config()
         image_context = await self._step_image_analysis(
             self._state.reference_image, self._state.end_frame_images
         )
         self._check_shutdown()
+        await self._maybe_pause("step_image_analysis")
         self._story = await self._step_story(image_context)
         self._check_shutdown()
+        await self._maybe_pause("step_story")
         self._scenes = await self._step_script(self._story)
         self._check_shutdown()
         await self._step_generate_narrations(self._story, self._scenes)
         self._check_shutdown()
+        await self._maybe_pause("step_script")
 
     # ------------------------------------------------------------------
     # 数据来源：参考图（角色参考 + 尾帧 prompt + 预生成，仅 keyframes 模式）
     # ------------------------------------------------------------------
 
     async def _build_reference_images(self) -> None:
-        """参考图生成：角色参考 → 尾帧 prompt → 预生成（keyframes 模式）。"""
+        """参考图生成：角色参考 → 尾帧 prompt → 预生成（keyframes 模式）。
+
+        每个有产物的细粒度环节完成后检查手动暂停点（v6.1）。
+        """
         self._character_ref_path = await self._step_character_reference(self._story)
         self._check_shutdown()
+        await self._maybe_pause("step_character_ref")
         self._end_frame_prompts = await self._step_end_frame_prompts(
             self._story, self._scenes
         )
         self._check_shutdown()
+        await self._maybe_pause("step_end_frame_prompts")
         self._pregenerated_end_frames = await self._step_pregenerate_end_frames(
             self._scenes, self._end_frame_prompts, self._character_ref_path
         )
         self._check_shutdown()
+        await self._maybe_pause("step_end_frame_generation")
 
     # ------------------------------------------------------------------
     # 视频生成（链式 keyframes / ti2vid / independent — 保留原逻辑）

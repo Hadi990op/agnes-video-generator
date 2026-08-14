@@ -71,10 +71,59 @@ function scrollToStep(stepKey: string) {
   }
 }
 
+// ── 任务信息展示（优化 v6.1：展示用户输入提示词与各项配置）──
+const taskInfo = ref<any>(null)
+const taskInfoOpen = ref(true)
+
+// 各任务类型：输入提示词字段 → i18n label
+const INPUT_FIELDS: Record<string, { field: string; label: string }[]> = {
+  creative: [{ field: 'idea', label: 'tiIdea' }],
+  manuscript: [{ field: 'manuscript_text', label: 'tiManuscript' }],
+  anchor: [
+    { field: 'script_text', label: 'tiScript' },
+    { field: 'anchor_prompt', label: 'tiAnchorPrompt' },
+  ],
+  poetry: [{ field: 'poem_text', label: 'tiPoem' }],
+  simple: [{ field: 'prompt', label: 'tiPrompt' }],
+}
+
+// 各任务类型：关键配置展示（字段 → i18n label）
+const CONFIG_FIELDS: Record<string, { field: string; label: string; fmt?: (v: any) => string }[]> = {
+  creative: [
+    { field: 'video_width', label: 'tiWidth', fmt: (v) => String(v ?? '') },
+    { field: 'video_height', label: 'tiHeight', fmt: (v) => String(v ?? '') },
+    { field: 'scene_count', label: 'tiScenes', fmt: (v) => String(v ?? '') },
+    { field: 'chaining_mode', label: 'tiChaining' },
+    { field: 'style', label: 'tiStyle' },
+  ],
+  manuscript: [
+    { field: 'scene_count', label: 'tiScenes', fmt: (v) => String(v ?? '') },
+    { field: 'paragraph_count', label: 'tiParagraphs', fmt: (v) => String(v ?? '') },
+  ],
+  anchor: [
+    { field: 'audio_source', label: 'tiAudioSource' },
+    { field: 'video_width', label: 'tiWidth', fmt: (v) => String(v ?? '') },
+    { field: 'video_height', label: 'tiHeight', fmt: (v) => String(v ?? '') },
+  ],
+  poetry: [
+    { field: 'video_width', label: 'tiWidth', fmt: (v) => String(v ?? '') },
+    { field: 'video_height', label: 'tiHeight', fmt: (v) => String(v ?? '') },
+    { field: 'scene_count', label: 'tiScenes', fmt: (v) => String(v ?? '') },
+    { field: 'style', label: 'tiStyle' },
+  ],
+  simple: [
+    { field: 'mode', label: 'tiMode' },
+    { field: 'duration', label: 'tiDuration', fmt: (v) => String(v ?? '') },
+  ],
+}
+
+const taskInputs = computed(() => INPUT_FIELDS[appState.currentTaskType] || [])
+const taskConfigs = computed(() => CONFIG_FIELDS[appState.currentTaskType] || [])
+
 onMounted(async () => {
   const taskId = appState.progressTaskId
   if (!taskId) return
-  await mountProgressPage(taskId, appState.currentDirName)
+  taskInfo.value = await mountProgressPage(taskId, appState.currentDirName)
 })
 
 onUnmounted(() => {
@@ -116,6 +165,33 @@ onUnmounted(() => {
           </div>
           <!-- 进度消息（HTML 渲染，来自后端安全文案） -->
           <div v-else class="mt-4 text-sm text-muted" v-html="progressMessage"></div>
+        </div>
+
+        <!-- 任务信息（用户输入提示词 + 各项配置，v6.1） -->
+        <div v-if="taskInfo" class="glass-card rounded-2xl mb-4 overflow-hidden">
+          <button class="w-full flex items-center gap-3 px-4 py-3 text-left hover:bg-paper-2/30 transition" @click="taskInfoOpen = !taskInfoOpen">
+            <span class="text-sm transition-transform" :class="taskInfoOpen ? 'rotate-90' : ''">▸</span>
+            <span class="text-sm font-medium text-ink-2">{{ t('taskInfo') }}</span>
+            <span class="ml-auto text-xs text-muted">{{ taskInfoOpen ? t('ppCollapse') : t('ppExpand') }}</span>
+          </button>
+
+          <div v-show="taskInfoOpen" class="px-4 pb-4 space-y-3">
+            <!-- 输入提示词 -->
+            <div v-for="f in taskInputs" :key="f.field" class="space-y-1">
+              <div class="text-xs text-muted">{{ t(f.label) }}</div>
+              <p class="text-sm text-ink-2 bg-paper-2/30 rounded-lg px-3 py-2 whitespace-pre-wrap break-words leading-relaxed">
+                {{ taskInfo[f.field] || '—' }}
+              </p>
+            </div>
+
+            <!-- 关键配置 -->
+            <div v-if="taskConfigs.length" class="flex flex-wrap gap-x-6 gap-y-2 pt-1">
+              <div v-for="c in taskConfigs" :key="c.field" class="flex items-center gap-1.5 text-xs">
+                <span class="text-muted">{{ t(c.label) }}:</span>
+                <span class="text-ink-2 font-mono">{{ c.fmt ? c.fmt(taskInfo[c.field]) : (taskInfo[c.field] || '—') }}</span>
+              </div>
+            </div>
+          </div>
         </div>
 
         <!-- 产物流：逐步追加（按环节分组，已完成折叠） -->

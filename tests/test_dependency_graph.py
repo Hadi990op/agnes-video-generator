@@ -308,12 +308,20 @@ class TestArtifactsCheckpoint:
     def test_checkpoint_for_artifact(self):
         from core.artifacts import checkpoint_for_artifact
 
-        assert checkpoint_for_artifact("creative:script") == "scenes"
-        assert checkpoint_for_artifact("creative:end_frame:2") == "references"
+        # v6.1：creative 细粒度检查点（每个有产物的环节独立）
+        assert checkpoint_for_artifact("creative:image_analysis") == "image_analysis"
+        assert checkpoint_for_artifact("creative:story") == "story"
+        assert checkpoint_for_artifact("creative:script") == "script"
+        assert checkpoint_for_artifact("creative:character_ref") == "character_ref"
+        assert checkpoint_for_artifact("creative:end_frame:2") == "end_frame_gen"
         assert checkpoint_for_artifact("creative:video:1") == "videos"
         assert checkpoint_for_artifact("creative:audio") == "audio"
         assert checkpoint_for_artifact("creative:subtitle") == "subtitle"
         assert checkpoint_for_artifact("creative:final_video") == "final"
+        # 非 creative 仍为粗粒度合并
+        assert checkpoint_for_artifact("manuscript:scene_prompts") == "scenes"
+        assert checkpoint_for_artifact("poetry:script") == "scenes"
+        assert checkpoint_for_artifact("anchor:anchor_image") == "references"
         assert checkpoint_for_artifact("bogus:thing") == "other"
 
     def test_build_checkpoint_manifest(self, tmp_path, monkeypatch):
@@ -330,12 +338,18 @@ class TestArtifactsCheckpoint:
         data = build_checkpoint_manifest(state, str(tmp_path))
 
         assert data["task_id"] == "t"
-        assert "scenes" in data["checkpoints"]
+        # v6.1：creative 细粒度检查点分组
+        assert "story" in data["checkpoints"]
+        assert "script" in data["checkpoints"]
+        assert "character_ref" in data["checkpoints"]
         assert "videos" in data["checkpoints"]
         assert "final" in data["checkpoints"]
-        # scenes 分组包含 script 产物
-        cp_artifacts = {a["artifact_id"] for a in data["checkpoints"]["scenes"]["artifacts"]}
-        assert "creative:script" in cp_artifacts
+        # story 分组包含 story 产物
+        cp_artifacts = {a["artifact_id"] for a in data["checkpoints"]["story"]["artifacts"]}
+        assert "creative:story" in cp_artifacts
+        # script 分组包含 script 产物
+        script_ids = {a["artifact_id"] for a in data["checkpoints"]["script"]["artifacts"]}
+        assert "creative:script" in script_ids
         # videos 分组包含场景视频（2 个场景）
         video_ids = {a["artifact_id"] for a in data["checkpoints"]["videos"]["artifacts"]}
         assert "creative:video:0" in video_ids

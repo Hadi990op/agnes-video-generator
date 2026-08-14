@@ -655,6 +655,25 @@ def apply_cascade_plan(state: BaseTaskState, plan: CascadePlan) -> dict:
     state.status = StepStatus.PENDING
     update_kwargs["status"] = StepStatus.PENDING
 
+    # 6. v6.1：删除前置环节产物后，重置受影响检查点的"已批准"状态
+    #    级联重置了某检查点对应步骤 → 该检查点不再视为已确认，
+    #    恢复执行时 _maybe_pause 会重新在此暂停等待用户（否则会静默跳过）。
+    mc = getattr(state, "manual_config", None)
+    if mc is not None:
+        approved = list(mc.approved_checkpoints or [])
+        removed: list[str] = []
+        for cp in list(approved):
+            step_field = _checkpoint_to_step_field(cp, state)
+            if step_field and step_field in plan.steps_to_reset:
+                approved.remove(cp)
+                removed.append(cp)
+        if removed:
+            mc.approved_checkpoints = approved
+            update_kwargs["manual_config"] = mc
+            logger.info(
+                "[Artifacts] Cascade reset un-approved checkpoints: %s", removed
+            )
+
     return update_kwargs
 
 
@@ -750,7 +769,21 @@ _MANIFEST_FILES = {"manifest.json", "MANIFEST.md", "task_state.json", "checkpoin
 # ═══════════════════════════════════════════════════════════════
 
 # 产物 type → 检查点名（与 dependency_graph._TYPE_TO_CHECKPOINT 语义一致）
-_ARTIFACT_TO_CHECKPOINT: dict[str, str] = {
+# creative：细粒度检查点（每个有产物的环节独立，v6.1）
+_ARTIFACT_TO_CHECKPOINT_FINE: dict[str, str] = {
+    "image_analysis": "image_analysis",
+    "story": "story",
+    "script": "script",
+    "character_ref": "character_ref",
+    "end_frame_prompts": "end_frame_prompts",
+    "end_frame": "end_frame_gen",
+    "video": "videos",
+    "audio": "audio",
+    "subtitle": "subtitle",
+    "final_video": "final",
+}
+# 非 creative（manuscript/poetry/anchor）：粗粒度合并检查点
+_ARTIFACT_TO_CHECKPOINT_COARSE: dict[str, str] = {
     "story": "scenes",
     "script": "scenes",
     "end_frame_prompts": "scenes",
@@ -766,15 +799,33 @@ _ARTIFACT_TO_CHECKPOINT: dict[str, str] = {
     "clip": "videos",
 }
 
-# 检查点展示顺序
+# 检查点展示顺序（creative 细粒度；其余粗粒度）
+_CHECKPOINT_ORDER_FINE = [
+    "image_analysis", "story", "script", "character_ref",
+    "end_frame_prompts", "end_frame_gen", "videos", "audio", "subtitle", "final",
+]
 _CHECKPOINT_ORDER = ["scenes", "references", "videos", "audio", "subtitle", "final"]
 
 
-def checkpoint_for_artifact(artifact_id: str) -> str:
-    """返回产物 id 所属检查点名（未知产物 → "other"）。"""
+def _checkpoint_order_for(state: BaseTaskState) -> list[str]:
+    """按任务类型返回检查点展示顺序。"""
+    if isinstance(state, CreativeVideoTask):
+        return _CHECKPOINT_ORDER_FINE
+    return _CHECKPOINT_ORDER
+
+
+def checkpoint_for_artifact(artifact_id: str, task_type: Optional[str] = None) -> str:
+    """返回产物 id 所属检查点名（未知产物 → "other"）。
+
+    Args:
+        artifact_id: 产物 id（含任务类型前缀，如 ``creative:script``）。
+        task_type: 任务类型（缺省时从产物 id 前缀解析）。
+    """
     parts = artifact_id.split(":")
     if len(parts) >= 2:
-        return _ARTIFACT_TO_CHECKPOINT.get(parts[1], "other")
+        t = task_type or parts[0]
+        mapping = _ARTIFACT_TO_CHECKPOINT_FINE if t == "creative" else _ARTIFACT_TO_CHECKPOINT_COARSE
+        return mapping.get(parts[1], "other")
     return "other"
 
 
@@ -799,15 +850,16 @@ def build_checkpoint_manifest(state: BaseTaskState, task_dir: str) -> dict:
     """
     task_dir = safe_join(get_working_dir(), task_dir)
     manifest = build_manifest(state, task_dir)
+    order = _checkpoint_order_for(state)
 
-    groups: dict[str, dict] = {cp: {"artifacts": []} for cp in _CHECKPOINT_ORDER}
+    groups: dict[str, dict] = {cp: {"artifacts": []} for cp in order}
     for a in manifest.get("artifacts", []):
-        cp = checkpoint_for_artifact(a["artifact_id"])
+        cp = checkpoint_for_artifact(a["artifact_id"], state.task_type.value)
         if cp in groups:
             groups[cp]["artifacts"].append(a)
 
     # 状态：检查点对应的 step 字段状态（复用 step 状态）
-    for cp in _CHECKPOINT_ORDER:
+    for cp in order:
         step_field = _checkpoint_to_step_field(cp, state)
         status = "pending"
         if step_field:
@@ -835,8 +887,12 @@ def _checkpoint_to_step_field(checkpoint: str, state: BaseTaskState) -> Optional
     """检查点名 → 步骤字段名（按任务类型）。"""
     if isinstance(state, CreativeVideoTask):
         mapping = {
-            "scenes": "step_script",       # creative 的 scenes 合并了多个细步骤，取 script 为代表
-            "references": "step_end_frame_generation",
+            "image_analysis": "step_image_analysis",
+            "story": "step_story",
+            "script": "step_script",
+            "character_ref": "step_character_ref",
+            "end_frame_prompts": "step_end_frame_prompts",
+            "end_frame_gen": "step_end_frame_generation",
             "videos": "step_video_generation",
             "audio": "step_audio",
             "subtitle": "step_subtitle",

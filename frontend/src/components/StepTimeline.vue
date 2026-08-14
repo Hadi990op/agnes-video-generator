@@ -10,6 +10,12 @@ const { steps, stepStates, awaitingCheckpoint } = useProgress()
 
 // checkpoint -> 最近似的 step key（用于暂停时在时间线中高亮对应环节）
 const CHECKPOINT_TO_STEP: Record<string, string> = {
+  image_analysis: 'image_analysis',
+  story: 'story',
+  script: 'script',
+  character_ref: 'character_ref',
+  end_frame_prompts: 'end_frame_prompts',
+  end_frame_gen: 'end_frame_gen',
   scenes: 'script',
   references: 'character_ref',
   videos: 'video_gen',
@@ -19,6 +25,12 @@ const CHECKPOINT_TO_STEP: Record<string, string> = {
 }
 
 const checkpointLabelKey: Record<string, string> = {
+  image_analysis: 'cpImageAnalysis',
+  story: 'cpStory',
+  script: 'cpScript',
+  character_ref: 'cpCharacterRef',
+  end_frame_prompts: 'cpEndFramePrompts',
+  end_frame_gen: 'cpEndFrameGen',
   scenes: 'cpScenes',
   references: 'cpReferences',
   videos: 'cpVideos',

@@ -154,7 +154,20 @@ _PARAM_EDGES: dict[str, dict[str, set[str]]] = {
 # ═══════════════════════════════════════════════════════════════
 
 # 产物 type → 检查点名（与 core/pipelines _STEP_TO_CHECKPOINT 对齐）
-_TYPE_TO_CHECKPOINT: dict[str, str] = {
+# creative：细粒度检查点（v6.1，每个有产物的环节独立暂停）
+_TYPE_TO_CHECKPOINT_FINE: dict[str, str] = {
+    T_STORY: "story",
+    T_SCRIPT: "script",
+    T_END_FRAME_PROMPTS: "end_frame_prompts",
+    T_CHARACTER_REF: "character_ref",
+    T_END_FRAME: "end_frame_gen",
+    T_VIDEO: "videos",
+    T_AUDIO: "audio",
+    T_SUBTITLE: "subtitle",
+    T_FINAL_VIDEO: "final",
+}
+# 非 creative：粗粒度合并检查点
+_TYPE_TO_CHECKPOINT_COARSE: dict[str, str] = {
     T_STORY: "scenes",
     T_SCRIPT: "scenes",
     T_END_FRAME_PROMPTS: "scenes",
@@ -179,8 +192,28 @@ _CHECKPOINT_EDGES: dict[str, set[str]] = {
     "subtitle": {"final"},
     "final": set(),
 }
+# creative 细粒度依赖链（v6.1）
+_CHECKPOINT_EDGES_FINE: dict[str, set[str]] = {
+    "image_analysis": {"story", "script", "character_ref", "end_frame_prompts",
+                       "end_frame_gen", "videos", "audio", "subtitle", "final"},
+    "story": {"script", "character_ref", "end_frame_prompts", "end_frame_gen",
+              "videos", "audio", "subtitle", "final"},
+    "script": {"character_ref", "end_frame_prompts", "end_frame_gen",
+               "videos", "audio", "subtitle", "final"},
+    "character_ref": {"end_frame_prompts", "end_frame_gen", "videos", "final"},
+    "end_frame_prompts": {"end_frame_gen", "videos", "final"},
+    "end_frame_gen": {"videos", "final"},
+    "videos": {"audio", "subtitle", "final"},
+    "audio": {"subtitle", "final"},
+    "subtitle": {"final"},
+    "final": set(),
+}
 
 _ALL_CHECKPOINTS = ["scenes", "references", "videos", "audio", "subtitle", "final"]
+_ALL_CHECKPOINTS_FINE = [
+    "image_analysis", "story", "script", "character_ref",
+    "end_frame_prompts", "end_frame_gen", "videos", "audio", "subtitle", "final",
+]
 
 
 # ═══════════════════════════════════════════════════════════════
@@ -454,16 +487,20 @@ class DependencyGraph:
         return [s for s in order if s in steps] + sorted(steps - set(order))
 
     def _checkpoints_for_affected(self, affected_ids: set[str]) -> list[str]:
-        """受影响产物 → 检查点名（去重保序）。"""
+        """受影响产物 → 检查点名（去重保序，按任务类型）。"""
+        mapping = (
+            _TYPE_TO_CHECKPOINT_FINE if self.task_type == TaskType.CREATIVE else _TYPE_TO_CHECKPOINT_COARSE
+        )
+        order = _ALL_CHECKPOINTS_FINE if self.task_type == TaskType.CREATIVE else _ALL_CHECKPOINTS
         cps: set[str] = set()
         for aid in affected_ids:
             parts = aid.split(":")
             if len(parts) < 2:
                 continue
-            cp = _TYPE_TO_CHECKPOINT.get(parts[1])
+            cp = mapping.get(parts[1])
             if cp:
                 cps.add(cp)
-        return [c for c in _ALL_CHECKPOINTS if c in cps]
+        return [c for c in order if c in cps]
 
 
 # ═══════════════════════════════════════════════════════════════
@@ -475,6 +512,11 @@ def get_dependency_graph(task_type) -> DependencyGraph:
     return DependencyGraph(task_type)
 
 
-def checkpoint_edges() -> dict[str, list[str]]:
-    """返回检查点级依赖边（供前端渲染依赖图）。"""
-    return {k: sorted(v) for k, v in _CHECKPOINT_EDGES.items()}
+def checkpoint_edges(task_type: Optional[TaskType] = None) -> dict[str, list[str]]:
+    """返回检查点级依赖边（供前端渲染依赖图）。
+
+    Args:
+        task_type: 任务类型；creative 返回细粒度依赖链，其余返回粗粒度。
+    """
+    edges = _CHECKPOINT_EDGES_FINE if task_type == TaskType.CREATIVE else _CHECKPOINT_EDGES
+    return {k: sorted(v) for k, v in edges.items()}

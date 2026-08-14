@@ -95,7 +95,7 @@ async function showProgress(taskId: string, dirName?: string | null): Promise<Ta
 // 进度页挂载：加载任务 + 按状态决定轮询/结果/暂停审查
 async function mountProgressPage(taskId: string, dirName?: string | null) {
   const state = await showProgress(taskId, dirName)
-  if (!state) return
+  if (!state) return state
   appState.currentTaskType = state.task_type || appState.currentTaskType
   appState.currentDirName = state.dir_name || dirName || taskId
   const st = state.status
@@ -115,6 +115,7 @@ async function mountProgressPage(taskId: string, dirName?: string | null) {
     if (cp) awaitingCheckpoint.value = cp
     appState.isTaskRunning = false
   }
+  return state
 }
 
 // 进度页卸载：停止一切轮询与临时状态
