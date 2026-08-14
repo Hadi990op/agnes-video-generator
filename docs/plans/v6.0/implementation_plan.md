@@ -50,7 +50,7 @@
 | P0 | 后端暂停机制 | `ManualConfig` + `_maybe_pause` 钩子 + 暂停态复用 `PENDING` + `mode` 端点（approve/regen 属 P1 产物级） | 现有 resume/stop | 🟢 已完成（2026-08-14，CI 异步确认中） |
 | P1 | 产物规范 | `checkpoint.json` 清单 + artifacts 预览/上传 + `impact` 预计算 + approve/regen 端点 | P0 | 🟢 已完成（2026-08-14，CI 异步确认中） |
 | P2 | 前端闭环 | 创建面板模式选择 + 检查点详情页三卡片 + diff 预览 + 协作 prompt 复制 | P0/P1 | 🟢 已完成（2026-08-14，CI 异步确认中） |
-| P3 | 推广全流水线 | manuscript / poetry / anchor 统一检查点；simple 产物清单 | P1 | 🟡 规划 |
+| P3 | 推广全流水线 | manuscript / poetry / anchor 统一检查点；simple 产物清单 | P1 | 🟢 已完成（2026-08-14，CI 异步确认中） |
 | P4 | 交付打磨 | 协作 prompt 库整理 + 示例视频教程 + 回归测试补充 | P3 | 🟡 规划 |
 
 ---
@@ -231,7 +231,10 @@ manuscript / poetry / anchor 继承同一检查点机制；simple / simple_image
 >   - 改动：API 层 7 个调用 + CreatePanel 执行模式条/暂停点 + 4 表单提交带模式 + TaskList 徽标/切换 + CheckpointDetail 组件（三卡片 + impact 弹窗）+ useProgress 暂停态检测 + i18n ~45 key
 >   - 本地自检：vue-tsc + vite build 通过，static 产物已更新；无 lint 错误
 >   - 注：通道 1（ai-modify）后端真实调用待 P1.5 补齐（当前前端按 impact 预计算 + 产物矩阵驱动）；前端单测保持现状（构建+CI+冒烟门槛）
-> - ⏳ **P3 推广全流水线**（下一个）：manuscript / poetry / anchor 统一检查点；simple 产物清单
+> - ✅ **P3 推广全流水线**：manuscript / poetry / anchor 统一检查点 + simple 产物清单（提交 `ab97d44`）
+>   - 改动：`_get_pausable_steps`（manuscript/poetry 去 references，anchor model 去 audio/subtitle）+ poetry 逐场景产物定义 + dependency_graph 场景级传播 + checkpoint manifest 补 files 树
+>   - 本地自检：新增测试全绿（54）+ 核心套件 139 用例不破
+> - ⏳ **P4 交付打磨**（下一个）：协作 prompt 库整理 + 示例视频教程 + 回归测试补充
 >
 > 推进方式：
 > 1. 按 P0 → P4 顺序实施；
