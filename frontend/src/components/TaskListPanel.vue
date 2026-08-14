@@ -108,9 +108,9 @@ function onMainBtn(task: TaskListItem) {
         <span class="text-xs" :class="statusColors[task.status || ''] || 'text-muted'">
           {{ t(statusLabelKey[task.status || ''] || '') || task.status }}
         </span>
-        <!-- v6.0 运行时切换 -->
+        <!-- v6.0 运行时切换（已完成/失败任务不显示） -->
         <button
-          v-if="task.current_mode && task.task_type !== 'simple' && task.task_type !== 'image'"
+          v-if="task.current_mode && !isCompleted(task) && task.status !== 'failed' && task.task_type !== 'simple' && task.task_type !== 'image'"
           class="text-xs px-2.5 py-1.5 rounded-lg transition border border-rule text-ink-2 hover:border-accent/40"
           :title="t(task.current_mode === 'manual' ? 'switchToAuto' : 'switchToManual')"
           @click="toggleMode(task)"

@@ -105,6 +105,23 @@ function showToastMsg(msg: string) {
   console.log('[CheckpointDetail]', msg)
 }
 
+async function copyText(text: string) {
+  if (!text) return
+  try {
+    await navigator.clipboard.writeText(text)
+    showToastMsg(t('copied'))
+  } catch {
+    // 旧浏览器回退：select 方式
+    const ta = document.createElement('textarea')
+    ta.value = text
+    document.body.appendChild(ta)
+    ta.select()
+    document.execCommand('copy')
+    document.body.removeChild(ta)
+    showToastMsg(t('copied'))
+  }
+}
+
 // ── 通道 2 / 3：直接确认（approve 不传 modified → 仅确认继续）──
 async function confirmNoChange() {
   await doApprove([])
@@ -208,9 +225,13 @@ async function regen() {
 
     <!-- 通道 2 面板 -->
     <div v-else-if="activeCard === 'self'" class="space-y-3">
-      <p class="text-xs text-muted">
-        {{ t('selfEditPath') }}: <code class="text-ink-2 bg-paper-2 px-1.5 py-0.5 rounded">{{ checkpointData?.working_dir || '' }}</code>
-      </p>
+      <div v-for="art in checkpointData?.artifacts || []" :key="art.artifact_id" class="text-xs">
+        <span class="text-muted">{{ art.label_key || art.artifact_id }}:</span>
+        <code class="block text-ink-2 bg-paper-2 px-2 py-1 rounded mt-0.5 break-all cursor-pointer hover:border-accent/40 border border-transparent"
+          :title="t('copy')"
+          @click="copyText(art.abs_path || art.path || '')"
+        >{{ art.abs_path || art.path || '' }}</code>
+      </div>
       <p class="text-xs text-muted">{{ t('selfEditAffected') }}: {{ t('selfEditAffectedHint') }}</p>
       <button class="text-xs px-4 py-2 bg-accent text-accent-ink rounded-lg transition" @click="confirmNoChange">
         {{ t('selfEditDone') }}

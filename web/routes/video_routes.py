@@ -360,7 +360,17 @@ async def get_task_checkpoint(task_id: str, checkpoint: str):
     if checkpoint not in groups:
         raise HTTPException(status_code=404, detail=f"Checkpoint '{checkpoint}' not found")
 
-    return {"ok": True, "checkpoint": checkpoint, **groups[checkpoint]}
+    # 补产物绝对路径 + 任务目录（供通道 2/3 展示产物路径）
+    group = groups[checkpoint]
+    for a in group.get("artifacts", []):
+        rel = a.get("path") or ""
+        a["abs_path"] = os.path.join(tm.task_dir, rel) if rel else ""
+    return {
+        "ok": True,
+        "checkpoint": checkpoint,
+        "working_dir": tm.task_dir,
+        **group,
+    }
 
 
 @router.get("/api/tasks/{task_id}/checkpoints/{checkpoint}/impact")
