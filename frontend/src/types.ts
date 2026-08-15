@@ -20,6 +20,8 @@ export interface TaskState {
   paragraph_count?: number
   paragraphs?: unknown[]
   creative_name?: string
+  // v6.1：后台是否有活跃 pipeline（服务重启后遗留的 pending/queued 任务为 false）
+  active?: boolean
   [key: string]: any
 }
 

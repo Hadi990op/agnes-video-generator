@@ -5,11 +5,13 @@ import * as api from '@/api'
 import { t } from '@/i18n'
 import { useGa } from './useGa'
 import { useArtifacts } from './useArtifacts'
+import { useToast } from './useToast'
 import type { TaskState, StepDef } from '@/types'
 
 const POLL_INTERVAL = 30000
 
 const { trackTaskResultOnce } = useGa()
+const { showToast } = useToast()
 
 // 产物刷新（模块级单例，进度页共享状态）
 const { loadArtifacts, scheduleArtifactRefresh } = useArtifacts()
@@ -26,6 +28,8 @@ const failedMessage = ref('')
 const taskFailed = ref(false)
 // v6.0 手动模式：当前检查点（暂停等待用户操作时非空）
 const awaitingCheckpoint = ref('')
+// v6.1：任务未完成但后台无活跃 pipeline → 待续传（展示续传入口）
+const needsResume = ref(false)
 
 let pollTimer: ReturnType<typeof setInterval> | null = null
 
@@ -99,7 +103,9 @@ async function mountProgressPage(taskId: string, dirName?: string | null) {
   appState.currentTaskType = state.task_type || appState.currentTaskType
   appState.currentDirName = state.dir_name || dirName || taskId
   const st = state.status
-  if (st === 'running' || st === 'queued') {
+  // 后台是否真有活跃 pipeline：false 且任务未完成 → 需要续传
+  const hasActive = state.active === true
+  if ((st === 'running' || st === 'queued') && hasActive) {
     setRunning(taskId)
     // 立即用后端实时进度消息（排队中/当前步骤），避免首次展示「任务启动中 + 0%」占位
     if (state.current_message) {
@@ -120,8 +126,34 @@ async function mountProgressPage(taskId: string, dirName?: string | null) {
     const cp = (state as any).manual_config?.current_checkpoint || ''
     if (cp) awaitingCheckpoint.value = cp
     appState.isTaskRunning = false
+  } else if (!hasActive) {
+    // 未完成但后台无活跃 pipeline（服务重启后遗留 / 创建后未启动）：
+    // 标记「待续传」，不轮询，提示用户点击续传恢复执行
+    needsResume.value = true
+    appState.isTaskRunning = false
+    setProgressMessageHtml(
+      `<span class="text-amber-400">${t('taskNotRunning')}</span><br><span class="text-muted text-xs">${t('taskNotRunningHint')}</span>`,
+    )
   }
   return state
+}
+
+// 续传：调用后端 resume，恢复执行并立即进入轮询
+async function resumeTask(taskId: string) {
+  try {
+    const d = await api.resumeTask(taskId)
+    if (!d.ok) {
+      showToast(t('failResume') + (d.detail ? ': ' + d.detail : ''), 3500)
+      return
+    }
+    needsResume.value = false
+    taskFailed.value = false
+    setRunning(taskId)
+    setProgressMessageHtml(`<span class="text-accent animate-pulse">${t('resuming')}</span>`)
+    startPolling(taskId)
+  } catch (e: any) {
+    showToast(t('failResume') + (e.message ? ': ' + e.message : ''), 3500)
+  }
 }
 
 // 进度页卸载：停止一切轮询与临时状态
@@ -131,6 +163,7 @@ function unmountProgressPage() {
   appState.currentTaskId = null
   appState.currentArtifactsTaskId = null
   awaitingCheckpoint.value = ''
+  needsResume.value = false
   taskFailed.value = false
 }
 
@@ -242,6 +275,8 @@ export function useProgress() {
     taskFailed,
     failedMessage,
     awaitingCheckpoint,
+    needsResume,
+    resumeTask,
     showProgress,
     mountProgressPage,
     unmountProgressPage,

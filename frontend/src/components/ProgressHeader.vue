@@ -7,7 +7,7 @@ import { useTasks } from '@/composables/useTasks'
 import { useNavigation } from '@/composables/useNavigation'
 
 const { switchLang } = useI18n()
-const { progressPct, awaitingCheckpoint, taskFailed } = useProgress()
+const { progressPct, awaitingCheckpoint, taskFailed, needsResume, resumeTask } = useProgress()
 const { stopTaskById, switchMode } = useTasks()
 const { goBack, goHome } = useNavigation()
 
@@ -25,6 +25,7 @@ const typeLabelKey: Record<string, string> = {
 
 const statusInfo = computed(() => {
   if (taskFailed.value) return { key: 'statusFailed', cls: 'text-red-400 bg-red-950/60 border-red-800/60' }
+  if (needsResume.value) return { key: 'statusNeedsResume', cls: 'text-amber-400 bg-amber-500/10 border-amber-500/30' }
   if (awaitingCheckpoint.value) return { key: 'statusAwaitingUser', cls: 'text-amber-400 bg-amber-500/10 border-amber-500/30' }
   if (appState.isTaskRunning || progressPct.value > 0 && progressPct.value < 100) {
     return { key: 'statusRunning', cls: 'text-yellow-400 bg-yellow-500/10 border-yellow-500/30' }
@@ -42,6 +43,10 @@ function onHome() {
 
 async function onStop() {
   if (taskId.value) await stopTaskById(taskId.value)
+}
+
+async function onResume() {
+  if (taskId.value) await resumeTask(taskId.value)
 }
 
 async function onSwitchAuto() {
@@ -88,6 +93,13 @@ async function onSwitchAuto() {
         <span class="text-xs px-2.5 py-1 rounded-full border" :class="statusInfo.cls">
           {{ t(statusInfo.key) }}
         </span>
+        <button
+          v-if="needsResume"
+          class="text-xs px-3 py-1.5 bg-accent text-accent-ink rounded-lg transition"
+          @click="onResume"
+        >
+          ▶ {{ t('resumeTaskBtn') }}
+        </button>
         <button
           v-if="awaitingCheckpoint"
           class="text-xs px-3 py-1.5 border border-rule text-ink-2 rounded-lg transition hover:border-accent/40"

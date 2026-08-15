@@ -84,6 +84,9 @@ async def get_task(task_id: str):
         raise HTTPException(status_code=404, detail="Task not found")
     data = state.model_dump()
     data["dir_name"] = dir_name
+    # 后台是否有活跃 pipeline（v6.1）：前端据此区分「运行中/排队中」与
+    # 「服务重启后遗留的 pending/queued（需点击续传）」，避免误导用户。
+    data["active"] = task_id in app_state.active_pipelines
     return data
 
 
