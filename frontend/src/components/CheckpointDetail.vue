@@ -58,7 +58,10 @@ async function runAiModify() {
   aiResult.value = null
   try {
     // 当前检查点第一个可编辑产物作为修改目标（简化：通道 1 一期由产物矩阵驱动）
-    const arts = (checkpointData.value?.artifacts || []).filter((a: any) => a.deletable)
+    // 兼容 manifest 字段（editable）与 artifacts 接口字段（deletable）
+    const arts = (checkpointData.value?.artifacts || []).filter(
+      (a: any) => a.editable !== false && a.deletable !== false && a.exists !== false,
+    )
     const target = arts[0]
     if (!target) throw new Error(t('noEditableArtifact'))
     // 先按 impact 预计算
