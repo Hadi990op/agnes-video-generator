@@ -282,9 +282,13 @@ function artLabel(a: any): string {
         <div class="text-sm font-medium text-ink-2">{{ t('handleAgent') }}</div>
         <div class="text-xs text-muted mt-0.5">{{ t('handleAgentDesc') }}</div>
       </button>
-      <button class="p-3 rounded-xl border text-left transition" :class="activeCard === 'edit' ? 'border-accent bg-accent/10' : 'border-rule bg-paper-2/30 hover:border-accent/40'" @click="activeCard = 'edit'">
-        <div class="text-sm font-medium text-ink-2">{{ t('handleEdit') }}</div>
+      <button class="p-3 rounded-xl border text-left transition"
+        :class="activeCard === 'edit' ? 'border-accent bg-accent/10' : 'border-rule bg-paper-2/30'"
+        :disabled="!editableTextArts.length"
+        @click="activeCard = 'edit'">
+        <div class="text-sm font-medium" :class="editableTextArts.length ? 'text-ink-2' : 'text-muted'">{{ t('handleEdit') }}</div>
         <div class="text-xs text-muted mt-0.5">{{ t('handleEditDesc') }}</div>
+        <div v-if="!editableTextArts.length" class="text-[10px] text-muted/70 mt-1">{{ t('editTextOnly') }}</div>
       </button>
     </div>
 
@@ -337,7 +341,7 @@ function artLabel(a: any): string {
         </span>
       </div>
       <p v-else class="text-xs text-amber-400">{{ t('noEditableText') }}</p>
-      <button class="text-xs px-4 py-2 bg-accent text-accent-ink rounded-lg transition" :disabled="!editableTextArts.length" @click="openEditModal">
+      <button class="text-xs px-4 py-2 bg-accent text-accent-ink rounded-lg transition disabled:opacity-40 disabled:cursor-not-allowed" :disabled="!editableTextArts.length" @click="openEditModal">
         {{ t('editOpen') }}
       </button>
     </div>
