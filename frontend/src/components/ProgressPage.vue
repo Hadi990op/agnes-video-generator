@@ -53,23 +53,29 @@ const orderedGroups = computed(() => {
   return keys.map((k) => map[k])
 })
 
-// 折叠状态：默认已完成环节折叠为一行（产物流只聚焦进行中 + 最新）
+// 折叠状态：默认只展开「最近一个环节」的产物，之前的历史环节自动折叠
+// （暂停点时主体聚焦当前检查点产物；自动模式时主体聚焦最近生成环节）
 const collapsed = ref<Record<string, boolean>>({})
 function toggleCollapse(key: string) {
   collapsed.value[key] = !collapsed.value[key]
 }
-function isCollapsed(key: string): boolean {
-  if (key in collapsed.value) return collapsed.value[key]
-  // 暂停点：产物全部自动展开，便于用户审查当前检查点内容
-  if (awaitingCheckpoint.value) return false
-  return stepStates.value[key] === 'done'
-}
 
-// 当前暂停点产物分组 = 最新产物分组（高亮 + 大图展示）
-const checkpointGroup = computed(() => {
-  if (!awaitingCheckpoint.value) return null
+// 当前聚焦分组 = 最新产物分组（暂停点高亮 + 大图展示；自动模式为主体的最近环节）
+const focusGroup = computed(() => {
   const groups = orderedGroups.value
   return groups.length ? groups[groups.length - 1].stepKey : null
+})
+
+function isCollapsed(key: string): boolean {
+  if (key in collapsed.value) return collapsed.value[key]
+  // 仅展开最近一个环节，之前的全部自动折叠（页面主体留给当前环节/暂停点产物）
+  return key !== focusGroup.value
+}
+
+// 当前暂停点产物分组（用于高亮 + 大图展示）
+const checkpointGroup = computed(() => {
+  if (!awaitingCheckpoint.value) return null
+  return focusGroup.value
 })
 
 // 步骤定位：点击时间线滚动到对应产物分组
