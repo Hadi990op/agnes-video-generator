@@ -118,9 +118,19 @@ async function copyText(text: string) {
   }
 }
 
-// ── 通道 2 / 3：直接确认（approve 不传 modified → 仅确认继续）──
-async function confirmNoChange() {
-  await doApprove([])
+// ── 统一继续按钮：无论是否修改，走同一 approve 逻辑。
+//   根据当前通道自动收集修改产物：
+//     - 通道 1（AI 修改完成）→ 携带 AI 修改目标产物
+//     - 通道 4（在线编辑已保存）→ 携带已保存的产物
+//     - 其余 → 无修改，直接确认继续
+async function continueTask() {
+  let modified: string[] = []
+  if (activeCard.value === 'ai' && aiResult.value?.target) {
+    modified = [aiResult.value.target]
+  } else if (activeCard.value === 'edit') {
+    modified = Object.keys(savedMap.value).filter((id) => savedMap.value[id])
+  }
+  await doApprove(modified)
 }
 
 // ── 切回自动并继续 ──
@@ -246,14 +256,14 @@ function artLabel(a: any): string {
 
     <p class="text-xs text-muted mb-3">{{ t('awaitingUserTip') }}</p>
 
-    <!-- 不修改直接继续（任何通道下均可跳过审查） -->
+    <!-- 统一继续按钮：无论是否修改，均走同一 approve 逻辑（自动收集当前通道的修改产物） -->
     <div class="flex items-center justify-center mb-4">
       <button
         class="text-sm px-6 py-2 bg-emerald-600 text-white rounded-lg transition hover:bg-emerald-500 disabled:opacity-50 shadow-sm"
         :disabled="confirming"
-        @click="confirmNoChange"
+        @click="continueTask"
       >
-        {{ confirming ? t('submitting') : t('continueNoChange') }}
+        {{ confirming ? t('submitting') : t('continueConfirm') }}
       </button>
       <span class="text-xs text-muted ml-3">{{ t('continueNoChangeHint') }}</span>
     </div>
@@ -294,12 +304,7 @@ function artLabel(a: any): string {
           <li v-for="a in impactData.affected || []" :key="a">• {{ a }}</li>
         </ul>
         <p v-if="impactData.retained?.length" class="text-xs text-emerald-400">{{ t('impactRetained') }}: {{ (impactData.retained || []).length }}</p>
-      </div>
-      <div class="flex gap-2">
-        <button v-if="impactData" class="text-xs px-4 py-2 bg-red-700 text-red-100 rounded-lg transition" :disabled="confirming" @click="doApprove([aiResult?.target])">
-          {{ confirming ? t('submitting') : t('impactConfirm') }}
-        </button>
-        <button v-if="impactData" class="text-xs px-4 py-2 border border-rule text-ink-2 rounded-lg transition" @click="impactData = null">{{ t('impactCancel') }}</button>
+        <p class="text-xs text-accent mt-1">{{ t('continueToApply') }}</p>
       </div>
     </div>
 
@@ -313,9 +318,6 @@ function artLabel(a: any): string {
         >{{ art.abs_path || art.path || '' }}</code>
       </div>
       <p class="text-xs text-muted">{{ t('selfEditAffected') }}: {{ t('selfEditAffectedHint') }}</p>
-      <button class="text-xs px-4 py-2 bg-accent text-accent-ink rounded-lg transition" @click="confirmNoChange">
-        {{ t('selfEditDone') }}
-      </button>
     </div>
 
     <!-- 通道 3 面板 -->
@@ -324,9 +326,6 @@ function artLabel(a: any): string {
       <code class="block text-xs bg-black/40 text-green-300 px-3 py-2 rounded-lg mb-2 break-all">{{ 'cd ' + (checkpointData?.working_dir || '') + ' && opencode' }}</code>
       <p class="text-xs text-muted">{{ t('agentPrompt') }}:</p>
       <textarea rows="3" class="w-full glass-input rounded-lg px-3 py-2 text-sm text-ink font-mono text-xs resize-y" :value="t('agentPromptTemplate').replace('{dir}', checkpointData?.working_dir || '')" readonly></textarea>
-      <button class="text-xs px-4 py-2 bg-accent text-accent-ink rounded-lg transition" @click="confirmNoChange">
-        {{ t('agentDone') }}
-      </button>
     </div>
 
     <!-- 通道 4 面板：在线编辑 -->
@@ -340,9 +339,6 @@ function artLabel(a: any): string {
       <p v-else class="text-xs text-amber-400">{{ t('noEditableText') }}</p>
       <button class="text-xs px-4 py-2 bg-accent text-accent-ink rounded-lg transition" :disabled="!editableTextArts.length" @click="openEditModal">
         {{ t('editOpen') }}
-      </button>
-      <button class="text-xs px-4 py-2 border border-rule text-ink-2 rounded-lg transition" @click="confirmNoChange">
-        {{ t('selfEditDone') }}
       </button>
     </div>
   </div>

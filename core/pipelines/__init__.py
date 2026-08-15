@@ -85,6 +85,24 @@ _STEP_TO_CHECKPOINT = {
     "step_concatenation": CHECKPOINT_FINAL,
 }
 
+# 步骤 → 暂停点应展示的进度（步骤完成时的真实进度，而非 100%）。
+# 与 multi_scene.StepProgressLimits 对齐；creative 细粒度步骤映射到所属大阶段。
+_PAUSE_PROGRESS_BY_STEP = {
+    "step_build_scenes": 0.08,
+    "step_resolve_scene_config": 0.05,
+    "step_image_analysis": 0.06,
+    "step_story": 0.07,
+    "step_script": 0.08,
+    "step_reference_images": 0.12,
+    "step_character_ref": 0.12,
+    "step_end_frame_prompts": 0.12,
+    "step_end_frame_generation": 0.15,
+    "step_video_generation": 0.80,
+    "step_audio": 0.86,
+    "step_subtitle": 0.90,
+    "step_concatenation": 0.98,
+}
+
 
 def compute_current_checkpoint(state) -> str:
     """推断任务当前所处检查点（最近一个已完成的步骤对应的检查点，v6.0）。
@@ -193,7 +211,7 @@ class BasePipeline(ABC):
         """
         return set(_STEP_TO_CHECKPOINT.keys())
 
-    async def _maybe_pause(self, step_name: str) -> bool:
+    async def _maybe_pause(self, step_name: str, progress: Optional[float] = None) -> bool:
         """手动模式检查点暂停判定（v6.0）。
 
         在步骤完成后调用。命中手动暂停点时落盘暂停态（PENDING + current_checkpoint），
@@ -207,6 +225,8 @@ class BasePipeline(ABC):
 
         Args:
             step_name: 步骤字段名（如 ``step_build_scenes``），经 _STEP_TO_CHECKPOINT 映射。
+            progress: 暂停点应展示的进度。缺省按 _PAUSE_PROGRESS_BY_STEP 映射取
+                该步骤完成时的真实进度（而非 100%）；未映射的步骤兜底 1.0。
 
         Returns:
             False（未暂停）；命中时抛出 CheckpointPause。
@@ -230,6 +250,9 @@ class BasePipeline(ABC):
             return False
 
         # 落盘暂停态：复用 PENDING + current_checkpoint 表达"等待用户"（PRD §4.2）
+        # 进度展示该步骤完成时的真实进度（progress 参数 > 映射表 > 兜底 1.0），避免暂停显示 100%
+        if progress is None:
+            progress = _PAUSE_PROGRESS_BY_STEP.get(step_name, 1.0)
         mc.current_checkpoint = checkpoint
         state.status = StepStatus.PENDING
         self.task_manager.update_state(
@@ -238,7 +261,7 @@ class BasePipeline(ABC):
             current_step=checkpoint,
             current_status="awaiting_user",
             current_message=f"等待你在检查点 '{checkpoint}' 确认或修改产物",
-            current_progress=1.0,
+            current_progress=progress,
         )
         logger.info(
             "[Pipeline] Task %s paused at checkpoint '%s' (manual mode)",

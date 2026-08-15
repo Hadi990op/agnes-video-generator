@@ -249,6 +249,8 @@ export const T: Record<string, Record<string, string>> = {
     selfEditDone: '✏️ 我已修改，继续',
     continueNoChange: '✅ 不修改，直接继续',
     continueNoChangeHint: '保留当前产物继续生成',
+    continueConfirm: '✅ 确认并继续',
+    continueToApply: '点击上方「确认并继续」应用修改',
     agentCommand: '操作命令',
     agentPrompt: '协作提示词',
     agentDone: '🤝 已修改，继续',
@@ -349,7 +351,7 @@ export const T: Record<string, Record<string, string>> = {
     durationMode: 'Scene Duration', uniformDuration: 'Uniform', independentDuration: 'Independent', seconds: 's',
     artifact: 'Output', paragraphCount: 'Paragraphs',
     statusCompleted: 'Completed', statusRunning: 'Running', statusFailed: 'Failed', statusPending: 'Pending', statusQueued: 'Queued',
-    pausePoints: 'Pause Points', pausePointsHint: 'Select checkpoints to pause in manual mode; unchecked ones pass automatically', cpScenes: 'Storyboard', cpReferences: 'References', cpVideos: 'Video Clips', cpAudio: 'Voiceover', cpSubtitle: 'Subtitles', cpFinal: 'Compose', manualUnsupported: 'This task type does not support manual mode', modeSwitching: 'Switching execution mode...', modeSwitched: 'Execution mode switched', failSwitchMode: 'Failed to switch mode', switchToAuto: 'Switch to Auto', switchToManual: 'Switch to Manual', switchToAutoConfirm: 'Switching to auto mode will clear pause points and run to completion. Continue?', switchToManualConfirm: 'Switching to manual mode will pause at the next checkpoint for your review. Continue?', awaitingUser: 'Waiting for you', awaitingUserTip: 'Task paused at a checkpoint; review or edit artifacts then continue', checkpointTitle: 'Checkpoint', cpDone: 'Done', cpPending: 'Pending', cpRunning: 'Running', howToHandle: 'How to handle this checkpoint', handleAi: 'AI Edit', handleAiDesc: 'Describe the change; system edits artifacts automatically', handleSelf: 'Edit Myself', handleSelfDesc: 'View paths, edit files locally, then confirm', handleAgent: 'External Agent', handleAgentDesc: 'Copy command and prompt, use a local agent, then confirm', handleEdit: 'Edit Inline', handleEditDesc: 'Edit text artifacts in a modal and save, compare with the original anytime', aiModifyRequest: 'Edit Request', aiModifyRequestPlaceholder: 'e.g. make narration of scene 2 more colloquial', aiModifyStart: 'Start Edit', aiModifyApplying: 'AI is editing...', aiModifyResult: 'Edit Result', applyAndContinue: 'Apply & Confirm', discard: 'Discard', selfEditPath: 'Artifact Path', selfEditSchemaHint: 'Format Requirements', selfEditAffected: 'Impact After Edit', selfEditDone: 'Edited, Continue', continueNoChange: '✅ Continue without changes', continueNoChangeHint: 'Keep current artifacts and continue', agentCommand: 'Command', agentPrompt: 'Prompt', agentDone: 'Done, Continue', copy: 'Copy', noEditableArtifact: 'No editable artifact in this checkpoint', aiModifyFailed: 'AI edit failed', failContinue: 'Failed to continue', continued: 'Confirmed, continuing', failRegen: 'Regeneration failed', regenCurrent: 'Regenerate', selfEditAffectedHint: 'Affected artifacts will be deleted and regenerated; unaffected ones are kept', agentPromptTemplate: 'Please review and optimize the artifacts of this checkpoint in task directory {dir}. Tell me the result when done, and I will click "Edited, Continue" in the web UI.\n\nRequirements:\n1. Keep artifact format and structure unchanged\n2. Only modify semantic content\n3. Report which files were changed', impactTitle: 'Will Delete & Rerun', impactRetained: 'Kept, Not Rerun', impactConfirm: 'Confirm Delete & Rerun', impactCancel: 'Cancel', noAffected: 'No impacted artifacts; continue directly', paramUpdates: 'Task Params', paramResolution: 'Resolution', paramVoice: 'Voice',
+    pausePoints: 'Pause Points', pausePointsHint: 'Select checkpoints to pause in manual mode; unchecked ones pass automatically', cpScenes: 'Storyboard', cpReferences: 'References', cpVideos: 'Video Clips', cpAudio: 'Voiceover', cpSubtitle: 'Subtitles', cpFinal: 'Compose', manualUnsupported: 'This task type does not support manual mode', modeSwitching: 'Switching execution mode...', modeSwitched: 'Execution mode switched', failSwitchMode: 'Failed to switch mode', switchToAuto: 'Switch to Auto', switchToManual: 'Switch to Manual', switchToAutoConfirm: 'Switching to auto mode will clear pause points and run to completion. Continue?', switchToManualConfirm: 'Switching to manual mode will pause at the next checkpoint for your review. Continue?', awaitingUser: 'Waiting for you', awaitingUserTip: 'Task paused at a checkpoint; review or edit artifacts then continue', checkpointTitle: 'Checkpoint', cpDone: 'Done', cpPending: 'Pending', cpRunning: 'Running', howToHandle: 'How to handle this checkpoint', handleAi: 'AI Edit', handleAiDesc: 'Describe the change; system edits artifacts automatically', handleSelf: 'Edit Myself', handleSelfDesc: 'View paths, edit files locally, then confirm', handleAgent: 'External Agent', handleAgentDesc: 'Copy command and prompt, use a local agent, then confirm', handleEdit: 'Edit Inline', handleEditDesc: 'Edit text artifacts in a modal and save, compare with the original anytime', aiModifyRequest: 'Edit Request', aiModifyRequestPlaceholder: 'e.g. make narration of scene 2 more colloquial', aiModifyStart: 'Start Edit', aiModifyApplying: 'AI is editing...', aiModifyResult: 'Edit Result', applyAndContinue: 'Apply & Confirm', discard: 'Discard', selfEditPath: 'Artifact Path', selfEditSchemaHint: 'Format Requirements', selfEditAffected: 'Impact After Edit', selfEditDone: 'Edited, Continue', continueNoChange: '✅ Continue without changes', continueNoChangeHint: 'Keep current artifacts and continue', continueConfirm: '✅ Confirm & Continue', continueToApply: 'Click "Confirm & Continue" above to apply changes', agentCommand: 'Command', agentPrompt: 'Prompt', agentDone: 'Done, Continue', copy: 'Copy', noEditableArtifact: 'No editable artifact in this checkpoint', aiModifyFailed: 'AI edit failed', failContinue: 'Failed to continue', continued: 'Confirmed, continuing', failRegen: 'Regeneration failed', regenCurrent: 'Regenerate', selfEditAffectedHint: 'Affected artifacts will be deleted and regenerated; unaffected ones are kept', agentPromptTemplate: 'Please review and optimize the artifacts of this checkpoint in task directory {dir}. Tell me the result when done, and I will click "Edited, Continue" in the web UI.\n\nRequirements:\n1. Keep artifact format and structure unchanged\n2. Only modify semantic content\n3. Report which files were changed', impactTitle: 'Will Delete & Rerun', impactRetained: 'Kept, Not Rerun', impactConfirm: 'Confirm Delete & Rerun', impactCancel: 'Cancel', noAffected: 'No impacted artifacts; continue directly', paramUpdates: 'Task Params', paramResolution: 'Resolution', paramVoice: 'Voice',
     statusAwaitingUser: 'Awaiting you', progressBack: 'Back', ppStages: 'Stages', ppExpand: 'Expand', ppCollapse: 'Collapse', ppWaiting: 'Waiting',
     goHome: 'Home', langSwitch: 'Switch Language',
     btnView: 'View', btnViewProgress: 'Progress', btnResume: 'Resume', btnStop: 'Stop',
@@ -791,6 +793,8 @@ export const T: Record<string, Record<string, string>> = {
     resuming: 'Возобновление выполнения...',
 
     langSwitch: 'Переключить язык',
+    continueConfirm: '✅ Подтвердить и продолжить',
+    continueToApply: 'Нажмите «Подтвердить и продолжить» выше, чтобы применить изменения',
   },
   ja: {
     subtitle: 'AI動画、ワンクリック',
@@ -1053,6 +1057,8 @@ export const T: Record<string, Record<string, string>> = {
     resuming: '実行を再開中...',
 
     langSwitch: '言語を切り替え',
+    continueConfirm: '✅ 確認して続行',
+    continueToApply: '上の「確認して続行」をクリックして変更を適用',
   },
   ko: {
     subtitle: 'AI 영상, 원클릭',
@@ -1315,6 +1321,8 @@ export const T: Record<string, Record<string, string>> = {
     resuming: '실행을 재개하는 중...',
 
     langSwitch: '언어 전환',
+    continueConfirm: '✅ 확인하고 계속',
+    continueToApply: '위의 「확인하고 계속」을 클릭하여 변경사항 적용',
   },
   ms: {
     subtitle: 'Video AI, Satu Klik',
@@ -1577,6 +1585,8 @@ export const T: Record<string, Record<string, string>> = {
     resuming: 'Menyambung semula...',
 
     langSwitch: 'Tukar Bahasa',
+    continueConfirm: '✅ Sahkan & Teruskan',
+    continueToApply: 'Klik "Sahkan & Teruskan" di atas untuk menggunakan perubahan',
   },
   id: {
     subtitle: 'Video AI, Satu Klik',
@@ -1840,6 +1850,8 @@ export const T: Record<string, Record<string, string>> = {
     resuming: 'Melanjutkan eksekusi...',
 
     langSwitch: 'Ganti Bahasa',
+    continueConfirm: '✅ Konfirmasi & Lanjutkan',
+    continueToApply: 'Klik "Konfirmasi & Lanjutkan" di atas untuk menerapkan perubahan',
   },
   de: {
     subtitle: 'KI-Video, ein Klick',
@@ -2107,6 +2119,8 @@ export const T: Record<string, Record<string, string>> = {
     resuming: 'Ausführung wird fortgesetzt...',
 
     langSwitch: 'Sprache wechseln',
+    continueConfirm: '✅ Bestätigen & Fortfahren',
+    continueToApply: 'Klicken Sie oben auf „Bestätigen & Fortfahren", um Änderungen anzuwenden',
   },
   fr: {
     subtitle: 'Vidéo IA, un clic',
@@ -2374,6 +2388,8 @@ export const T: Record<string, Record<string, string>> = {
     resuming: 'Reprise de l\'exécution...',
 
     langSwitch: 'Changer de langue',
+    continueConfirm: '✅ Confirmer & Continuer',
+    continueToApply: 'Cliquez sur « Confirmer & Continuer » ci-dessus pour appliquer',
   },
   nl: {
     subtitle: 'AI-video, één klik',
@@ -2641,6 +2657,8 @@ export const T: Record<string, Record<string, string>> = {
     resuming: 'Uitvoering hervatten...',
 
     langSwitch: 'Taal wisselen',
+    continueConfirm: '✅ Bevestigen & Doorgaan',
+    continueToApply: 'Klik hierboven op "Bevestigen & Doorgaan" om wijzigingen toe te passen',
   },
   es: {
     subtitle: 'Video IA, un clic',
@@ -2908,6 +2926,8 @@ export const T: Record<string, Record<string, string>> = {
     resuming: 'Reanudando ejecución...',
 
     langSwitch: 'Cambiar idioma',
+    continueConfirm: '✅ Confirmar y Continuar',
+    continueToApply: 'Haz clic en «Confirmar y Continuar» arriba para aplicar los cambios',
   },
   pt: {
     subtitle: 'Vídeo IA, um clique',
@@ -3175,6 +3195,8 @@ export const T: Record<string, Record<string, string>> = {
     resuming: 'Retomando execução...',
 
     langSwitch: 'Trocar idioma',
+    continueConfirm: '✅ Confirmar e Continuar',
+    continueToApply: 'Clique em "Confirmar e Continuar" acima para aplicar as alterações',
   },
   it: {
     subtitle: 'Video IA, un clic',
@@ -3442,6 +3464,8 @@ export const T: Record<string, Record<string, string>> = {
     resuming: 'Ripresa dell\'esecuzione...',
 
     langSwitch: 'Cambia lingua',
+    continueConfirm: '✅ Conferma e Continua',
+    continueToApply: 'Fai clic su "Conferma e Continua" sopra per applicare le modifiche',
   },
   tr: {
     subtitle: 'AI Video, Tek Tıkla',
@@ -3676,6 +3700,8 @@ export const T: Record<string, Record<string, string>> = {
     resuming: 'Yürütme sürdürülüyor...',
 
     langSwitch: 'Dil Değiştir',
+    continueConfirm: '✅ Onayla ve Devam Et',
+    continueToApply: 'Değişiklikleri uygulamak için yukarıdaki "Onayla ve Devam Et"e tıklayın',
   },
 
   vi: {
@@ -3911,6 +3937,8 @@ export const T: Record<string, Record<string, string>> = {
     resuming: 'Đang tiếp tục thực thi...',
 
     langSwitch: 'Đổi ngôn ngữ',
+    continueConfirm: '✅ Xác nhận & Tiếp tục',
+    continueToApply: 'Bấm "Xác nhận & Tiếp tục" phía trên để áp dụng thay đổi',
   },
 
   th: {
@@ -4146,6 +4174,8 @@ export const T: Record<string, Record<string, string>> = {
     resuming: 'กำลังดำเนินการต่อ...',
 
     langSwitch: 'เปลี่ยนภาษา',
+    continueConfirm: '✅ ยืนยันและดำเนินการต่อ',
+    continueToApply: 'คลิก "ยืนยันและดำเนินการต่อ" ด้านบนเพื่อใช้การเปลี่ยนแปลง',
   },
 
   hi: {
@@ -4381,6 +4411,8 @@ export const T: Record<string, Record<string, string>> = {
     resuming: 'निष्पादन फिर से शुरू हो रहा है...',
 
     langSwitch: 'भाषा बदलें',
+    continueConfirm: '✅ पुष्टि करें और जारी रखें',
+    continueToApply: 'परिवर्तन लागू करने के लिए ऊपर "पुष्टि करें और जारी रखें" पर क्लिक करें',
   },
 
   bn: {
@@ -4616,6 +4648,8 @@ export const T: Record<string, Record<string, string>> = {
     resuming: 'নিষ্পাদন আবার শুরু হচ্ছে...',
 
     langSwitch: 'ভাষা পরিবর্তন করুন',
+    continueConfirm: '✅ নিশ্চিত করুন এবং চালিয়ে যান',
+    continueToApply: 'পরিবর্তন প্রয়োগ করতে উপরের "নিশ্চিত করুন এবং চালিয়ে যান" ক্লিক করুন',
   },
 
   tl: {
@@ -4851,6 +4885,8 @@ export const T: Record<string, Record<string, string>> = {
     resuming: 'Ipinagpapatuloy ang pagtakbo...',
 
     langSwitch: 'Palitan ang Wika',
+    continueConfirm: '✅ Kumpirmahin at Magpatuloy',
+    continueToApply: 'I-click ang "Kumpirmahin at Magpatuloy" sa itaas para ilapat ang mga pagbabago',
   },
 
   ar: {
@@ -5086,6 +5122,8 @@ export const T: Record<string, Record<string, string>> = {
     resuming: 'جارٍ استئناف التنفيذ...',
 
     langSwitch: 'تغيير اللغة',
+    continueConfirm: '✅ تأكيد ومتابعة',
+    continueToApply: 'انقر على «تأكيد ومتابعة» بالأعلى لتطبيق التغييرات',
   },
 
   fa: {
@@ -5321,6 +5359,8 @@ export const T: Record<string, Record<string, string>> = {
     resuming: 'در حال از سرگیری اجرا...',
 
     langSwitch: 'تغییر زبان',
+    continueConfirm: '✅ تأیید و ادامه',
+    continueToApply: 'برای اعمال تغییرات روی «تأیید و ادامه» در بالا کلیک کنید',
   },
 
   ur: {
@@ -5556,5 +5596,7 @@ export const T: Record<string, Record<string, string>> = {
     resuming: 'عمل دوبارہ شروع ہو رہا ہے...',
 
     langSwitch: 'زبان تبدیل کریں',
+    continueConfirm: '✅ تصدیق کریں اور جاری رکھیں',
+    continueToApply: 'تبدیلیاں لاگو کرنے کے لیے اوپر "تصدیق کریں اور جاری رکھیں" پر کلک کریں',
   },
 };

@@ -186,8 +186,9 @@ class MultiScenePipeline(BasePipeline):
         self.task_manager.update_step(step_name, StepStatus.COMPLETED)
         await self._emit(step_name, "completed", completed_msg, progress_end)
 
-        # v6.0 手动模式：步骤完成后检查是否命中暂停点（coarse_skip 跳过的不触发）
-        await self._maybe_pause(step_name)
+        # v6.0 手动模式：步骤完成后检查是否命中暂停点（coarse_skip 跳过的不触发）。
+        # 传入步骤完成进度，暂停点展示真实进度而非 100%。
+        await self._maybe_pause(step_name, progress_end)
         return result
 
     # ==================================================================

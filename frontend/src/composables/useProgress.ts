@@ -198,6 +198,8 @@ async function pollTaskProgress(taskId: string) {
 
 function startPolling(taskId: string) {
   stopPolling()
+  // 立即执行首次轮询：恢复/继续后无需等一个完整轮询周期（30s）即可刷新状态
+  void pollTaskProgress(taskId)
   pollTimer = setInterval(() => pollTaskProgress(taskId), POLL_INTERVAL)
 }
 
