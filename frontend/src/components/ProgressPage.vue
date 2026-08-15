@@ -60,8 +60,17 @@ function toggleCollapse(key: string) {
 }
 function isCollapsed(key: string): boolean {
   if (key in collapsed.value) return collapsed.value[key]
+  // 暂停点：产物全部自动展开，便于用户审查当前检查点内容
+  if (awaitingCheckpoint.value) return false
   return stepStates.value[key] === 'done'
 }
+
+// 当前暂停点产物分组 = 最新产物分组（高亮 + 大图展示）
+const checkpointGroup = computed(() => {
+  if (!awaitingCheckpoint.value) return null
+  const groups = orderedGroups.value
+  return groups.length ? groups[groups.length - 1].stepKey : null
+})
 
 // 步骤定位：点击时间线滚动到对应产物分组
 function scrollToStep(stepKey: string) {
@@ -201,19 +210,22 @@ onUnmounted(() => {
             :id="'artifact-group-' + g.stepKey"
             :key="g.stepKey"
             class="artifact-group glass-card rounded-2xl overflow-hidden"
+            :class="g.stepKey === checkpointGroup ? 'border-amber-500/40 ring-1 ring-amber-500/20' : ''"
           >
             <button
               class="w-full flex items-center gap-3 px-4 py-3 text-left transition hover:bg-paper-2/30"
+              :class="g.stepKey === checkpointGroup ? 'bg-amber-500/5' : ''"
               @click="toggleCollapse(g.stepKey)"
             >
               <span class="text-sm transition-transform" :class="isCollapsed(g.stepKey) ? '' : 'rotate-90'">▸</span>
-              <span class="text-sm font-medium text-ink-2">{{ t(stepLabelMap[g.stepKey] || g.stepKey) }}</span>
+              <span class="text-sm font-medium" :class="g.stepKey === checkpointGroup ? 'text-amber-400' : 'text-ink-2'">{{ t(stepLabelMap[g.stepKey] || g.stepKey) }}</span>
+              <span v-if="g.stepKey === checkpointGroup" class="text-xs px-1.5 py-0.5 rounded-full bg-amber-500/10 text-amber-400 shrink-0">⏸ {{ t('awaitingUser') }}</span>
               <span class="text-xs text-muted">{{ g.items.length }} 项</span>
               <span class="ml-auto text-xs text-muted">{{ isCollapsed(g.stepKey) ? t('ppExpand') : t('ppCollapse') }}</span>
             </button>
 
-            <div v-show="!isCollapsed(g.stepKey)" class="px-4 pb-4 space-y-2">
-              <ArtifactCard v-for="art in g.items" :key="art.artifact_id" :art="art" />
+            <div v-show="!isCollapsed(g.stepKey)" class="px-4 pb-4 space-y-2" :class="g.stepKey === checkpointGroup ? 'px-5 pb-5' : ''">
+              <ArtifactCard v-for="art in g.items" :key="art.artifact_id" :art="art" :large="g.stepKey === checkpointGroup" />
             </div>
           </div>
         </div>
@@ -234,6 +246,43 @@ onUnmounted(() => {
             <a href="https://video.lichuanyang.top/learn" target="_blank" rel="noopener" class="text-accent hover:text-ink transition-colors">{{ t('doneTipTiktok') }}</a>
             <span class="text-ink/10 select-none">·</span>
             <a href="https://video.lichuanyang.top/learn" target="_blank" rel="noopener" class="text-muted hover:text-ink-2 transition-colors">{{ t('doneTipMore') }}</a>
+          </div>
+        </div>
+
+        <!-- 官网导流 & 支持项目（与主页一致） -->
+        <div class="mt-8">
+          <div class="glass-card rounded-2xl p-5 mb-4 text-center">
+            <div class="text-sm font-semibold text-ink-2 mb-1">{{ t('adSupportTitle') }}</div>
+            <p class="text-muted text-xs leading-relaxed mb-3">{{ t('adSupportDesc') }}</p>
+            <div class="flex flex-wrap justify-center items-center gap-x-4 gap-y-2 text-xs">
+              <a href="https://github.com/lcy362/agnes-video-generator" target="_blank" rel="noopener" class="hover:text-accent transition-colors">{{ t('adStar') }}</a>
+              <span class="text-ink/10 select-none">·</span>
+              <a href="https://video.lichuanyang.top" target="_blank" rel="noopener" class="hover:text-accent transition-colors">{{ t('adAdblock') }}</a>
+              <span class="text-ink/10 select-none">·</span>
+              <a href="https://video.lichuanyang.top" target="_blank" rel="noopener" class="hover:text-accent transition-colors">{{ t('adClick') }}</a>
+            </div>
+            <div class="flex flex-wrap justify-center gap-x-5 gap-y-1 mt-2 text-[10px] text-muted">
+              <span>{{ t('adStarDesc') }}</span>
+              <span>{{ t('adAdblockDesc') }}</span>
+              <span>{{ t('adClickDesc') }}</span>
+            </div>
+            <p class="text-muted text-xs mt-3">{{ t('adThanks') }}</p>
+          </div>
+
+          <div class="border-t border-rule/30 pt-6 text-center">
+            <p class="text-xs text-muted mb-3">{{ t('moreResources') }}</p>
+            <div class="flex justify-center flex-wrap gap-x-5 gap-y-2 text-xs">
+              <a href="https://video.lichuanyang.top" target="_blank" rel="noopener" class="text-muted hover:text-ink-2 transition-colors">{{ t('projectHome') }}</a>
+              <a href="https://video.lichuanyang.top/demo" target="_blank" rel="noopener" class="text-accent hover:text-ink transition-colors">{{ t('onlineDemo') }}</a>
+              <a href="https://video.lichuanyang.top/guides/prompt-tips" target="_blank" rel="noopener" class="text-muted hover:text-ink-2 transition-colors">{{ t('usageGuide') }}</a>
+              <a href="https://video.lichuanyang.top/guides/prompt-tips" target="_blank" rel="noopener" class="text-muted hover:text-ink-2 transition-colors">{{ t('promptTips') }}</a>
+              <a href="https://video.lichuanyang.top/faq" target="_blank" rel="noopener" class="text-muted hover:text-ink-2 transition-colors">{{ t('faqTitle') }}</a>
+              <a href="https://video.lichuanyang.top/api-docs" target="_blank" rel="noopener" class="text-muted hover:text-ink-2 transition-colors">{{ t('modelOverview') }}</a>
+              <a href="https://video.lichuanyang.top/api-docs" target="_blank" rel="noopener" class="text-muted hover:text-ink-2 transition-colors">{{ t('apiCall') }}</a>
+              <a href="https://video.lichuanyang.top/api-docs" target="_blank" rel="noopener" class="text-muted hover:text-ink-2 transition-colors">{{ t('apiDocs') }}</a>
+              <a href="https://video.lichuanyang.top/learn" target="_blank" rel="noopener" class="text-muted hover:text-ink-2 transition-colors">{{ t('appScenarios') }}</a>
+              <a href="https://github.com/lcy362/agnes-video-generator" target="_blank" rel="noopener" class="text-muted hover:text-ink-2 transition-colors">📖 GitHub</a>
+            </div>
           </div>
         </div>
       </main>

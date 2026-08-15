@@ -4,7 +4,7 @@ import { t } from '@/i18n'
 import { useArtifacts } from '@/composables/useArtifacts'
 import type { Artifact } from '@/types'
 
-const props = defineProps<{ art: Artifact }>()
+const props = defineProps<{ art: Artifact; large?: boolean }>()
 
 const {
   isRunning,
@@ -73,7 +73,8 @@ async function onCopyPath() {
       <img
         v-if="art.category === 'image'"
         :src="artifactFileUrl(art)"
-        class="max-h-36 rounded-lg cursor-pointer border border-rule/50"
+        class="rounded-lg cursor-pointer border border-rule/50"
+        :class="large ? 'w-full max-h-[400px]' : 'max-h-36'"
         loading="lazy"
         @click="openImageModal(artifactFileUrl(art))"
       />
@@ -85,14 +86,15 @@ async function onCopyPath() {
         playsinline
         preload="metadata"
         class="w-full rounded-lg border border-rule/50 bg-black"
-        style="max-height: 260px"
+        :style="large ? 'max-height: 460px' : 'max-height: 260px'"
       ></video>
       <!-- 音频预览 -->
       <audio v-else-if="art.category === 'audio'" :src="artifactFileUrl(art)" controls class="w-full" preload="metadata"></audio>
       <!-- 文本 / JSON 预览 -->
       <pre
         v-else
-        class="text-xs text-muted max-h-24 overflow-auto bg-paper/70 p-2 rounded-lg border border-rule/40 cursor-pointer whitespace-pre-wrap"
+        class="text-xs text-muted overflow-auto bg-paper/70 p-2 rounded-lg border border-rule/40 cursor-pointer whitespace-pre-wrap"
+        :class="large ? 'max-h-64' : 'max-h-24'"
         @click="onPreviewClick"
       >{{ previewExpanded ? (previewLoading ? t('loading') + '...' : previewText) : t('clickToPreview') }}</pre>
 
