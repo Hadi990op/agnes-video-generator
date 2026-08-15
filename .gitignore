@@ -55,3 +55,4 @@ final_video*TEMP*.mp4
 htmlcov/
 coverage.xml
 coverage.json
+scripts/_verify_resume_skip.py

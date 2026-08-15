@@ -125,6 +125,17 @@ class ScriptStepsMixin:
         scene_count = self._state.scene_count
         scene_durations = list(self._state.scene_durations) if self._state.scene_durations else []
 
+        # v6.1 断点续传：场景配置已确定（COMPLETED 且有结果）→ 直接跳过。
+        # 恢复执行（暂停点继续 / resume）会重跑 _build_scenes，prompt 模式下
+        # 无此检查会重复调用 LLM 提取场景信息，造成「恢复阶段」明显的等待。
+        if (
+            self._state.step_scene_config == StepStatus.COMPLETED
+            and self._state.scene_count > 0
+            and self._state.scene_durations
+        ):
+            logger.info("[Pipeline] Step scene_config: SKIP (already resolved)")
+            return
+
         logger.info(
             f"[Pipeline] Resolving scene config: source={duration_source}, "
             f"manual_count={scene_count}, manual_durations={scene_durations}"

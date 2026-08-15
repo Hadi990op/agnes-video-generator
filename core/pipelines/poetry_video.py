@@ -166,6 +166,12 @@ class PoetryVideoPipeline(MultiScenePipeline):
             self._state.scenes = []
             return
 
+        # v6.1 断点续传：场景已拆分（scenes 已填充）→ 直接复用，
+        # 避免恢复执行（暂停点继续 / resume）重复调用 LLM 拆分原诗。
+        if self._state.scenes:
+            logger.info("[Poetry] _build_scenes: SKIP (scenes already exist)")
+            return
+
         duration_source = self._state.duration_source
         scene_count = self._state.scene_count
         scene_durations = list(self._state.scene_durations) if self._state.scene_durations else []

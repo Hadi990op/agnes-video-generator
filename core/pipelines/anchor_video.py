@@ -159,7 +159,14 @@ class AnchorPipeline(MultiScenePipeline):
     # ------------------------------------------------------------------
 
     async def _build_scenes(self) -> None:
-        """构建单段场景：生成循环优化 / 含口播的视频 prompt。"""
+        """构建单段场景：生成循环优化 / 含口播的视频 prompt。
+
+        v6.1 断点续传：场景 prompt 已生成（scenes 已填充）→ 直接复用，
+        避免恢复执行（暂停点继续 / resume）重复调用 LLM。
+        """
+        if self._state.scenes and self._state.scenes[0].scene_prompt:
+            logger.info("[Anchor] _build_scenes: SKIP (scene prompt already exists)")
+            return
         audio_source = self._state.audio_source or "post_stitch"
         anchor_prompt = self._state.anchor_prompt or self._get_default_anchor_prompt()
 
