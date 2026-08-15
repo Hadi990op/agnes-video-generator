@@ -145,9 +145,22 @@ onUnmounted(() => {
     <ProgressHeader />
 
     <div class="max-w-6xl mx-auto px-4 py-6 lg:flex lg:gap-6">
-      <!-- 左侧环节状态列表（宽屏） -->
+      <!-- 左侧：支持项目卡片（置顶，与首页一致）+ 环节状态列表（宽屏） -->
       <aside class="hidden lg:block w-[240px] shrink-0">
-        <StepTimeline @locate="scrollToStep" />
+        <div class="sticky top-[120px]">
+          <div class="sidebar-card">
+            <div class="stitle">{{ t('adSupportTitle') }}</div>
+            <p class="text-muted text-xs leading-relaxed mb-2">{{ t('adSupportDesc') }}</p>
+            <a href="https://github.com/lcy362/agnes-video-generator" target="_blank" rel="noopener">{{ t('adStar') }}</a>
+            <p class="text-muted text-xs px-1 -mt-0.5 mb-1">{{ t('adStarDesc') }}</p>
+            <a href="https://video.lichuanyang.top" target="_blank" rel="noopener">{{ t('adAdblock') }}</a>
+            <p class="text-muted text-xs px-1 -mt-0.5 mb-1">{{ t('adAdblockDesc') }}</p>
+            <a href="https://video.lichuanyang.top" target="_blank" rel="noopener">{{ t('adClick') }}</a>
+            <p class="text-muted text-xs px-1 -mt-0.5 mb-1">{{ t('adClickDesc') }}</p>
+            <p class="text-muted text-xs mt-2 leading-relaxed">{{ t('adThanks') }}</p>
+          </div>
+          <StepTimeline @locate="scrollToStep" />
+        </div>
       </aside>
 
       <!-- 主工作台 -->
@@ -249,40 +262,20 @@ onUnmounted(() => {
           </div>
         </div>
 
-        <!-- 官网导流 & 支持项目（与主页一致） -->
-        <div class="mt-8">
-          <div class="glass-card rounded-2xl p-5 mb-4 text-center">
-            <div class="text-sm font-semibold text-ink-2 mb-1">{{ t('adSupportTitle') }}</div>
-            <p class="text-muted text-xs leading-relaxed mb-3">{{ t('adSupportDesc') }}</p>
-            <div class="flex flex-wrap justify-center items-center gap-x-4 gap-y-2 text-xs">
-              <a href="https://github.com/lcy362/agnes-video-generator" target="_blank" rel="noopener" class="hover:text-accent transition-colors">{{ t('adStar') }}</a>
-              <span class="text-ink/10 select-none">·</span>
-              <a href="https://video.lichuanyang.top" target="_blank" rel="noopener" class="hover:text-accent transition-colors">{{ t('adAdblock') }}</a>
-              <span class="text-ink/10 select-none">·</span>
-              <a href="https://video.lichuanyang.top" target="_blank" rel="noopener" class="hover:text-accent transition-colors">{{ t('adClick') }}</a>
-            </div>
-            <div class="flex flex-wrap justify-center gap-x-5 gap-y-1 mt-2 text-[10px] text-muted">
-              <span>{{ t('adStarDesc') }}</span>
-              <span>{{ t('adAdblockDesc') }}</span>
-              <span>{{ t('adClickDesc') }}</span>
-            </div>
-            <p class="text-muted text-xs mt-3">{{ t('adThanks') }}</p>
-          </div>
-
-          <div class="border-t border-rule/30 pt-6 text-center">
-            <p class="text-xs text-muted mb-3">{{ t('moreResources') }}</p>
-            <div class="flex justify-center flex-wrap gap-x-5 gap-y-2 text-xs">
-              <a href="https://video.lichuanyang.top" target="_blank" rel="noopener" class="text-muted hover:text-ink-2 transition-colors">{{ t('projectHome') }}</a>
-              <a href="https://video.lichuanyang.top/demo" target="_blank" rel="noopener" class="text-accent hover:text-ink transition-colors">{{ t('onlineDemo') }}</a>
-              <a href="https://video.lichuanyang.top/guides/prompt-tips" target="_blank" rel="noopener" class="text-muted hover:text-ink-2 transition-colors">{{ t('usageGuide') }}</a>
-              <a href="https://video.lichuanyang.top/guides/prompt-tips" target="_blank" rel="noopener" class="text-muted hover:text-ink-2 transition-colors">{{ t('promptTips') }}</a>
-              <a href="https://video.lichuanyang.top/faq" target="_blank" rel="noopener" class="text-muted hover:text-ink-2 transition-colors">{{ t('faqTitle') }}</a>
-              <a href="https://video.lichuanyang.top/api-docs" target="_blank" rel="noopener" class="text-muted hover:text-ink-2 transition-colors">{{ t('modelOverview') }}</a>
-              <a href="https://video.lichuanyang.top/api-docs" target="_blank" rel="noopener" class="text-muted hover:text-ink-2 transition-colors">{{ t('apiCall') }}</a>
-              <a href="https://video.lichuanyang.top/api-docs" target="_blank" rel="noopener" class="text-muted hover:text-ink-2 transition-colors">{{ t('apiDocs') }}</a>
-              <a href="https://video.lichuanyang.top/learn" target="_blank" rel="noopener" class="text-muted hover:text-ink-2 transition-colors">{{ t('appScenarios') }}</a>
-              <a href="https://github.com/lcy362/agnes-video-generator" target="_blank" rel="noopener" class="text-muted hover:text-ink-2 transition-colors">📖 GitHub</a>
-            </div>
+        <!-- 官网导流资源（更多资源链接，与主页一致） -->
+        <div class="mt-8 border-t border-rule/30 pt-6 text-center">
+          <p class="text-xs text-muted mb-3">{{ t('moreResources') }}</p>
+          <div class="flex justify-center flex-wrap gap-x-5 gap-y-2 text-xs">
+            <a href="https://video.lichuanyang.top" target="_blank" rel="noopener" class="text-muted hover:text-ink-2 transition-colors">{{ t('projectHome') }}</a>
+            <a href="https://video.lichuanyang.top/demo" target="_blank" rel="noopener" class="text-accent hover:text-ink transition-colors">{{ t('onlineDemo') }}</a>
+            <a href="https://video.lichuanyang.top/guides/prompt-tips" target="_blank" rel="noopener" class="text-muted hover:text-ink-2 transition-colors">{{ t('usageGuide') }}</a>
+            <a href="https://video.lichuanyang.top/guides/prompt-tips" target="_blank" rel="noopener" class="text-muted hover:text-ink-2 transition-colors">{{ t('promptTips') }}</a>
+            <a href="https://video.lichuanyang.top/faq" target="_blank" rel="noopener" class="text-muted hover:text-ink-2 transition-colors">{{ t('faqTitle') }}</a>
+            <a href="https://video.lichuanyang.top/api-docs" target="_blank" rel="noopener" class="text-muted hover:text-ink-2 transition-colors">{{ t('modelOverview') }}</a>
+            <a href="https://video.lichuanyang.top/api-docs" target="_blank" rel="noopener" class="text-muted hover:text-ink-2 transition-colors">{{ t('apiCall') }}</a>
+            <a href="https://video.lichuanyang.top/api-docs" target="_blank" rel="noopener" class="text-muted hover:text-ink-2 transition-colors">{{ t('apiDocs') }}</a>
+            <a href="https://video.lichuanyang.top/learn" target="_blank" rel="noopener" class="text-muted hover:text-ink-2 transition-colors">{{ t('appScenarios') }}</a>
+            <a href="https://github.com/lcy362/agnes-video-generator" target="_blank" rel="noopener" class="text-muted hover:text-ink-2 transition-colors">📖 GitHub</a>
           </div>
         </div>
       </main>

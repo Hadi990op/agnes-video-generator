@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref } from 'vue'
+import { ref, onMounted } from 'vue'
 import { t } from '@/i18n'
 import { useArtifacts } from '@/composables/useArtifacts'
 import type { Artifact } from '@/types'
@@ -21,28 +21,40 @@ const previewExpanded = ref(false)
 const previewText = ref('')
 const previewLoading = ref(false)
 
+// 文本 / JSON / 字幕类产物：默认自动展开预览
+async function loadPreview() {
+  previewExpanded.value = true
+  previewLoading.value = true
+  previewText.value = ''
+  try {
+    const resp = await fetch(artifactFileUrl(props.art))
+    let text = await resp.text()
+    if (text.length > 2000) text = text.substring(0, 2000) + '\n...'
+    previewText.value = text
+  } catch (err: any) {
+    previewText.value = 'Error: ' + err.message
+  } finally {
+    previewLoading.value = false
+  }
+}
+
 async function onPreviewClick(e: Event) {
   const el = e.currentTarget as HTMLElement
-  if (!previewExpanded.value) {
-    previewExpanded.value = true
-    previewLoading.value = true
-    previewText.value = ''
-    try {
-      const resp = await fetch(artifactFileUrl(props.art))
-      let text = await resp.text()
-      if (text.length > 2000) text = text.substring(0, 2000) + '\n...'
-      previewText.value = text
-    } catch (err: any) {
-      previewText.value = 'Error: ' + err.message
-    } finally {
-      previewLoading.value = false
-    }
-  } else {
+  if (previewExpanded.value) {
     previewExpanded.value = false
     previewText.value = ''
+  } else {
+    await loadPreview()
   }
   void el
 }
+
+onMounted(() => {
+  const cat = props.art.category
+  if (cat !== 'image' && cat !== 'video' && cat !== 'audio') {
+    loadPreview()
+  }
+})
 
 async function onCopyPath() {
   const p = (props.art as any).abs_path || (props.art as any).path || ''
