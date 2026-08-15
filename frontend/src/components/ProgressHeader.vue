@@ -8,7 +8,7 @@ import { useNavigation } from '@/composables/useNavigation'
 
 const { progressPct, awaitingCheckpoint, taskFailed } = useProgress()
 const { stopTaskById, switchMode } = useTasks()
-const { goBack } = useNavigation()
+const { goBack, goHome } = useNavigation()
 
 const taskId = computed(() => appState.currentTaskId || appState.progressTaskId || '')
 const dirName = computed(() => appState.currentDirName || '')
@@ -35,6 +35,10 @@ function onBack() {
   goBack()
 }
 
+function onHome() {
+  goHome()
+}
+
 async function onStop() {
   if (taskId.value) await stopTaskById(taskId.value)
 }
@@ -54,6 +58,15 @@ async function onSwitchAuto() {
         <span class="text-lg leading-none">←</span>
         <span class="text-xs">{{ t('progressBack') }}</span>
       </button>
+
+      <a
+        href="#"
+        class="flex items-center gap-1 text-sm text-accent hover:text-ink transition rounded-lg px-2 py-1"
+        @click.prevent="onHome"
+      >
+        <span class="text-lg leading-none">🏠</span>
+        <span class="text-xs">{{ t('goHome') }}</span>
+      </a>
 
       <div class="flex items-center gap-2 min-w-0">
         <span class="text-xs px-2 py-0.5 rounded-full bg-accent/15 text-accent shrink-0">

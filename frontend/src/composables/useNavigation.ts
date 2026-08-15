@@ -4,12 +4,25 @@ import { appState } from '@/store'
 // hash 规则：'#/progress/<taskId>' | '#/list' | '#/create'
 
 export function useNavigation() {
+  // 打开任务详情页：始终在新标签页打开，原页面（主页）保持不变
   function goProgress(taskId: string, origin: 'create' | 'list' = 'create') {
+    // 来源标记不跨标签页传递（新标签页内默认回主页），仅在当前页记录
+    appState.progressOrigin = origin
+    const url = location.pathname + location.search + '#/progress/' + encodeURIComponent(taskId)
+    window.open(url, '_blank', 'noopener')
+  }
+
+  // 同页打开任务详情（自动恢复场景用，避免自动重连时无限开新标签页）
+  function goProgressInPage(taskId: string) {
     appState.view = 'progress'
     appState.progressTaskId = taskId
-    appState.progressOrigin = origin
     appState.currentTaskId = taskId
     location.hash = '#/progress/' + encodeURIComponent(taskId)
+  }
+
+  // 显式跳转主页（去掉 hash 回到根视图）
+  function goHome() {
+    location.href = location.pathname + location.search
   }
 
   function goBack() {
@@ -27,5 +40,5 @@ export function useNavigation() {
     return { view: 'create' }
   }
 
-  return { goProgress, goBack, parseHash }
+  return { goProgress, goProgressInPage, goHome, goBack, parseHash }
 }
