@@ -56,3 +56,13 @@ htmlcov/
 coverage.xml
 coverage.json
 scripts/_verify_resume_skip.py
+
+scripts/_i18n_fill.py
+scripts/_i18n_fill2.py
+scripts/_i18n_fill_all.py
+
+# 回归测试运行期产物（报告与专用工作目录，不入库）
+.regression_workspace/
+docs/dev/regression_report.json
+docs/dev/regression_report.md
+docs/dev/regression_issues.md

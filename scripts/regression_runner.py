@@ -1755,6 +1755,17 @@ async def main(resume: bool = False, auto_start: bool = False,
                     logger.error(f"  - {e}")
         return 0 if result.get("ok") else 1
 
+    # ── 多语言完整性检查（回归前置门槛：缺失直接停止，不进行正式回归）──
+    i18n_ret = subprocess.run(
+        [sys.executable, os.path.join(PROJECT_ROOT, "scripts", "i18n_check.py")],
+        capture_output=True, text=True, timeout=60)
+    if i18n_ret.returncode != 0:
+        logger.error("❌ 多语言完整性检查未通过，回归终止（请先补齐缺失翻译后重试）：")
+        for line in i18n_ret.stdout.strip().splitlines():
+            logger.error(f"  {line}")
+        return 2
+    logger.info("✅ 多语言完整性检查通过")
+
     # 确保测试素材存在
     _ensure_test_assets()
 
