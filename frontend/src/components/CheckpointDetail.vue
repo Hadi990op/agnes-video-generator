@@ -5,14 +5,16 @@ import { appState } from '@/store'
 import * as api from '@/api'
 import { useTasks } from '@/composables/useTasks'
 import { useProgress } from '@/composables/useProgress'
+import { useToast } from '@/composables/useToast'
 
 const props = defineProps<{ taskId: string; checkpoint: string }>()
 
 const { switchMode, loadTaskList } = useTasks()
 const { startPolling, setRunning } = useProgress()
+const { showToast } = useToast()
 
-// 三卡片选择
-const activeCard = ref<'ai' | 'self' | 'agent'>('ai')
+// 四卡片选择：AI 帮我改 / 我自己改 / 外部 Agent 改 / 在线编辑
+const activeCard = ref<'ai' | 'self' | 'agent' | 'edit'>('ai')
 const aiRequest = ref('')
 const aiLoading = ref(false)
 const aiResult = ref<any>(null)
@@ -135,6 +137,86 @@ async function regen() {
     confirming.value = false
   }
 }
+
+// ── 通道 4：在线编辑（弹窗内修改文本产物 + 与原内容对比）──
+const editModalOpen = ref(false)
+const editArts = ref<any[]>([])
+const editLoading = ref(false)
+const origins = ref<Record<string, string>>({})
+const edits = ref<Record<string, string>>({})
+const savedMap = ref<Record<string, boolean>>({})
+const compareMap = ref<Record<string, boolean>>({})
+const savingId = ref('')
+
+// 检查点内可编辑的文本类产物（text / json / subtitle 且 deletable 且存在）
+const editableTextArts = computed(() =>
+  (checkpointData.value?.artifacts || []).filter(
+    (a: any) => a.deletable && a.exists && ['text', 'json', 'subtitle'].includes(a.category),
+  ),
+)
+
+async function openEditModal() {
+  const arts = editableTextArts.value
+  if (!arts.length) {
+    alert(t('noEditableText'))
+    return
+  }
+  editModalOpen.value = true
+  editLoading.value = true
+  editArts.value = []
+  origins.value = {}
+  edits.value = {}
+  savedMap.value = {}
+  compareMap.value = {}
+  try {
+    for (const a of arts) {
+      const resp = await fetch(api.getArtifactFileUrl(props.taskId, a.artifact_id))
+      const text = await resp.text()
+      origins.value[a.artifact_id] = text
+      edits.value[a.artifact_id] = text
+    }
+    editArts.value = arts
+  } catch (e: any) {
+    alert(e.message || t('loadFailed'))
+  } finally {
+    editLoading.value = false
+  }
+}
+
+function closeEditModal() {
+  editModalOpen.value = false
+}
+
+function toggleCompare(id: string) {
+  compareMap.value[id] = !compareMap.value[id]
+}
+
+// 保存单个产物：调用 upload 接口覆盖回填（记录 modified_artifacts + 刷新清单）
+async function saveArtifact(id: string) {
+  if (savingId.value) return
+  savingId.value = id
+  try {
+    const file = new File([edits.value[id] || ''], id + '.txt', { type: 'text/plain' })
+    const d = await api.uploadArtifact(props.taskId, id, file)
+    if (!d.ok) throw new Error(d.detail || t('artifactSaveFailed'))
+    savedMap.value[id] = true
+    origins.value[id] = edits.value[id]
+    showToast(t('artifactSaved'))
+  } catch (e: any) {
+    showToast(t('artifactSaveFailed') + (e.message ? ': ' + e.message : ''), 3500)
+  } finally {
+    savingId.value = ''
+  }
+}
+
+// 弹窗内产物 label（复用产物矩阵 label）
+function artLabel(a: any): string {
+  let label = t(a.label_key) || a.label_key
+  if (a.scope_index !== null && a.scope_index !== undefined) {
+    label = label.replace('{index}', String(a.scope_index + 1))
+  }
+  return label
+}
 </script>
 
 <template>
@@ -155,8 +237,8 @@ async function regen() {
 
     <p class="text-xs text-muted mb-3">{{ t('awaitingUserTip') }}</p>
 
-    <!-- 三卡片 -->
-    <div class="grid grid-cols-1 md:grid-cols-3 gap-3 mb-4">
+    <!-- 四卡片 -->
+    <div class="grid grid-cols-1 md:grid-cols-4 gap-3 mb-4">
       <button class="p-3 rounded-xl border text-left transition" :class="activeCard === 'ai' ? 'border-accent bg-accent/10' : 'border-rule bg-paper-2/30 hover:border-accent/40'" @click="activeCard = 'ai'">
         <div class="text-sm font-medium text-ink-2">{{ t('handleAi') }}</div>
         <div class="text-xs text-muted mt-0.5">{{ t('handleAiDesc') }}</div>
@@ -168,6 +250,10 @@ async function regen() {
       <button class="p-3 rounded-xl border text-left transition" :class="activeCard === 'agent' ? 'border-accent bg-accent/10' : 'border-rule bg-paper-2/30 hover:border-accent/40'" @click="activeCard = 'agent'">
         <div class="text-sm font-medium text-ink-2">{{ t('handleAgent') }}</div>
         <div class="text-xs text-muted mt-0.5">{{ t('handleAgentDesc') }}</div>
+      </button>
+      <button class="p-3 rounded-xl border text-left transition" :class="activeCard === 'edit' ? 'border-accent bg-accent/10' : 'border-rule bg-paper-2/30 hover:border-accent/40'" @click="activeCard = 'edit'">
+        <div class="text-sm font-medium text-ink-2">{{ t('handleEdit') }}</div>
+        <div class="text-xs text-muted mt-0.5">{{ t('handleEditDesc') }}</div>
       </button>
     </div>
 
@@ -212,7 +298,7 @@ async function regen() {
     </div>
 
     <!-- 通道 3 面板 -->
-    <div v-else class="space-y-3">
+    <div v-else-if="activeCard === 'agent'" class="space-y-3">
       <p class="text-xs text-muted">{{ t('agentCommand') }}:</p>
       <code class="block text-xs bg-black/40 text-green-300 px-3 py-2 rounded-lg mb-2 break-all">{{ 'cd ' + (checkpointData?.working_dir || '') + ' && opencode' }}</code>
       <p class="text-xs text-muted">{{ t('agentPrompt') }}:</p>
@@ -220,6 +306,79 @@ async function regen() {
       <button class="text-xs px-4 py-2 bg-accent text-accent-ink rounded-lg transition" @click="confirmNoChange">
         {{ t('agentDone') }}
       </button>
+    </div>
+
+    <!-- 通道 4 面板：在线编辑 -->
+    <div v-else class="space-y-3">
+      <p class="text-xs text-muted">{{ t('handleEditDesc') }}</p>
+      <div v-if="editableTextArts.length" class="flex flex-wrap gap-x-4 gap-y-1 text-xs">
+        <span v-for="a in editableTextArts" :key="a.artifact_id" class="text-ink-2">
+          📄 {{ artLabel(a) }}
+        </span>
+      </div>
+      <p v-else class="text-xs text-amber-400">{{ t('noEditableText') }}</p>
+      <button class="text-xs px-4 py-2 bg-accent text-accent-ink rounded-lg transition" :disabled="!editableTextArts.length" @click="openEditModal">
+        {{ t('editOpen') }}
+      </button>
+      <button class="text-xs px-4 py-2 border border-rule text-ink-2 rounded-lg transition" @click="confirmNoChange">
+        {{ t('selfEditDone') }}
+      </button>
+    </div>
+  </div>
+
+  <!-- 在线编辑弹窗 -->
+  <div v-if="editModalOpen" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70" @click.self="closeEditModal">
+    <div class="w-full max-w-3xl max-h-[85vh] flex flex-col glass-card rounded-2xl overflow-hidden">
+      <div class="flex items-center justify-between px-5 py-3 border-b border-rule/50 bg-paper-2/50">
+        <h3 class="text-sm font-semibold text-ink-2">✏️ {{ t('editModalTitle') }} · {{ checkpointLabel }}</h3>
+        <button class="text-xs px-2.5 py-1.5 border border-rule text-ink-2 rounded-lg transition hover:border-accent/40" @click="closeEditModal">{{ t('close') }}</button>
+      </div>
+
+      <div class="flex-1 overflow-auto p-5 space-y-5">
+        <div v-if="editLoading" class="text-sm text-muted text-center py-10">{{ t('loading') }}...</div>
+
+        <div v-for="a in editArts" :key="a.artifact_id" class="rounded-xl border border-rule/60 p-4 space-y-3">
+          <!-- 标题 + 保存状态 -->
+          <div class="flex items-center gap-2">
+            <span class="text-sm font-medium text-ink-2">{{ artLabel(a) }}</span>
+            <span v-if="savedMap[a.artifact_id]" class="text-xs px-1.5 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400">✓ {{ t('artifactSaved') }}</span>
+            <span class="ml-auto text-[10px] text-muted font-mono truncate">{{ a.abs_path || a.path || '' }}</span>
+          </div>
+
+          <!-- 原内容（可折叠） -->
+          <div class="rounded-lg bg-paper/50 border border-rule/40 overflow-hidden">
+            <button class="w-full flex items-center gap-2 px-3 py-2 text-left text-xs text-muted hover:bg-paper-2/30 transition" @click="toggleCompare(a.artifact_id)">
+              <span class="transition-transform" :class="compareMap[a.artifact_id] ? 'rotate-90' : ''">▸</span>
+              <span>{{ t('originalContent') }}</span>
+              <span v-if="compareMap[a.artifact_id]" class="ml-auto text-[10px] text-accent">⇄ {{ t('compare') }}</span>
+            </button>
+            <pre v-show="compareMap[a.artifact_id]" class="text-xs text-muted max-h-48 overflow-auto px-3 pb-3 whitespace-pre-wrap break-words">{{ origins[a.artifact_id] || '' }}</pre>
+          </div>
+
+          <!-- 编辑区 -->
+          <textarea
+            v-model="edits[a.artifact_id]"
+            rows="6"
+            class="w-full text-xs text-ink-2 bg-paper/70 p-2 rounded-lg border border-accent/40 font-mono resize-y whitespace-pre-wrap leading-relaxed focus:border-accent/70 focus:outline-none"
+            :placeholder="t('editPlaceholder')"
+          ></textarea>
+
+          <!-- 操作行 -->
+          <div class="flex items-center gap-2">
+            <button
+              class="text-xs px-3 py-1.5 bg-accent text-accent-ink rounded-lg transition disabled:opacity-50"
+              :disabled="!!savingId"
+              @click="saveArtifact(a.artifact_id)"
+            >{{ savingId === a.artifact_id ? t('submitting') : t('editSave') }}</button>
+            <button
+              class="text-xs px-3 py-1.5 border border-rule text-ink-2 rounded-lg transition hover:border-accent/40"
+              :class="compareMap[a.artifact_id] ? 'border-accent/50 text-accent' : ''"
+              @click="toggleCompare(a.artifact_id)"
+            >{{ t('compare') }}</button>
+            <span class="text-[10px] text-muted">{{ t('editArtifactHint') }}</span>
+          </div>
+        </div>
+      </div>
     </div>
   </div>
 </template>
