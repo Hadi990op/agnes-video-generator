@@ -84,7 +84,7 @@ export const T: Record<string, Record<string, string>> = {
     statusCompleted: '已完成', statusRunning: '进行中', statusFailed: '失败', statusPending: '待处理', statusQueued: '排队中',
     statusAwaitingUser: '等待用户操作',
     progressBack: '返回', ppStages: '生成环节', ppExpand: '展开', ppCollapse: '收起', ppWaiting: '等待用户',
-    goHome: '主页',
+    goHome: '主页', langSwitch: '切换语言',
     btnView: '查看', btnViewProgress: '查看进度', btnResume: '续传', btnStop: '中断',
     sceneUnit: '个场景', paraUnit: '段',
     typeSimple: '简单', typeCreative: '创意', typeManuscript: '稿件', typeImage: '图片',
@@ -351,7 +351,7 @@ export const T: Record<string, Record<string, string>> = {
     statusCompleted: 'Completed', statusRunning: 'Running', statusFailed: 'Failed', statusPending: 'Pending', statusQueued: 'Queued',
     pausePoints: 'Pause Points', pausePointsHint: 'Select checkpoints to pause in manual mode; unchecked ones pass automatically', cpScenes: 'Storyboard', cpReferences: 'References', cpVideos: 'Video Clips', cpAudio: 'Voiceover', cpSubtitle: 'Subtitles', cpFinal: 'Compose', manualUnsupported: 'This task type does not support manual mode', modeSwitching: 'Switching execution mode...', modeSwitched: 'Execution mode switched', failSwitchMode: 'Failed to switch mode', switchToAuto: 'Switch to Auto', switchToManual: 'Switch to Manual', switchToAutoConfirm: 'Switching to auto mode will clear pause points and run to completion. Continue?', switchToManualConfirm: 'Switching to manual mode will pause at the next checkpoint for your review. Continue?', awaitingUser: 'Waiting for you', awaitingUserTip: 'Task paused at a checkpoint; review or edit artifacts then continue', checkpointTitle: 'Checkpoint', cpDone: 'Done', cpPending: 'Pending', cpRunning: 'Running', howToHandle: 'How to handle this checkpoint', handleAi: 'AI Edit', handleAiDesc: 'Describe the change; system edits artifacts automatically', handleSelf: 'Edit Myself', handleSelfDesc: 'View paths, edit files locally, then confirm', handleAgent: 'External Agent', handleAgentDesc: 'Copy command and prompt, use a local agent, then confirm', handleEdit: 'Edit Inline', handleEditDesc: 'Edit text artifacts in a modal and save, compare with the original anytime', aiModifyRequest: 'Edit Request', aiModifyRequestPlaceholder: 'e.g. make narration of scene 2 more colloquial', aiModifyStart: 'Start Edit', aiModifyApplying: 'AI is editing...', aiModifyResult: 'Edit Result', applyAndContinue: 'Apply & Confirm', discard: 'Discard', selfEditPath: 'Artifact Path', selfEditSchemaHint: 'Format Requirements', selfEditAffected: 'Impact After Edit', selfEditDone: 'Edited, Continue', continueNoChange: '✅ Continue without changes', continueNoChangeHint: 'Keep current artifacts and continue', agentCommand: 'Command', agentPrompt: 'Prompt', agentDone: 'Done, Continue', copy: 'Copy', noEditableArtifact: 'No editable artifact in this checkpoint', aiModifyFailed: 'AI edit failed', failContinue: 'Failed to continue', continued: 'Confirmed, continuing', failRegen: 'Regeneration failed', regenCurrent: 'Regenerate', selfEditAffectedHint: 'Affected artifacts will be deleted and regenerated; unaffected ones are kept', agentPromptTemplate: 'Please review and optimize the artifacts of this checkpoint in task directory {dir}. Tell me the result when done, and I will click "Edited, Continue" in the web UI.\n\nRequirements:\n1. Keep artifact format and structure unchanged\n2. Only modify semantic content\n3. Report which files were changed', impactTitle: 'Will Delete & Rerun', impactRetained: 'Kept, Not Rerun', impactConfirm: 'Confirm Delete & Rerun', impactCancel: 'Cancel', noAffected: 'No impacted artifacts; continue directly', paramUpdates: 'Task Params', paramResolution: 'Resolution', paramVoice: 'Voice',
     statusAwaitingUser: 'Awaiting you', progressBack: 'Back', ppStages: 'Stages', ppExpand: 'Expand', ppCollapse: 'Collapse', ppWaiting: 'Waiting',
-    goHome: 'Home',
+    goHome: 'Home', langSwitch: 'Switch Language',
     btnView: 'View', btnViewProgress: 'Progress', btnResume: 'Resume', btnStop: 'Stop',
     sceneUnit: ' scenes', paraUnit: ' paragraphs',
     typeSimple: 'Simple', typeCreative: 'Creative', typeManuscript: 'Article', typeImage: 'Image',
@@ -790,6 +790,7 @@ export const T: Record<string, Record<string, string>> = {
     originalContent: 'Оригинал',
     resuming: 'Возобновление выполнения...',
 
+    langSwitch: 'Переключить язык',
   },
   ja: {
     subtitle: 'AI動画、ワンクリック',
@@ -1051,6 +1052,7 @@ export const T: Record<string, Record<string, string>> = {
     originalContent: '原文',
     resuming: '実行を再開中...',
 
+    langSwitch: '言語を切り替え',
   },
   ko: {
     subtitle: 'AI 영상, 원클릭',
@@ -1312,6 +1314,7 @@ export const T: Record<string, Record<string, string>> = {
     originalContent: '원본',
     resuming: '실행을 재개하는 중...',
 
+    langSwitch: '언어 전환',
   },
   ms: {
     subtitle: 'Video AI, Satu Klik',
@@ -1573,6 +1576,7 @@ export const T: Record<string, Record<string, string>> = {
     originalContent: 'Asal',
     resuming: 'Menyambung semula...',
 
+    langSwitch: 'Tukar Bahasa',
   },
   id: {
     subtitle: 'Video AI, Satu Klik',
@@ -1835,6 +1839,7 @@ export const T: Record<string, Record<string, string>> = {
     originalContent: 'Asli',
     resuming: 'Melanjutkan eksekusi...',
 
+    langSwitch: 'Ganti Bahasa',
   },
   de: {
     subtitle: 'KI-Video, ein Klick',
@@ -2101,6 +2106,7 @@ export const T: Record<string, Record<string, string>> = {
     originalContent: 'Original',
     resuming: 'Ausführung wird fortgesetzt...',
 
+    langSwitch: 'Sprache wechseln',
   },
   fr: {
     subtitle: 'Vidéo IA, un clic',
@@ -2367,6 +2373,7 @@ export const T: Record<string, Record<string, string>> = {
     originalContent: 'Original',
     resuming: 'Reprise de l\'exécution...',
 
+    langSwitch: 'Changer de langue',
   },
   nl: {
     subtitle: 'AI-video, één klik',
@@ -2633,6 +2640,7 @@ export const T: Record<string, Record<string, string>> = {
     originalContent: 'Origineel',
     resuming: 'Uitvoering hervatten...',
 
+    langSwitch: 'Taal wisselen',
   },
   es: {
     subtitle: 'Video IA, un clic',
@@ -2899,6 +2907,7 @@ export const T: Record<string, Record<string, string>> = {
     originalContent: 'Original',
     resuming: 'Reanudando ejecución...',
 
+    langSwitch: 'Cambiar idioma',
   },
   pt: {
     subtitle: 'Vídeo IA, um clique',
@@ -3165,6 +3174,7 @@ export const T: Record<string, Record<string, string>> = {
     originalContent: 'Original',
     resuming: 'Retomando execução...',
 
+    langSwitch: 'Trocar idioma',
   },
   it: {
     subtitle: 'Video IA, un clic',
@@ -3431,6 +3441,7 @@ export const T: Record<string, Record<string, string>> = {
     originalContent: 'Originale',
     resuming: 'Ripresa dell\'esecuzione...',
 
+    langSwitch: 'Cambia lingua',
   },
   tr: {
     subtitle: 'AI Video, Tek Tıkla',
@@ -3664,6 +3675,7 @@ export const T: Record<string, Record<string, string>> = {
     originalContent: 'Orijinal',
     resuming: 'Yürütme sürdürülüyor...',
 
+    langSwitch: 'Dil Değiştir',
   },
 
   vi: {
@@ -3898,6 +3910,7 @@ export const T: Record<string, Record<string, string>> = {
     originalContent: 'Bản gốc',
     resuming: 'Đang tiếp tục thực thi...',
 
+    langSwitch: 'Đổi ngôn ngữ',
   },
 
   th: {
@@ -4132,6 +4145,7 @@ export const T: Record<string, Record<string, string>> = {
     originalContent: 'ต้นฉบับ',
     resuming: 'กำลังดำเนินการต่อ...',
 
+    langSwitch: 'เปลี่ยนภาษา',
   },
 
   hi: {
@@ -4366,6 +4380,7 @@ export const T: Record<string, Record<string, string>> = {
     originalContent: 'मूल',
     resuming: 'निष्पादन फिर से शुरू हो रहा है...',
 
+    langSwitch: 'भाषा बदलें',
   },
 
   bn: {
@@ -4600,6 +4615,7 @@ export const T: Record<string, Record<string, string>> = {
     originalContent: 'মূল',
     resuming: 'নিষ্পাদন আবার শুরু হচ্ছে...',
 
+    langSwitch: 'ভাষা পরিবর্তন করুন',
   },
 
   tl: {
@@ -4834,6 +4850,7 @@ export const T: Record<string, Record<string, string>> = {
     originalContent: 'Orihinal',
     resuming: 'Ipinagpapatuloy ang pagtakbo...',
 
+    langSwitch: 'Palitan ang Wika',
   },
 
   ar: {
@@ -5068,6 +5085,7 @@ export const T: Record<string, Record<string, string>> = {
     originalContent: 'الأصل',
     resuming: 'جارٍ استئناف التنفيذ...',
 
+    langSwitch: 'تغيير اللغة',
   },
 
   fa: {
@@ -5302,6 +5320,7 @@ export const T: Record<string, Record<string, string>> = {
     originalContent: 'اصل',
     resuming: 'در حال از سرگیری اجرا...',
 
+    langSwitch: 'تغییر زبان',
   },
 
   ur: {
@@ -5536,5 +5555,6 @@ export const T: Record<string, Record<string, string>> = {
     originalContent: 'اصل',
     resuming: 'عمل دوبارہ شروع ہو رہا ہے...',
 
+    langSwitch: 'زبان تبدیل کریں',
   },
 };

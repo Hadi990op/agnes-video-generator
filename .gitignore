@@ -66,3 +66,4 @@ scripts/_i18n_fill_all.py
 docs/dev/regression_report.json
 docs/dev/regression_report.md
 docs/dev/regression_issues.md
+scripts/_i18n_langswitch.py
