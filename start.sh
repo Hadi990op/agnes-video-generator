@@ -73,12 +73,10 @@ fi
 if command -v lsof &> /dev/null; then
     PID=$(lsof -ti:8765 2>/dev/null || true)
     if [ -n "$PID" ]; then
-        echo "⚠️  端口 8765 已被以下进程占用："
-        # 逐个 PID 输出 kill 命令，避免多个 PID 挤在一行被终端折行截断（复制后无法执行）
-        for p in $PID; do
-            echo "   kill $p"
-        done
-        echo "   执行上面的命令后重试，或修改端口"
+        # lsof 输出的多行 PID 拼成单行，输出一条完整的 kill 命令（kill 支持一次传入多个 PID）
+        PID_ONE_LINE=$(echo $PID | tr '\n' ' ')
+        echo "⚠️  端口 8765 已被 PID $PID_ONE_LINE 占用"
+        echo "   执行: kill $PID_ONE_LINE 后重试，或修改端口"
         echo "   或直接在线体验（免安装）：$(link 'https://video.lichuanyang.top/demo' 'https://video.lichuanyang.top/demo')"
         exit 1
     fi
