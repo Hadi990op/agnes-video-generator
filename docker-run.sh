@@ -23,6 +23,20 @@ link() {
   fi
 }
 
+# ── 语言检测：仅中文环境显示中文，其他情况一律英文 ──────────────
+_LANG_VAL="${LC_ALL:-${LC_MESSAGES:-${LANG:-}}}"
+_IS_ZH=0
+case "$_LANG_VAL" in
+  zh*) _IS_ZH=1 ;;
+esac
+msg() {
+  if [ "$_IS_ZH" = "1" ]; then
+    printf '%s\n' "$1"
+  else
+    printf '%s\n' "$2"
+  fi
+}
+
 # ── 启动图案（ASCII art）：TTY 下亮青色显示，非 TTY 纯文本 ──────────
 FSV_LOGO=(
   '   _____ ______     __'
@@ -44,9 +58,9 @@ print_logo() {
 
 echo "================================================"
 print_logo
-echo "   free-short-video — 免费 AI 短视频生成"
+msg "   free-short-video — 免费 AI 短视频生成" "   free-short-video — Free AI Short Video Generator"
 echo ""
-echo "   $(link 'https://video.lichuanyang.top' '🌐 官网：https://video.lichuanyang.top')  |  $(link 'https://video.lichuanyang.top/demo' '⚡ 在线体验（免安装）：https://video.lichuanyang.top/demo')"
+msg "   $(link 'https://video.lichuanyang.top' '🌐 官网：https://video.lichuanyang.top')  |  $(link 'https://video.lichuanyang.top/demo' '⚡ 在线体验（免安装）：https://video.lichuanyang.top/demo')" "   $(link 'https://video.lichuanyang.top' '🌐 Website: https://video.lichuanyang.top')  |  $(link 'https://video.lichuanyang.top/demo' '⚡ Try Online (no install): https://video.lichuanyang.top/demo')"
 echo "================================================"
 echo ""
 
@@ -68,6 +82,6 @@ docker run -d --name "$NAME" -p "$PORT:$PORT" \
   -v "$DATA_DIR/config:/app/.agnes_config" \
   "$IMAGE" >/dev/null
 
-echo "✓ 已启动: http://localhost:$PORT"
-echo "✓ 生成文件在本地: $DATA_DIR/working/"
-echo "✓ 停止: docker stop $NAME   查看日志: docker logs -f $NAME"
+msg "✓ 已启动: http://localhost:$PORT" "✓ Started: http://localhost:$PORT"
+msg "✓ 生成文件在本地: $DATA_DIR/working/" "✓ Generated files are local: $DATA_DIR/working/"
+msg "✓ 停止: docker stop $NAME   查看日志: docker logs -f $NAME" "✓ Stop: docker stop $NAME   Logs: docker logs -f $NAME"
