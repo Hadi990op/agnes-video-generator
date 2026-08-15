@@ -47,12 +47,18 @@ def client():
 class _StubTaskManager:
     """打桩 TaskManager：只记录 state，不落盘。"""
 
+    all_updates: list = []
+
     def __init__(self, task_id, dir_name=None):
         self.task_id = task_id
         self.state = None
 
     def create(self, state):
         self.state = state
+
+    def update_state(self, **kwargs):
+        """记录状态更新（创建端点现在会同步落盘 queued）。"""
+        _StubTaskManager.all_updates.append(kwargs)
 
 
 @pytest.fixture
@@ -79,6 +85,7 @@ def task_env(monkeypatch, tmp_path):
 
     monkeypatch.setattr(task_creation_routes.app_state, "launch_background_task", fake_launch)
     monkeypatch.setattr(task_creation_routes, "TaskManager", _StubTaskManager)
+    _StubTaskManager.all_updates = []
     return launched
 
 
@@ -329,6 +336,8 @@ class TestTaskCreationValidation:
         body = resp.json()
         assert body["ok"] is True and len(body["task_id"]) == 12
         assert len(task_env) == 1, "应启动一个后台任务"
+        # v6.1：创建后立即落盘 queued（前端打开详情页即可识别「排队中」并轮询）
+        assert _StubTaskManager.all_updates and _StubTaskManager.all_updates[-1]["status"].value == "queued"
 
     def test_creative_invalid_scene_count_422(self, client, task_env):
         resp = client.post(

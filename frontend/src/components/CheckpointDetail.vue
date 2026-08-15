@@ -10,7 +10,7 @@ import { useToast } from '@/composables/useToast'
 const props = defineProps<{ taskId: string; checkpoint: string }>()
 
 const { switchMode, loadTaskList } = useTasks()
-const { startPolling, setRunning } = useProgress()
+const { startPolling, setRunning, setProgressMessageHtml } = useProgress()
 const { showToast } = useToast()
 
 // 四卡片选择：AI 帮我改 / 我自己改 / 外部 Agent 改 / 在线编辑
@@ -88,15 +88,20 @@ async function doApprove(modifiedIds: string[], paramUpdates: Record<string, any
   try {
     const d = await api.approveCheckpoint(props.taskId, props.checkpoint, modifiedIds, paramUpdates, true)
     if (!d.ok) throw new Error(d.detail || t('failContinue'))
-    // 恢复执行
-    setRunning(props.taskId)
-    await startPolling(props.taskId)
-    loadTaskList()
+    await continueAfterConfirm()
   } catch (e: any) {
     alert(e.message || t('failContinue'))
   } finally {
     confirming.value = false
   }
+}
+
+// 统一恢复执行：清除暂停 UI（setRunning 内部处理）+ 立即展示恢复中消息 + 启动轮询
+async function continueAfterConfirm() {
+  setRunning(props.taskId)
+  setProgressMessageHtml(`<span class="text-accent animate-pulse">${t('resuming')}</span>`)
+  await startPolling(props.taskId)
+  loadTaskList()
 }
 
 async function copyText(text: string) {
@@ -120,7 +125,11 @@ async function confirmNoChange() {
 
 // ── 切回自动并继续 ──
 async function switchToAutoAndRun() {
-  await switchMode(props.taskId, 'auto')
+  const d = await switchMode(props.taskId, 'auto')
+  // 后端切换即继续（resume），前端同步恢复轮询与状态展示
+  if (d?.ok) {
+    await continueAfterConfirm()
+  }
 }
 
 // ── 重新生成当前检查点 ──
@@ -129,8 +138,7 @@ async function regen() {
   try {
     const d = await api.regenCheckpoint(props.taskId, props.checkpoint)
     if (!d.ok) throw new Error(d.detail || t('failRegen'))
-    setRunning(props.taskId)
-    await startPolling(props.taskId)
+    await continueAfterConfirm()
   } catch (e: any) {
     alert(e.message || t('failRegen'))
   } finally {

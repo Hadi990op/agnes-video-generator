@@ -101,6 +101,12 @@ async function mountProgressPage(taskId: string, dirName?: string | null) {
   const st = state.status
   if (st === 'running' || st === 'queued') {
     setRunning(taskId)
+    // 立即用后端实时进度消息（排队中/当前步骤），避免首次展示「任务启动中 + 0%」占位
+    if (state.current_message) {
+      setProgressMessageHtml(
+        `<span class="text-accent animate-pulse">${state.current_message}</span>`,
+      )
+    }
     startPolling(taskId)
   } else if (st === 'completed') {
     if (state.final_video_file) showResult(state.final_video_file, taskId)
@@ -181,9 +187,9 @@ async function pollTaskProgress(taskId: string) {
       // 暂停时不视为运行中（释放并发槽位后前端也停止轮询视为等待）
       appState.isTaskRunning = false
       scheduleArtifactRefresh()
-    } else if (awaitingCheckpoint.value) {
-      // 恢复后清除
-      if (state.status === 'running') awaitingCheckpoint.value = ''
+    } else if (awaitingCheckpoint.value && (state.status === 'running' || state.status === 'queued')) {
+      // 已恢复执行（含排队阶段）：立即清除暂停 UI，避免「继续」按钮残留可点
+      awaitingCheckpoint.value = ''
     }
   } catch {
     // 网络错误静默，下次轮询重试
@@ -212,6 +218,8 @@ function showResult(videoPath?: string, taskId?: string | null) {
 function setRunning(taskId: string) {
   appState.isTaskRunning = true
   appState.currentTaskId = taskId
+  // 进入运行态即代表暂停结束：乐观清除暂停审查 UI，避免「继续」按钮残留
+  awaitingCheckpoint.value = ''
 }
 
 function clearRunning() {

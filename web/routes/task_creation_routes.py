@@ -192,6 +192,7 @@ async def create_simple_task(
 
     tm = TaskManager(task_id, dir_name=dir_name)
     tm.create(state)
+    deps.mark_task_queued(tm)
     app_state.launch_background_task(deps.run_pipeline_with_concurrency(pipeline, state, tm))
     logger.info(f"[Simple] Task created: {task_id}, mode={mode}, duration={duration}s (queued)")
     return {"ok": True, "task_id": task_id, "dir_name": dir_name}
@@ -329,6 +330,7 @@ async def create_creative_task(
 
     tm = TaskManager(task_id, dir_name=dir_name)
     tm.create(state)
+    deps.mark_task_queued(tm)
     app_state.launch_background_task(deps.run_pipeline_with_concurrency(pipeline, state, tm))
     logger.info(f"[Creative] Task created: {task_id}, idea={idea[:40]}... (queued)")
     return {"ok": True, "task_id": task_id, "dir_name": dir_name}
@@ -410,6 +412,7 @@ async def create_manuscript_task(
 
     tm = TaskManager(task_id, dir_name=dir_name)
     tm.create(state)
+    deps.mark_task_queued(tm)
     app_state.launch_background_task(deps.run_pipeline_with_concurrency(pipeline, state, tm))
     logger.info(f"[Manuscript] Task created: {task_id}, text_len={len(manuscript_text)} (queued)")
     return {"ok": True, "task_id": task_id, "dir_name": dir_name}
@@ -511,6 +514,7 @@ async def create_poetry_task(
 
     tm = TaskManager(task_id, dir_name=dir_name)
     tm.create(state)
+    deps.mark_task_queued(tm)
     app_state.launch_background_task(deps.run_pipeline_with_concurrency(pipeline, state, tm))
     logger.info(f"[Poetry] Task created: {task_id}, poem={poem_text[:20]!r} (queued)")
     return {"ok": True, "task_id": task_id, "dir_name": dir_name}
@@ -592,6 +596,7 @@ async def create_anchor_task(
 
     tm = TaskManager(task_id, dir_name=dir_name)
     tm.create(state)
+    deps.mark_task_queued(tm)
     app_state.launch_background_task(deps.run_pipeline_with_concurrency(pipeline, state, tm))
     logger.info(f"[Anchor] Task created: {task_id}, script_len={len(script_text)} (queued)")
     return {"ok": True, "task_id": task_id, "dir_name": dir_name}

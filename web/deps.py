@@ -107,6 +107,22 @@ def _refresh_task_manifests(state: BaseTaskState, pipeline: BasePipeline) -> Non
         logger.warning(f"[Artifacts] manifest refresh failed for {pipeline.task_id}: {e}")
 
 
+def mark_task_queued(task_manager: TaskManager) -> None:
+    """创建任务后立即落盘为排队状态（status=queued + 排队消息）。
+
+    创建端点同步落盘（而非等后台协程异步置位），保证前端在响应返回后
+    打开任务详情页时能立即识别为「排队中」并启动轮询，避免进度卡在
+    「0% / 待启动」。
+    """
+    task_manager.update_state(
+        status=StepStatus.QUEUED,
+        current_step="init",
+        current_status="running",
+        current_message="任务排队中...",
+        current_progress=0.0,
+    )
+
+
 async def run_pipeline(pipeline: BasePipeline, state: BaseTaskState):
     """通用 Pipeline 执行包装器。"""
     try:
