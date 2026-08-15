@@ -148,10 +148,10 @@ const savedMap = ref<Record<string, boolean>>({})
 const compareMap = ref<Record<string, boolean>>({})
 const savingId = ref('')
 
-// 检查点内可编辑的文本类产物（text / json / subtitle 且 deletable 且存在）
+// 检查点内可编辑的文本类产物（manifest 条目：editable + exists + category；兼容 deletable）
 const editableTextArts = computed(() =>
   (checkpointData.value?.artifacts || []).filter(
-    (a: any) => a.deletable && a.exists && ['text', 'json', 'subtitle'].includes(a.category),
+    (a: any) => a.editable !== false && a.deletable !== false && a.exists && ['text', 'json', 'subtitle'].includes(a.category),
   ),
 )
 
@@ -209,9 +209,10 @@ async function saveArtifact(id: string) {
   }
 }
 
-// 弹窗内产物 label（复用产物矩阵 label）
+// 弹窗内产物 label（manifest 条目字段为 name_key；兼容 label_key）
 function artLabel(a: any): string {
-  let label = t(a.label_key) || a.label_key
+  const key = a.name_key || a.label_key
+  let label = t(key) || key || a.artifact_id
   if (a.scope_index !== null && a.scope_index !== undefined) {
     label = label.replace('{index}', String(a.scope_index + 1))
   }
