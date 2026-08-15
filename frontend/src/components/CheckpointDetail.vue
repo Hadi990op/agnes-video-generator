@@ -246,6 +246,18 @@ function artLabel(a: any): string {
 
     <p class="text-xs text-muted mb-3">{{ t('awaitingUserTip') }}</p>
 
+    <!-- 不修改直接继续（任何通道下均可跳过审查） -->
+    <div class="flex items-center justify-center mb-4">
+      <button
+        class="text-sm px-6 py-2 bg-emerald-600 text-white rounded-lg transition hover:bg-emerald-500 disabled:opacity-50 shadow-sm"
+        :disabled="confirming"
+        @click="confirmNoChange"
+      >
+        {{ confirming ? t('submitting') : t('continueNoChange') }}
+      </button>
+      <span class="text-xs text-muted ml-3">{{ t('continueNoChangeHint') }}</span>
+    </div>
+
     <!-- 四卡片 -->
     <div class="grid grid-cols-1 md:grid-cols-4 gap-3 mb-4">
       <button class="p-3 rounded-xl border text-left transition" :class="activeCard === 'ai' ? 'border-accent bg-accent/10' : 'border-rule bg-paper-2/30 hover:border-accent/40'" @click="activeCard = 'ai'">
