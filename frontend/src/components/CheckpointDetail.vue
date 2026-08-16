@@ -286,12 +286,14 @@ function artLabel(a: any): string {
         <div class="text-xs text-muted mt-0.5">{{ t('handleAgentDesc') }}</div>
       </button>
       <button class="p-3 rounded-xl border text-left transition"
-        :class="activeCard === 'edit' ? 'border-accent bg-accent/10' : 'border-rule bg-paper-2/30'"
+        :class="editableTextArts.length
+          ? (activeCard === 'edit' ? 'border-accent bg-accent/10' : 'border-rule bg-paper-2/30 hover:border-accent/40')
+          : 'border-rule/40 bg-paper-2/20 opacity-45 cursor-not-allowed'"
         :disabled="!editableTextArts.length"
         @click="activeCard = 'edit'">
         <div class="text-sm font-medium" :class="editableTextArts.length ? 'text-ink-2' : 'text-muted'">{{ t('handleEdit') }}</div>
         <div class="text-xs text-muted mt-0.5">{{ t('handleEditDesc') }}</div>
-        <div v-if="!editableTextArts.length" class="text-[10px] text-muted/70 mt-1">{{ t('editTextOnly') }}</div>
+        <div v-if="!editableTextArts.length" class="text-[10px] text-muted mt-1">🚫 {{ t('editTextOnly') }}</div>
       </button>
     </div>
 
