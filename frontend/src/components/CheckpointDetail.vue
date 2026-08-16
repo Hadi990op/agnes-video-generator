@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref, computed } from 'vue'
-import { t } from '@/i18n'
+import { t, currentLang as lang } from '@/i18n'
 import { appState } from '@/store'
 import * as api from '@/api'
 import { useTasks } from '@/composables/useTasks'
@@ -15,6 +15,12 @@ const { showToast } = useToast()
 
 // 四卡片选择：AI 帮我改 / 我自己改 / 外部 Agent 改 / 在线编辑
 const activeCard = ref<'ai' | 'self' | 'agent' | 'edit'>('ai')
+
+// 官网"其他免费 AI 工具"页面（官网提供 zh / en 多语言路径，其余语言回退 en）
+const moreToolsHref = computed(() => {
+  const l = lang.value === 'zh' ? 'zh' : 'en'
+  return `https://video.lichuanyang.top/${l}/learn/tools`
+})
 const aiRequest = ref('')
 const aiLoading = ref(false)
 const aiResult = ref<any>(null)
@@ -335,6 +341,7 @@ function artLabel(a: any): string {
       <code class="block text-xs bg-black/40 text-green-300 px-3 py-2 rounded-lg mb-2 break-all">{{ 'cd ' + (checkpointData?.working_dir || '') + ' && opencode' }}</code>
       <p class="text-xs text-muted">{{ t('agentPrompt') }}:</p>
       <textarea rows="3" class="w-full glass-input rounded-lg px-3 py-2 text-sm text-ink font-mono text-xs resize-y" :value="t('agentPromptTemplate').replace('{dir}', checkpointData?.working_dir || '')" readonly></textarea>
+      <a :href="moreToolsHref" target="_blank" rel="noopener" class="inline-flex items-center gap-1 text-xs text-accent hover:text-ink transition-colors">🔗 {{ t('agentMoreTools') }}</a>
     </div>
 
     <!-- 通道 4 面板：在线编辑 -->
