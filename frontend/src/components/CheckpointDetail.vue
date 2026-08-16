@@ -287,10 +287,13 @@ function artLabel(a: any): string {
         <div class="text-sm font-medium text-ink-2">{{ t('handleSelf') }}</div>
         <div class="text-xs text-muted mt-0.5">{{ t('handleSelfDesc') }}</div>
       </button>
-      <button class="p-3 rounded-xl border text-left transition" :class="activeCard === 'agent' ? 'border-accent bg-accent/10' : 'border-rule bg-paper-2/30 hover:border-accent/40'" @click="activeCard = 'agent'">
-        <div class="text-sm font-medium text-ink-2">{{ t('handleAgent') }}</div>
-        <div class="text-xs text-muted mt-0.5">{{ t('handleAgentDesc') }}</div>
-      </button>
+      <div class="p-3 rounded-xl border transition flex flex-col" :class="activeCard === 'agent' ? 'border-accent bg-accent/10' : 'border-rule bg-paper-2/30 hover:border-accent/40'">
+        <button class="text-left" @click="activeCard = 'agent'">
+          <div class="text-sm font-medium text-ink-2">{{ t('handleAgent') }}</div>
+          <div class="text-xs text-muted mt-0.5">{{ t('handleAgentDesc') }}</div>
+        </button>
+        <a :href="moreToolsHref" target="_blank" rel="noopener" class="inline-flex items-center gap-1 text-[10px] text-accent hover:text-ink transition-colors mt-1.5">🔗 {{ t('agentMoreTools') }}</a>
+      </div>
       <button class="p-3 rounded-xl border text-left transition"
         :class="editableTextArts.length
           ? (activeCard === 'edit' ? 'border-accent bg-accent/10' : 'border-rule bg-paper-2/30 hover:border-accent/40')
@@ -341,7 +344,6 @@ function artLabel(a: any): string {
       <code class="block text-xs bg-black/40 text-green-300 px-3 py-2 rounded-lg mb-2 break-all">{{ 'cd ' + (checkpointData?.working_dir || '') + ' && opencode' }}</code>
       <p class="text-xs text-muted">{{ t('agentPrompt') }}:</p>
       <textarea rows="3" class="w-full glass-input rounded-lg px-3 py-2 text-sm text-ink font-mono text-xs resize-y" :value="t('agentPromptTemplate').replace('{dir}', checkpointData?.working_dir || '')" readonly></textarea>
-      <a :href="moreToolsHref" target="_blank" rel="noopener" class="inline-flex items-center gap-1 text-xs text-accent hover:text-ink transition-colors">🔗 {{ t('agentMoreTools') }}</a>
     </div>
 
     <!-- 通道 4 面板：在线编辑 -->
