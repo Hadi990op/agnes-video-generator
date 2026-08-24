@@ -425,7 +425,7 @@ class AudioStepsMixin:
         """
         final_video_path = os.path.join(self.working_dir, "final_video.mp4")
 
-        if os.path.exists(final_video_path):
+        if os.path.exists(final_video_path) and os.path.getsize(final_video_path) > 0:
             self._state.step_concatenation = StepStatus.COMPLETED
             self._state.final_video_file = final_video_path
             self.task_manager.update_state(
@@ -433,6 +433,12 @@ class AudioStepsMixin:
                 final_video_file=final_video_path,
             )
             return final_video_path
+        # Remove stale 0KB file if present
+        if os.path.exists(final_video_path):
+            try:
+                os.remove(final_video_path)
+            except OSError:
+                pass
 
         await self._emit("concatenate", "running", "正在拼接视频...", _PROGRESS_CONCAT_START)
 

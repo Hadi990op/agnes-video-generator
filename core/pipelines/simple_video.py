@@ -90,9 +90,15 @@ class SimpleVideoPipeline(BasePipeline):
         """提交视频任务并等待完成。支持 resume。"""
         video_path = os.path.join(self.working_dir, "final_video.mp4")
 
-        if os.path.exists(video_path):
+        if os.path.exists(video_path) and os.path.getsize(video_path) > 0:
             logger.info("[Simple] Video already exists, skipping")
             return video_path
+        # Remove stale 0KB file if present
+        if os.path.exists(video_path):
+            try:
+                os.remove(video_path)
+            except OSError:
+                pass
 
         # 尝试从 task.json 恢复（resume 场景）
         saved_video_id = self._load_task_json(self.working_dir)

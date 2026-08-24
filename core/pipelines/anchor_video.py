@@ -373,9 +373,15 @@ class AnchorPipeline(MultiScenePipeline):
             return clip_path
 
         output_path = os.path.join(self.working_dir, "final_video.mp4")
-        if os.path.exists(output_path):
+        if os.path.exists(output_path) and os.path.getsize(output_path) > 0:
             logger.info("[Anchor] composite: final video already exists, skipping")
             return output_path
+        # Remove stale 0KB file if present
+        if os.path.exists(output_path):
+            try:
+                os.remove(output_path)
+            except OSError:
+                pass
 
         audio_path = self._state.combined_audio or ""
         audio_duration = 0.0
