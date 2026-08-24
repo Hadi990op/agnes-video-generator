@@ -215,35 +215,36 @@ class MultiScenePipeline(BasePipeline):
     # ==================================================================
 
     async def _generate_videos(self) -> None:
-        """通用视频生成：两阶段（批量提交 + 逐个等待）。
+        """通用视频生成：两阶段（并行提交 + 并行等待）。
 
         每个场景从 SceneTask 对象获取 prompt / duration / ref_images（通过钩子）。
         子类（如链式/循环视频）可整体覆写本方法以保留其特有逻辑。
+
+        v7.0: 改为并行提交+并行等待，充分利用多API Key的并发能力。
         """
         scenes = self._state.scenes
         total = len(scenes)
 
-        # Phase 1: 批量提交
-        pending: list = []
-        for i, scene in enumerate(scenes):
+        # Phase 1: 并行提交所有视频
+        async def _submit_scene(idx: int, scene) -> tuple:
+            """提交单个场景的视频，返回 (idx, video_id, video_path) 或 None。"""
             self._check_shutdown()
-            scene_dir = os.path.join(self.working_dir, f"scene_{i}")
+            scene_dir = os.path.join(self.working_dir, f"scene_{idx}")
             os.makedirs(scene_dir, exist_ok=True)
             video_path = os.path.join(scene_dir, "video.mp4")
 
             if os.path.exists(video_path):
                 scene.video_file = video_path
-                continue
+                return None
 
-            video_id = self._load_task_json(scene_dir)
-            if video_id:
-                scene.video_id = video_id
-                pending.append((i, video_id, video_path))
-                continue
+            saved_video_id = self._load_task_json(scene_dir)
+            if saved_video_id:
+                scene.video_id = saved_video_id
+                return (idx, saved_video_id, video_path)
 
-            prompt = self._get_scene_video_prompt(scene, i)
-            ref_images = self._get_scene_ref_images(scene, i)
-            duration = self._get_scene_duration(scene, i)
+            prompt = self._get_scene_video_prompt(scene, idx)
+            ref_images = self._get_scene_ref_images(scene, idx)
+            duration = self._get_scene_duration(scene, idx)
 
             video_id = await self.video_api.submit_video(
                 prompt=prompt,
@@ -254,22 +255,45 @@ class MultiScenePipeline(BasePipeline):
             )
             scene.video_id = video_id
             self._save_task_json(scene_dir, {"video_id": video_id})
-            pending.append((i, video_id, video_path))
+            return (idx, video_id, video_path)
+
+        # 并行提交所有场景（rate limiter 自动控制并发）
+        submit_tasks = [_submit_scene(i, scene) for i, scene in enumerate(scenes)]
+        submit_results = await asyncio.gather(*submit_tasks, return_exceptions=True)
+
+        # 收集需要等待的结果
+        pending: list = []
+        for result in submit_results:
+            if isinstance(result, Exception):
+                logger.error(f"[MultiScene] Video submit failed: {result}")
+                raise result
+            if result is not None:
+                pending.append(result)
 
         self.task_manager.update_state(scenes=[s.model_dump() for s in scenes])
 
-        # Phase 2: 逐个等待
-        for j, (scene_idx, video_id, video_path) in enumerate(pending):
+        if not pending:
+            logger.info("[MultiScene] All videos already generated, skipping wait phase")
+            return
+
+        # Phase 2: 并行等待所有视频完成
+        async def _wait_scene(idx: int, video_id: str, video_path: str) -> None:
+            """等待单个视频完成并保存。"""
             self._check_shutdown()
-            await self._emit(
-                "video_gen", "running",
-                f"等待视频 {j + 1}/{len(pending)}...",
-                0.40 + 0.35 * j / max(len(pending), 1),
-            )
-            video_output = await self._wait_for_video_with_retry(video_id, scene_idx)
+            video_output = await self._wait_for_video_with_retry(video_id, idx)
             video_output.save(video_path)
-            self._state.scenes[scene_idx].video_file = video_path
-            self.task_manager.update_state(scenes=[s.model_dump() for s in self._state.scenes])
+            self._state.scenes[idx].video_file = video_path
+
+        await self._emit(
+            "video_gen", "running",
+            f"并行等待 {len(pending)} 个视频...",
+            0.40,
+        )
+
+        wait_tasks = [_wait_scene(idx, vid, path) for idx, vid, path in pending]
+        await asyncio.gather(*wait_tasks, return_exceptions=True)
+
+        self.task_manager.update_state(scenes=[s.model_dump() for s in self._state.scenes])
 
     async def _wait_for_video_with_retry(
         self, video_id: str, scene_idx: int, max_retries: int = 3
