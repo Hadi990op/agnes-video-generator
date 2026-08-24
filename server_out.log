@@ -1,0 +1,69 @@
+INFO:     127.0.0.1:55298 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55319 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55329 - "GET /api/config HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55389 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55391 - "GET /static/assets/index-DHsfPVeA.css HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55390 - "GET /static/assets/index-D_s7mM2_.js HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55390 - "GET /api/config/keys HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55390 - "GET /api/config HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55390 - "GET /api/workspaces HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55390 - "GET /api/config HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55390 - "GET /static/favicon.ico HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55390 - "GET /api/models HTTP/1.1" 400 Bad Request
+INFO:     127.0.0.1:55390 - "GET /api/config HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55390 - "GET /api/voices HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55390 - "GET /api/tasks HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55534 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55534 - "GET /api/config/keys HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55535 - "GET /api/config HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55535 - "GET /api/workspaces HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55535 - "GET /api/config HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55535 - "GET /api/models HTTP/1.1" 400 Bad Request
+INFO:     127.0.0.1:55535 - "GET /api/config HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55535 - "GET /api/voices HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55535 - "GET /api/tasks HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55536 - "POST /api/config/domain HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55659 - "POST /api/config/keys HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55662 - "POST /api/config/keys HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55659 - "POST /api/config/keys HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55665 - "POST /api/config/keys HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55669 - "POST /api/config/keys HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55670 - "GET /api/models?refresh=1 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55562 - "GET /api/workspaces/pick-directory HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55735 - "POST /api/tasks/anchor HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55735 - "GET /static/assets/index-D_s7mM2_.js HTTP/1.1" 304 Not Modified
+INFO:     127.0.0.1:55735 - "GET /static/assets/index-DHsfPVeA.css HTTP/1.1" 304 Not Modified
+INFO:     127.0.0.1:55735 - "GET /api/config/keys HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55736 - "GET /api/config HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55735 - "GET /api/tasks/cbaceed7b560 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55735 - "GET /api/workspaces HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55736 - "GET /api/tasks/cbaceed7b560/artifacts HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55739 - "GET /api/tasks/cbaceed7b560 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55735 - "GET /api/config HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55735 - "GET /api/models HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55735 - "GET /api/config HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55735 - "GET /api/voices HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55735 - "GET /api/tasks/cbaceed7b560/artifacts HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55759 - "GET /api/tasks/cbaceed7b560 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55759 - "GET /api/tasks/cbaceed7b560/artifacts HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55759 - "GET /api/tasks/cbaceed7b560/artifacts/anchor%3Aclip_prompts/file HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55762 - "GET /api/tasks/cbaceed7b560 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55762 - "GET /api/tasks/cbaceed7b560/artifacts HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55789 - "GET /api/tasks/cbaceed7b560 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55789 - "GET /api/tasks/cbaceed7b560/artifacts HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55790 - "GET /api/tasks/cbaceed7b560 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55790 - "GET /api/tasks/cbaceed7b560/artifacts HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55809 - "GET /api/tasks/cbaceed7b560 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55809 - "GET /api/tasks/cbaceed7b560/artifacts HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55812 - "GET /api/tasks/cbaceed7b560 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55812 - "GET /api/tasks/cbaceed7b560/artifacts HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55831 - "GET /api/tasks/cbaceed7b560 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55831 - "GET /api/tasks/cbaceed7b560/artifacts HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55841 - "GET /api/video/cbaceed7b560 HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:55842 - "GET /api/tasks/cbaceed7b560/artifacts/anchor%3Aclip/file HTTP/1.1" 206 Partial Content
+INFO:     127.0.0.1:55841 - "GET /api/tasks/cbaceed7b560/artifacts/anchor%3Aclip/file HTTP/1.1" 206 Partial Content
+INFO:     127.0.0.1:55841 - "GET /api/tasks/cbaceed7b560/artifacts/anchor%3Aclip/file HTTP/1.1" 206 Partial Content
+INFO:     127.0.0.1:55841 - "GET /api/tasks/cbaceed7b560/artifacts/anchor%3Aclip/file HTTP/1.1" 206 Partial Content
+INFO:     127.0.0.1:55843 - "GET /static/icon.png HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57224 - "GET /api/tasks/cbaceed7b560/artifacts/anchor%3Aclip/file HTTP/1.1" 206 Partial Content
+INFO:     127.0.0.1:57225 - "GET /api/tasks/cbaceed7b560/artifacts/anchor%3Aclip/file HTTP/1.1" 206 Partial Content
