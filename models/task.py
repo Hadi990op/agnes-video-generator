@@ -525,6 +525,7 @@ class CreateAnchorTaskRequest(BaseModel):
     anchor_prompt: str = ""
     anchor_reference_image: str = ""
     script_text: str
+    audio_source: str = "post_stitch"  # "post_stitch" | "model"
     video_width: int = 768
     video_height: int = 1344
     audio_config: Optional[AudioConfig] = None

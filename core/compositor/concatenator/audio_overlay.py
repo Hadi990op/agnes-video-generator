@@ -277,19 +277,9 @@ class AudioOverlayMixin:
                 check=True, capture_output=True, timeout=300,
             )
         except subprocess.CalledProcessError as e:
-            logger.warning(f"[Compositor] Simple concat failed: {e.stderr[:200]}, trying xfade")
+            logger.warning(f"[Compositor] Simple concat failed: {e.stderr[:200]}, trying stream_loop fallback")
 
-            # Build complex filter for xfade cross-fade between each pair
-            fade_duration = 0.3
-            filter_parts = []
-            for i in range(n):
-                if i == 0:
-                    filter_parts.append(f"[0:{i}]")
-                else:
-                    filter_parts.append(f"[0:{i}]")
-                    filter_parts.append(f"xfade=transition=fade:duration={fade_duration}:offset={i * clip_duration - fade_duration * i}")
-            filter_str = "".join(filter_parts)
-
+            # Fallback: use -stream_loop to loop the clip, then trim to needed duration
             subprocess.run(
                 ["ffmpeg", "-y",
                  "-stream_loop", str(n - 1), "-i", clip_path,

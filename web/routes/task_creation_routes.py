@@ -523,7 +523,7 @@ async def create_poetry_task(
 @router.post("/api/tasks/anchor")
 async def create_anchor_task(
     anchor_prompt: str = Form(""),
-    anchor_reference_image: str = Form(""),
+    anchor_reference_image: UploadFile = File(None),
     script_text: str = Form(...),
     audio_source: str = Form("post_stitch"),
     video_width: int = Form(768),
@@ -577,11 +577,17 @@ async def create_anchor_task(
         subtitle_stroke_color, subtitle_stroke_width, subtitle_bg_color,
     )
 
+    # 处理参考图上传（与其他任务类型保持一致）
+    saved_ref_image = ""
+    upload_dir = helpers.get_upload_dir()
+    if anchor_reference_image and anchor_reference_image.filename:
+        saved_ref_image = await _save_upload_file(anchor_reference_image, upload_dir, f"{task_id}_anchor_ref")
+
     state = AnchorVideoTask(
         task_id=task_id,
         creative_name=name,
         anchor_prompt=anchor_prompt,
-        anchor_reference_image=anchor_reference_image,
+        anchor_reference_image=saved_ref_image,
         script_text=script_text.strip(),
         audio_source=audio_source,
         video_width=video_width,
