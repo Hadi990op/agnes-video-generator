@@ -8,26 +8,12 @@ ENV PYTHONUNBUFFERED=1 \
 
 WORKDIR /app
 
-# ffmpeg 是视频拼接/音频处理的硬依赖。
-# 采用 imageio-ffmpeg：ffmpeg 静态二进制打包在 PyPI wheel 内，
-# 避免 apt 装 ffmpeg 的庞大依赖树。
-# 默认走官方 PyPI（GitHub Actions 美国 runner 最快）。
-# 本地国内构建如需加速，传 --build-arg PIP_INDEX_URL=https://pypi.tuna.tsinghua.edu.cn/simple
-ARG PIP_INDEX_URL=
-RUN if [ -n "$PIP_INDEX_URL" ]; then \
-        pip config set global.index-url "$PIP_INDEX_URL"; \
-    fi \
-    && pip install --no-cache-dir --default-timeout=600 imageio-ffmpeg \
-    && if [ -n "$PIP_INDEX_URL" ]; then \
-        pip config unset global.index-url; \
-    fi
-
-# 将 imageio-ffmpeg 提供的静态二进制暴露到 PATH（moviepy / ffmpeg CLI 均可调用）
-RUN FFMPEG_BIN=$(python -c "import imageio_ffmpeg, os; print(os.path.join(os.path.dirname(imageio_ffmpeg.__file__), 'binaries', os.listdir(os.path.join(os.path.dirname(imageio_ffmpeg.__file__), 'binaries'))[0]))") \
-    && ln -sf "$FFMPEG_BIN" /usr/local/bin/ffmpeg \
-    && FFMPEG_EXE=$(python -c "import imageio_ffmpeg; print(imageio_ffmpeg.get_ffmpeg_exe())") \
-    && ln -sf "$FFMPEG_EXE" /usr/local/bin/ffmpeg \
-    && ffmpeg -version | head -1
+# ffmpeg + ffprobe 是视频拼接/音频处理的硬依赖。
+# 使用 apt 安装以同时获得 ffmpeg 和 ffprobe（imageio-ffmpeg 只提供 ffmpeg）
+RUN apt-get update && apt-get install -y --no-install-recommends ffmpeg \
+    && rm -rf /var/lib/apt/lists/* \
+    && ffmpeg -version | head -1 \
+    && ffprobe -version | head -1
 
 # 先装项目 Python 依赖（利用层缓存）
 COPY requirements.txt .
