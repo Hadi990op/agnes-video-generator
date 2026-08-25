@@ -224,7 +224,10 @@ class InfluencerPipeline(
         # Use locked voice from character profile
         if self._character:
             state.audio_config.voice = self._character.voice_role
-            state.audio_config.speed = self._character.voice_speed
+            # Convert voice_speed (float like 1.0) to rate string (like "+0%")
+            speed = self._character.voice_speed
+            rate_pct = int((speed - 1.0) * 100)
+            state.audio_config.rate = f"{rate_pct:+d}%"
 
         # Build full narration text
         full_text = "\n\n".join(
