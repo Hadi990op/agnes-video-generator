@@ -176,11 +176,21 @@ class AnchorPipeline(MultiScenePipeline):
         )
 
         if audio_source == "post_stitch":
-            prompt = await asyncio.to_thread(
-                self.screenwriter.generate_anchor_smooth_loop_prompt,
-                anchor_prompt=anchor_prompt,
-            )
-            prompt = prompt.strip()
+            try:
+                prompt = await asyncio.to_thread(
+                    self.screenwriter.generate_anchor_smooth_loop_prompt,
+                    anchor_prompt=anchor_prompt,
+                )
+                prompt = prompt.strip()
+            except Exception as e:
+                logger.warning(
+                    "[Anchor] clip prompt generation failed: %s, using fallback", e
+                )
+                prompt = (
+                    "A digital human anchor, subtle breathing motion, "
+                    "slight head micro-nod, nearly still posture, "
+                    "seamless loop, professional studio lighting"
+                )
             self.save_prompts({
                 "anchor_prompt": anchor_prompt,
                 "smooth_loop_prompt": prompt,
@@ -248,6 +258,10 @@ class AnchorPipeline(MultiScenePipeline):
                 # Guard against 0KB/empty download (API returned empty body)
                 if not os.path.exists(clip_path) or os.path.getsize(clip_path) == 0:
                     raise RuntimeError(f"[Anchor] clip download empty: {clip_path}")
+                # Guard against 0-duration clip (valid file, no frames)
+                clip_dur = VideoConcatenator._get_duration(clip_path)
+                if clip_dur <= 0.1:
+                    raise RuntimeError(f"[Anchor] clip has ~0 duration: {clip_path}")
                 break
             except Exception as e:
                 if attempt < 2:

@@ -303,13 +303,12 @@ class AudioOverlayMixin:
 
         # Step 4: Loop the clip to cover the full audio duration.
         # Use -stream_loop with re-encode (reliable across codecs/streams).
-        # The concat-demuxer (-c copy) path is fragile when the source clip has
-        # incompatible streams, so we prefer re-encode here.
+        # Drop the clip's own audio (-an) — we mux TTS audio separately.
         try:
             subprocess.run(
                 ["ffmpeg", "-y",
                  "-stream_loop", str(n - 1), "-i", clip_path,
-                 "-vf", f"trim=duration={needed},setpts=PTS-STARTPTS",
+                 "-an",
                  "-c:v", "libx264", "-preset", "fast", "-pix_fmt", "yuv420p",
                  "-t", str(needed),
                  looped_path],
@@ -324,22 +323,24 @@ class AudioOverlayMixin:
                 ["ffmpeg", "-y", "-f", "concat", "-safe", "0",
                  "-i", concat_file,
                  "-c", "copy",
+                 "-an",
                  "-t", str(needed),
                  looped_path],
                 stdin=subprocess.DEVNULL,
                 check=True, capture_output=True, timeout=300,
             )
 
+        # Verify looped clip has real duration (catch 0:00 / empty loops)
+        looped_dur = VideoConcatenator._get_duration(looped_path)
+        if looped_dur <= 0.1:
+            raise RuntimeError(
+                f"[Compositor] looped anchor video has ~0 duration: {looped_path}"
+            )
+
         # Step 5: Overlay audio + subtitles via ffmpeg streaming.
         # Using ffmpeg (not moviepy) avoids loading the full looped video into
         # memory — this prevents 0KB/OOM failures on long anchor videos.
         try:
-            # Verify looped clip is valid (non-empty) before compositing
-            if not os.path.exists(looped_path) or os.path.getsize(looped_path) == 0:
-                raise RuntimeError(
-                    f"[Compositor] looped anchor video is empty/missing: {looped_path}"
-                )
-
             video_filter = None
             if srt_path and os.path.exists(srt_path) and subtitle_style:
                 force_style = VideoConcatenator._build_ass_force_style(subtitle_style)
@@ -348,19 +349,33 @@ class AudioOverlayMixin:
                 if force_style:
                     video_filter = f"subtitles='{srt_escaped}':force_style='{force_style}'"
 
-            cmd = ["ffmpeg", "-y", "-i", looped_path, "-i", audio_path]
+            # Validate audio: if missing/empty, output video-only (avoid -shortest → 0:00)
+            audio_ok = (
+                audio_path and os.path.exists(audio_path)
+                and os.path.getsize(audio_path) > 0
+                and VideoConcatenator._get_duration(audio_path) > 0.1
+            )
+
+            cmd = ["ffmpeg", "-y", "-i", looped_path]
+            if audio_ok:
+                cmd += ["-i", audio_path]
             if video_filter:
-                cmd += [
-                    "-filter_complex",
-                    f"[0:v]{video_filter}[v];[1:a]volume=1.5[a]",
-                    "-map", "[v]", "-map", "[a]",
-                ]
+                if audio_ok:
+                    cmd += [
+                        "-filter_complex",
+                        f"[0:v]{video_filter}[v];[1:a]volume=1.5[a]",
+                        "-map", "[v]", "-map", "[a]",
+                    ]
+                else:
+                    cmd += ["-vf", video_filter]
             else:
-                cmd += ["-map", "0:v", "-map", "1:a", "-af", "volume=1.5"]
+                if audio_ok:
+                    cmd += ["-map", "0:v", "-map", "1:a", "-af", "volume=1.5"]
+                else:
+                    cmd += ["-map", "0:v"]
             cmd += [
                 "-c:v", "libx264", "-preset", "fast", "-pix_fmt", "yuv420p",
-                "-c:a", "aac", "-b:a", "192k",
-                "-shortest",
+                "-c:a", "aac", "-b:a", "192k" if audio_ok else "-an",
                 output_path,
             ]
 
@@ -368,6 +383,13 @@ class AudioOverlayMixin:
                 cmd, stdin=subprocess.DEVNULL,
                 check=True, capture_output=True, timeout=600,
             )
+
+            # Verify the output has real duration (catch 0:00 / empty output)
+            out_dur = VideoConcatenator._get_duration(output_path)
+            if out_dur <= 0.1:
+                raise RuntimeError(
+                    f"[Compositor] composite_anchor_video produced 0:00 video: {output_path}"
+                )
 
             # Verify the output is non-empty; remove 0KB file and raise if broken
             if not os.path.exists(output_path) or os.path.getsize(output_path) == 0:
