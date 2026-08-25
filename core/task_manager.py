@@ -9,6 +9,7 @@ import json
 import logging
 import os
 import tempfile
+import time
 from typing import Optional
 
 from core.config import get_working_dir
@@ -146,7 +147,17 @@ class TaskManager:
             try:
                 with os.fdopen(tmp_fd, "w", encoding="utf-8") as f:
                     json.dump(self._state.model_dump(), f, ensure_ascii=False, indent=2)
-                os.replace(tmp_path, self._task_file)
+                # Windows: os.replace fails with [WinError 5] if destination is
+                # locked/open by another writer. Retry a few times before giving up.
+                for _attempt in range(10):
+                    try:
+                        os.replace(tmp_path, self._task_file)
+                        break
+                    except OSError as exc:
+                        if _attempt < 9 and "Access is denied" in str(exc):
+                            time.sleep(0.2)
+                            continue
+                        raise
             except Exception:
                 if os.path.exists(tmp_path):
                     os.remove(tmp_path)

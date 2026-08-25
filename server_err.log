@@ -1,62 +1,7 @@
-INFO:     Started server process [5292]
+INFO:     Started server process [10872]
 INFO:     Waiting for application startup.
-2026-08-24 12:29:36,248 [INFO] core.api.error_collector: [ErrorCollector] Workspace root set to C:\Users\Salman\Desktop\agens\agnes-video-generator\.working_dir
-2026-08-24 12:29:39,389 [WARNING] __main__: [Startup] Voice catalog load timed out (>3s); continuing in background
+2026-08-25 12:42:37,153 [INFO] core.api.error_collector: [ErrorCollector] Workspace root set to C:\Users\Salman\Desktop\agens\agnes-video-generator\.working_dir
+2026-08-25 12:42:38,484 [INFO] core.audio.voices: [Voices] Loaded catalog: 154 voices across 13 languages
+2026-08-25 12:42:38,524 [INFO] __main__: [Startup] Voice catalog loaded
 INFO:     Application startup complete.
 INFO:     Uvicorn running on http://0.0.0.0:8765 (Press CTRL+C to quit)
-2026-08-24 12:29:44,235 [INFO] core.audio.voices: [Voices] Loaded catalog: 154 voices across 13 languages
-2026-08-24 12:29:44,285 [INFO] __main__: [Startup] Voice catalog loaded
-2026-08-24 12:44:57,693 [WARNING] web.helpers: [Workspace] Directory picker failed: Command '['powershell', '-NoProfile', '-Command', "Add-Type -AssemblyName System.Windows.Forms;$f = New-Object System.Windows.Forms.FolderBrowserDialog;if ($f.ShowDialog() -eq 'OK') { Write-Output $f.SelectedPath }"]' timed out after 120 seconds
-2026-08-24 12:47:15,913 [INFO] core.task_manager: [TaskManager] Created task cbaceed7b560, type=TaskType.ANCHOR
-2026-08-24 12:47:15,920 [INFO] web.routes.task_creation_routes: [Anchor] Task created: cbaceed7b560, script_len=567 (queued)
-2026-08-24 12:47:15,927 [INFO] web.deps: [Concurrency] Task cbaceed7b560 queued (weight=2, current=0/10)
-2026-08-24 12:47:15,937 [INFO] web.deps: [Concurrency] Task cbaceed7b560 acquired slot (weight=2, current=2/10)
-2026-08-24 12:47:15,938 [INFO] web.deps: [Pipeline] Starting run for task cbaceed7b560, type=TaskType.ANCHOR
-2026-08-24 12:47:15,975 [INFO] core.task_manager: [TaskManager] Created task cbaceed7b560, type=TaskType.ANCHOR
-2026-08-24 12:47:15,994 [INFO] core.screenwriter.characters: [Screenwriter] Generating anchor model-audio prompt (1943 chars, 567 script chars)...
-2026-08-24 12:47:16,027 [INFO] core.api.agnes_chat: [AgnesChat] Calling chat (agnes-2.0-flash), prompt: 2535 chars...
-2026-08-24 12:47:16,032 [INFO] core.api.key_manager: [KeyManager] KeyRing \u521d\u59cb\u5316: 6 \u4e2a Key
-2026-08-24 12:47:16,103 [INFO] core.api.rate_limiter: [RateLimiter] \u5171\u4eab\u6876\u521d\u59cb\u5316: 96 \u6b21/\u5206\u949f (Key \u6570 6), \u7a81\u53d1\u4e0a\u9650 24
-2026-08-24 12:47:29,329 [INFO] core.screenwriter.characters: [Screenwriter] Anchor model-audio prompt: **Prompt:**
-
-Young male influencer sits casually in his bedroom, speaking directly to the camera wit...
-2026-08-24 12:47:29,341 [INFO] core.pipelines: [Pipeline] prompts saved \u2192 C:\Users\Salman\Desktop\agens\agnes-video-generator\.working_dir\20260824_124715_cbaceed7b560\prompts.json
-2026-08-24 12:47:29,344 [INFO] core.pipelines.anchor_video: [Anchor] clip_prompt: **Prompt:**
-
-Young male influencer sits casually in his bedroom, speaking direct...
-2026-08-24 12:47:47,640 [INFO] utils.image_normalizer: [ImageNormalizer] cbaceed7b560_anchor_ref.png -> 768x1344 (pad), 166616 bytes
-2026-08-24 12:47:48,595 [INFO] core.api.agnes_image: [AgnesImage] Generating (i2i): Animate the young male influencer from the reference image as a realistic Instag...
-2026-08-24 12:48:07,371 [INFO] core.api.agnes_image: [AgnesImage] Done: https://platform-outputs.agnes-ai.space/images/i2i/task_MG6eEhV37BaN2vVrmPmSPIUj...
-2026-08-24 12:48:07,377 [INFO] utils.image: Downloading image from https://platform-outputs.agnes-ai.space/images/i2i/task_MG6eEhV37BaN2vVrmPmSPIUj2NJegneo/output.png to C:\Users\Salman\Desktop\agens\agnes-video-generator\.working_dir\20260824_124715_cbaceed7b560\anchor.png
-2026-08-24 12:48:10,817 [INFO] utils.image: Image saved to C:\Users\Salman\Desktop\agens\agnes-video-generator\.working_dir\20260824_124715_cbaceed7b560\anchor.png (1148641 bytes)
-2026-08-24 12:48:13,120 [INFO] utils.image_normalizer: [ImageNormalizer] anchor.png -> 768x1344 (pad), 152480 bytes
-2026-08-24 12:48:13,332 [INFO] core.api.agnes_video: [AgnesVideo] Uploading image to hosted URL (attempt 1/3)...
-2026-08-24 12:48:34,957 [INFO] core.api.agnes_video: [AgnesVideo] Image uploaded to hosted URL: https://platform-outputs.agnes-ai.space/images/i2i/task_IqjWite50j5LL5SIxLOz0lBU...
-2026-08-24 12:48:35,051 [INFO] core.api.agnes_video: [AgnesVideo] image-to-video: **Prompt:**
-
-Young male influencer sits casually in his bedroom, speaking direct...
-2026-08-24 12:48:35,052 [INFO] core.api.agnes_video: [AgnesVideo] Submitting image-to-video (attempt 1/5)...
-2026-08-24 12:48:35,054 [INFO] core.api.rate_limiter: [RateLimiter] \u89c6\u9891\u63d0\u4ea4\u6876\u521d\u59cb\u5316: 6 \u6b21/\u5206\u949f (Key \u6570 6), \u7a81\u53d1\u4e0a\u9650 6
-2026-08-24 12:48:38,251 [INFO] core.api.agnes_video: [AgnesVideo] Video submitted: task_h6WAqFKaGa8RmbP...
-2026-08-24 12:48:38,277 [INFO] core.api.agnes_video: [AgnesVideo] Polling video task_h6WAqFKaGa8... (poll #1, elapsed 0s)
-2026-08-24 12:48:41,634 [INFO] core.api.agnes_video: [AgnesVideo] Video task_h6WAqFKaGa8... status=pending progress=0%
-2026-08-24 12:49:43,963 [INFO] core.api.agnes_video: [AgnesVideo] Video task_h6WAqFKaGa8... status=in_progress progress=30%
-2026-08-24 12:50:56,816 [INFO] core.api.agnes_video: [AgnesVideo] Video task_h6WAqFKaGa8... status=completed progress=100%
-2026-08-24 12:50:56,818 [INFO] core.api.agnes_video: [AgnesVideo] Done: https://platform-outputs.agnes-ai.space/videos/agnes-video-v2.0/task_h6WAqFKaGa8...
-2026-08-24 12:50:56,852 [INFO] utils.video: Downloading video from https://platform-outputs.agnes-ai.space/videos/agnes-video-v2.0/task_h6WAqFKaGa8RmbPPVVjV75RGraBA4d2d.mp4 to C:\Users\Salman\Desktop\agens\agnes-video-generator\.working_dir\20260824_124715_cbaceed7b560\clip\clip.mp4
-2026-08-24 12:51:01,463 [INFO] utils.video: Video saved to C:\Users\Salman\Desktop\agens\agnes-video-generator\.working_dir\20260824_124715_cbaceed7b560\clip\clip.mp4 (1356370 bytes)
-2026-08-24 12:51:01,758 [INFO] core.pipelines.anchor_video: [Anchor] model audio mode: skip TTS
-2026-08-24 12:51:01,975 [INFO] core.pipelines.anchor_video: [Anchor] model audio mode: skip subtitle
-2026-08-24 12:51:02,263 [INFO] core.pipelines.anchor_video: [Anchor] model audio mode: return clip directly (watermark by template)
-2026-08-24 12:51:03,041 [INFO] web.deps: [Pipeline] Completed run for task cbaceed7b560
-2026-08-24 12:51:03,811 [INFO] web.deps: [Concurrency] Task cbaceed7b560 released slot (weight=2, current=0/10)
-2026-08-24 13:32:15,663 [ERROR] asyncio: Exception in callback _ProactorBasePipeTransport._call_connection_lost()
-handle: <Handle _ProactorBasePipeTransport._call_connection_lost()>
-Traceback (most recent call last):
-  File "C:\Users\Salman\AppData\Local\Python\pythoncore-3.14-64\Lib\asyncio\events.py", line 94, in _run
-    self._context.run(self._callback, *self._args)
-    ~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-  File "C:\Users\Salman\AppData\Local\Python\pythoncore-3.14-64\Lib\asyncio\proactor_events.py", line 165, in _call_connection_lost
-    self._sock.shutdown(socket.SHUT_RDWR)
-    ~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^
-ConnectionResetError: [WinError 10054] An existing connection was forcibly closed by the remote host

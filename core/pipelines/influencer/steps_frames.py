@@ -116,24 +116,30 @@ class InfluencerFrameStepsMixin:
 """
 
     def _get_end_frame_references(self, scene_idx: int) -> List[str]:
-        """Select references for end frame generation."""
+        """Select references for end frame generation (max 2 for API)."""
         refs = []
 
-        # Primary: character front face
+        # Primary: character front face (identity anchor)
         if self._character and self._character.front_face:
             refs.append(self._character.front_face)
 
-        # Continuity: previous scene's end frame
+        # Continuity: previous scene's end frame (visual flow)
         if scene_idx > 0 and self._state.previous_end_frame:
             if os.path.exists(self._state.previous_end_frame):
                 refs.append(self._state.previous_end_frame)
 
-        # Angle-specific reference
+        # If we already have 2 refs, stop (API max for i2i)
+        if len(refs) >= 2:
+            return refs[:2]
+
+        # Angle-specific reference (fill remaining slots, max 2 total)
         if self._character:
             scene = self._state.scenes[scene_idx]
             angle_refs = self._character.get_references_for_angle(scene.camera_angle)
             for ref in angle_refs:
                 if ref not in refs:
                     refs.append(ref)
+                if len(refs) >= 2:
+                    break
 
-        return refs[:3]  # Max 3 references
+        return refs[:2]  # API max 2 references for i2i
