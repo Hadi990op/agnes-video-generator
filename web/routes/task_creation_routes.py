@@ -19,6 +19,7 @@ from models.task import (
     AnchorVideoTask,
     AudioConfig,
     CreativeVideoTask,
+    InfluencerVideoTask,
     ManualConfig,
     ManuscriptVideoTask,
     PoetryVideoTask,
@@ -696,3 +697,78 @@ async def poetry_scene_prompt(
         total_duration=total_duration,
         style=style,
     )
+
+
+# ═══════════════════════════════════════════════════════════════
+# AI Influencer Studio
+# ═══════════════════════════════════════════════════════════════
+
+
+@router.post("/api/tasks/influencer")
+async def create_influencer_task(
+    character_name: str = Form(...),
+    character_description: str = Form(""),
+    script_text: str = Form(...),
+    scene_count: int = Form(5),
+    voice_role: str = Form("zh-CN-XiaoxiaoNeural"),
+    voice_speed: float = Form(1.0),
+    video_width: int = Form(768),
+    video_height: int = Form(1152),
+    character_seed: Optional[int] = Form(None),
+    enable_subtitle: bool = Form(True),
+    enable_narration: bool = Form(True),
+    character_image: Optional[UploadFile] = File(None),
+):
+    """Create AI Influencer video task."""
+    api_key = get_api_key()
+    if not api_key:
+        raise HTTPException(status_code=400, detail=API_KEY_MISSING_MSG)
+
+    task_id = f"influencer_{uuid.uuid4().hex[:12]}"
+    dir_name = f"influencer_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
+
+    # Handle character image upload
+    character_image_path = ""
+    if character_image and character_image.filename:
+        upload_dir = os.path.join("_workspaces", "default", dir_name, "uploads")
+        os.makedirs(upload_dir, exist_ok=True)
+        image_path = os.path.join(upload_dir, f"character_{character_image.filename}")
+        with open(image_path, "wb") as f:
+            f.write(await character_image.read())
+        character_image_path = image_path
+
+    # Build configs
+    audio_config = AudioConfig(enabled=enable_narration, voice=voice_role, speed=voice_speed)
+    subtitle_config = SubtitleConfig(enabled=enable_subtitle)
+
+    state = InfluencerVideoTask(
+        task_id=task_id,
+        task_type=TaskType.INFLUENCER,
+        character_name=character_name,
+        character_description=character_description,
+        character_image_path=character_image_path,
+        script_text=script_text,
+        scene_count=scene_count,
+        voice_role=voice_role,
+        voice_speed=voice_speed,
+        video_width=video_width,
+        video_height=video_height,
+        character_seed=character_seed,
+        audio_config=audio_config,
+        subtitle_config=subtitle_config,
+    )
+
+    tm = TaskManager(task_id, dir_name=dir_name)
+    tm.create(state)
+    deps.mark_task_queued(tm)
+
+    pipeline = deps.create_pipeline_for_type(
+        TaskType.INFLUENCER, api_key, task_id, dir_name,
+    )
+    app_state.active_pipelines[task_id] = pipeline
+    app_state.launch_background_task(
+        deps.run_pipeline_with_concurrency(pipeline, state, tm)
+    )
+
+    logger.info("[Influencer] Created task %s (character: %s)", task_id, character_name)
+    return {"ok": True, "task_id": task_id, "dir_name": dir_name}

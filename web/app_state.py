@@ -34,6 +34,7 @@ TASK_TYPE_WEIGHTS = {
     TaskType.ANCHOR: 2,       # 1 i2v submit + 轻量轮询
     TaskType.POETRY: 3,       # 1 Chat(拆分) + N*Video + N*合成
     TaskType.IMAGE: 1,        # 1 image submit
+    TaskType.INFLUENCER: 4,   # Character + Script + N*Image + N*Video + Audio
 }
 MAX_CONCURRENT_WEIGHT = _AGNES_RATE_LIMIT // 2  # 默认 10
 

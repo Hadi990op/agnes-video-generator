@@ -37,6 +37,7 @@ class TaskType(str, Enum):
     ANCHOR = "anchor"
     IMAGE = "image"
     POETRY = "poetry"
+    INFLUENCER = "influencer"
 
 
 class VideoMode(str, Enum):
@@ -445,10 +446,93 @@ class SimpleImageTask(BaseTaskState):
 
 
 # ═══════════════════════════════════════════════════
+# AI Influencer Studio（类型 7）
+# ═══════════════════════════════════════════════════
+
+
+class InfluencerSceneTask(BaseModel):
+    """Scene task for AI Influencer mode with continuity metadata."""
+
+    index: int
+    status: StepStatus = StepStatus.PENDING
+    scene_prompt: str = ""
+    end_frame_prompt: str = ""
+    end_frame_file: str = ""
+    video_id: str = ""
+    video_status: StepStatus = StepStatus.PENDING
+    video_file: str = ""
+    narration_text: str = ""
+    duration: int = 5
+
+    # ── Influencer-specific ───────────────────────────────────────
+    camera_angle: str = "front"      # front|left_profile|right_profile|3/4_left|3/4_right|full_body
+    location: str = ""               # Scene location
+    wardrobe_notes: str = ""         # Any wardrobe changes from baseline
+    emotion: str = "neutral"         # Character emotion
+    continuity_metadata: dict = Field(default_factory=dict)  # Hidden metadata for continuity engine
+
+
+class InfluencerVideoTask(BaseTaskState):
+    """AI Influencer Studio task — character-locked multi-scene video.
+
+    Extends the creative pipeline with:
+    - Persistent character identity (multi-angle references)
+    - Locked voice across all scenes
+    - Frame chaining (prev end = next start)
+    - Continuity engine metadata
+    """
+
+    task_type: Literal[TaskType.INFLUENCER] = TaskType.INFLUENCER
+
+    # ── Character identity ────────────────────────────────────────
+    character_name: str = ""
+    character_description: str = ""
+    character_image_path: str = ""            # Primary reference image
+    character_profile_data: dict = Field(default_factory=dict)  # Serialized CharacterProfile
+
+    # ── Script ────────────────────────────────────────────────────
+    script_text: str = ""
+    scenes: List[InfluencerSceneTask] = Field(default_factory=list)
+
+    # ── Scene planning ────────────────────────────────────────────
+    scene_count: int = 5
+    scene_durations: List[int] = Field(default_factory=list)
+
+    # ── Continuity ────────────────────────────────────────────────
+    previous_end_frame: str = ""              # Chain link between scenes
+    approved_frames: List[str] = Field(default_factory=list)
+
+    # ── Voice ─────────────────────────────────────────────────────
+    voice_role: str = "zh-CN-XiaoxiaoNeural"
+    voice_speed: float = 1.0
+    audio_config: AudioConfig = Field(default_factory=AudioConfig)
+    subtitle_config: SubtitleConfig = Field(default_factory=SubtitleConfig)
+    combined_audio: str = ""
+    combined_subtitle: str = ""
+    subtitle_styles_path: str = ""
+
+    # ── Seed ──────────────────────────────────────────────────────
+    character_seed: Optional[int] = None
+
+    # ── Step statuses ─────────────────────────────────────────────
+    step_character: StepStatus = StepStatus.PENDING
+    step_script: StepStatus = StepStatus.PENDING
+    step_reference_images: StepStatus = StepStatus.PENDING
+    step_end_frames: StepStatus = StepStatus.PENDING
+    step_video_generation: StepStatus = StepStatus.PENDING
+    step_audio: StepStatus = StepStatus.PENDING
+    step_subtitle: StepStatus = StepStatus.PENDING
+    step_concatenation: StepStatus = StepStatus.PENDING
+
+    # ── Products ──────────────────────────────────────────────────
+    final_video_file: str = ""
+
+
+# ═══════════════════════════════════════════════════
 # 联合类型 + 反序列化工厂
 # ═══════════════════════════════════════════════════
 
-AnyTaskState = Union[SimpleVideoTask, CreativeVideoTask, ManuscriptVideoTask, AnchorVideoTask, PoetryVideoTask, SimpleImageTask]
+AnyTaskState = Union[SimpleVideoTask, CreativeVideoTask, ManuscriptVideoTask, AnchorVideoTask, PoetryVideoTask, SimpleImageTask, InfluencerVideoTask]
 
 # 用于 TaskManager.load()：根据 task_type 字段选择正确的模型类
 _TASK_TYPE_MAP: dict[str, type[BaseTaskState]] = {
@@ -458,6 +542,7 @@ _TASK_TYPE_MAP: dict[str, type[BaseTaskState]] = {
     TaskType.ANCHOR: AnchorVideoTask,
     TaskType.POETRY: PoetryVideoTask,
     TaskType.IMAGE: SimpleImageTask,
+    TaskType.INFLUENCER: InfluencerVideoTask,
 }
 
 
@@ -539,6 +624,22 @@ class CreateSimpleImageTaskRequest(BaseModel):
     size: str = "1024x1024"
     negative_prompt: Optional[str] = None
     system_prompt: str = ""
+
+
+class CreateInfluencerTaskRequest(BaseModel):
+    """创建 AI Influencer 视频任务的请求体"""
+
+    character_name: str
+    character_description: str = ""
+    script_text: str
+    scene_count: int = 5
+    voice_role: str = "zh-CN-XiaoxiaoNeural"
+    voice_speed: float = 1.0
+    video_width: int = 768
+    video_height: int = 1152
+    character_seed: Optional[int] = None
+    audio_config: Optional[AudioConfig] = None
+    subtitle_config: Optional[SubtitleConfig] = None
 
 
 # ═══════════════════════════════════════════════════

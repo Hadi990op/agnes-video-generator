@@ -18,6 +18,7 @@ from core.pipelines import (
     PoetryVideoPipeline,
     SimpleVideoPipeline,
 )
+from core.pipelines.influencer import InfluencerPipeline
 from core.task_manager import TaskManager
 from models.task import BaseTaskState, StepStatus, TaskType
 
@@ -79,6 +80,16 @@ def create_pipeline_for_type(
             task_id=task_id,
             dir_name=dir_name,
             chat_model=text_model,
+            video_model=video_model,
+            shutdown_event=shutdown_event,
+        )
+    elif task_type == TaskType.INFLUENCER:
+        return InfluencerPipeline(
+            api_key=api_key,
+            task_id=task_id,
+            dir_name=dir_name,
+            chat_model=text_model,
+            image_model=image_model,
             video_model=video_model,
             shutdown_event=shutdown_event,
         )

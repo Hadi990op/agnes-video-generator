@@ -766,6 +766,7 @@ from core.pipelines.creative_video import CreativeVideoPipeline
 from core.pipelines.manuscript_video import ManuscriptVideoPipeline
 from core.pipelines.anchor_video import AnchorPipeline
 from core.pipelines.poetry_video import PoetryVideoPipeline
+from core.pipelines.influencer import InfluencerPipeline
 
 __all__ = [
     "BasePipeline",
@@ -776,4 +777,5 @@ __all__ = [
     "ManuscriptVideoPipeline",
     "AnchorPipeline",
     "PoetryVideoPipeline",
+    "InfluencerPipeline",
 ]
