@@ -245,6 +245,9 @@ class AnchorPipeline(MultiScenePipeline):
             try:
                 video_output = await self.video_generator.wait_for_video(video_id)
                 video_output.save(clip_path)
+                # Guard against 0KB/empty download (API returned empty body)
+                if not os.path.exists(clip_path) or os.path.getsize(clip_path) == 0:
+                    raise RuntimeError(f"[Anchor] clip download empty: {clip_path}")
                 break
             except Exception as e:
                 if attempt < 2:

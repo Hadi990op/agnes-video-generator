@@ -17,6 +17,28 @@ from .concat import _AUDIO_BITRATE, _AUDIO_CODEC, _AUDIO_FPS, _VIDEO_FPS
 logger = logging.getLogger(__name__)
 
 
+def _rgb_to_ass(color) -> str:
+    """Convert a color name or (r,g,b) tuple to ASS &HBBGGRR& format."""
+    named = {
+        "white": (255, 255, 255),
+        "black": (0, 0, 0),
+        "red": (255, 0, 0),
+        "green": (0, 255, 0),
+        "blue": (0, 0, 255),
+        "yellow": (255, 255, 0),
+        "cyan": (0, 255, 255),
+        "magenta": (255, 0, 255),
+    }
+    if isinstance(color, str):
+        rgb = named.get(color.strip().lower(), (255, 255, 255))
+    elif isinstance(color, (list, tuple)) and len(color) >= 3:
+        rgb = (int(color[0]), int(color[1]), int(color[2]))
+    else:
+        rgb = (255, 255, 255)
+    r, g, b = rgb
+    return f"&H{b:02X}{g:02X}{r:02X}&"
+
+
 class AudioOverlayMixin:
     """音频叠加拼接与数字人合成方法，v5.0 Batch 4（4.3）拆分。"""
 
@@ -186,6 +208,20 @@ class AudioOverlayMixin:
                     fps=_VIDEO_FPS,
                     logger="bar",
                 )
+
+            # Verify the output is non-empty; remove 0KB file and raise if broken
+            if not os.path.exists(output_path) or os.path.getsize(output_path) == 0:
+                raise RuntimeError(
+                    f"[Compositor] concat_videos_with_audio_overlay produced empty file: {output_path}"
+                )
+        except Exception:
+            # Clean up any partial/0KB output so a retry regenerates it
+            if os.path.exists(output_path):
+                try:
+                    os.remove(output_path)
+                except OSError:
+                    pass
+            raise
         finally:
             if video_clip is not None:
                 video_clip.close()
@@ -265,8 +301,25 @@ class AudioOverlayMixin:
 
         looped_path = output_path.replace(".mp4", "_looped.mp4")
 
-        # Step 4: Concatenate with xfade cross-fade transitions
+        # Step 4: Loop the clip to cover the full audio duration.
+        # Use -stream_loop with re-encode (reliable across codecs/streams).
+        # The concat-demuxer (-c copy) path is fragile when the source clip has
+        # incompatible streams, so we prefer re-encode here.
         try:
+            subprocess.run(
+                ["ffmpeg", "-y",
+                 "-stream_loop", str(n - 1), "-i", clip_path,
+                 "-vf", f"trim=duration={needed},setpts=PTS-STARTPTS",
+                 "-c:v", "libx264", "-preset", "fast", "-pix_fmt", "yuv420p",
+                 "-t", str(needed),
+                 looped_path],
+                stdin=subprocess.DEVNULL,
+                check=True, capture_output=True, timeout=300,
+            )
+        except subprocess.CalledProcessError as e:
+            logger.warning(f"[Compositor] stream_loop concat failed: {str(e)[:200]}, trying concat demuxer fallback")
+
+            # Fallback: concat demuxer with stream copy
             subprocess.run(
                 ["ffmpeg", "-y", "-f", "concat", "-safe", "0",
                  "-i", concat_file,
@@ -276,85 +329,60 @@ class AudioOverlayMixin:
                 stdin=subprocess.DEVNULL,
                 check=True, capture_output=True, timeout=300,
             )
-        except subprocess.CalledProcessError as e:
-            logger.warning(f"[Compositor] Simple concat failed: {e.stderr[:200]}, trying stream_loop fallback")
 
-            # Fallback: use -stream_loop to loop the clip, then trim to needed duration
+        # Step 5: Overlay audio + subtitles via ffmpeg streaming.
+        # Using ffmpeg (not moviepy) avoids loading the full looped video into
+        # memory — this prevents 0KB/OOM failures on long anchor videos.
+        try:
+            # Verify looped clip is valid (non-empty) before compositing
+            if not os.path.exists(looped_path) or os.path.getsize(looped_path) == 0:
+                raise RuntimeError(
+                    f"[Compositor] looped anchor video is empty/missing: {looped_path}"
+                )
+
+            video_filter = None
+            if srt_path and os.path.exists(srt_path) and subtitle_style:
+                force_style = VideoConcatenator._build_ass_force_style(subtitle_style)
+                srt_escaped = srt_path.replace("\\", "/").replace(":", "\\:")
+                video_filter = f"subtitles='{srt_escaped}'"
+                if force_style:
+                    video_filter = f"subtitles='{srt_escaped}':force_style='{force_style}'"
+
+            cmd = ["ffmpeg", "-y", "-i", looped_path, "-i", audio_path]
+            if video_filter:
+                cmd += [
+                    "-filter_complex",
+                    f"[0:v]{video_filter}[v];[1:a]volume=1.5[a]",
+                    "-map", "[v]", "-map", "[a]",
+                ]
+            else:
+                cmd += ["-map", "0:v", "-map", "1:a", "-af", "volume=1.5"]
+            cmd += [
+                "-c:v", "libx264", "-preset", "fast", "-pix_fmt", "yuv420p",
+                "-c:a", "aac", "-b:a", "192k",
+                "-shortest",
+                output_path,
+            ]
+
             subprocess.run(
-                ["ffmpeg", "-y",
-                 "-stream_loop", str(n - 1), "-i", clip_path,
-                 "-filter_complex",
-                 f"[0:v]trim=duration={needed}[v]",
-                 "-map", "[v]",
-                 "-c:v", "libx264",
-                 "-preset", "fast",
-                 "-t", str(needed),
-                 looped_path],
-                stdin=subprocess.DEVNULL,
-                check=True, capture_output=True, timeout=300,
+                cmd, stdin=subprocess.DEVNULL,
+                check=True, capture_output=True, timeout=600,
             )
 
-        # Step 5: Overlay audio and subtitles
-        concat_video_clip = None
-        audio_clip_obj = None
-        try:
-            concat_video_clip = VideoFileClip(looped_path)
-            audio_clip_obj = AudioFileClip(audio_path)
-
-            _AUDIO_VOLUME_FACTOR = 1.5
-            audio_clip_obj = audio_clip_obj.with_volume_scaled(_AUDIO_VOLUME_FACTOR)
-
-            video_with_audio = concat_video_clip.with_audio(audio_clip_obj)
-
-            if srt_path and os.path.exists(srt_path) and subtitle_style:
-                per_entry_styles = None
-                if subtitle_styles_path and os.path.exists(subtitle_styles_path):
-                    with open(subtitle_styles_path, "r", encoding="utf-8") as f:
-                        per_entry_styles = json.load(f)
-
-                subs_clips = VideoConcatenator._parse_srt_to_clips(
-                    srt_path, subtitle_style,
-                    video_width, video_height,
-                    video_duration=concat_video_clip.duration,
-                    subtitle_styles=per_entry_styles,
+            # Verify the output is non-empty; remove 0KB file and raise if broken
+            if not os.path.exists(output_path) or os.path.getsize(output_path) == 0:
+                raise RuntimeError(
+                    f"[Compositor] composite_anchor_video produced empty file: {output_path}"
                 )
-                if subs_clips:
-                    final = CompositeVideoClip([video_with_audio, *subs_clips])
-                    final.write_videofile(
-                        output_path,
-                        codec="libx264",
-                        audio_codec=_AUDIO_CODEC,
-                        audio_bitrate=_AUDIO_BITRATE,
-                        audio_fps=_AUDIO_FPS,
-                        fps=_VIDEO_FPS,
-                        logger="bar",
-                    )
-                    final.close()
-                else:
-                    video_with_audio.write_videofile(
-                        output_path,
-                        codec="libx264",
-                        audio_codec=_AUDIO_CODEC,
-                        audio_bitrate=_AUDIO_BITRATE,
-                        audio_fps=_AUDIO_FPS,
-                        fps=_VIDEO_FPS,
-                        logger="bar",
-                    )
-            else:
-                video_with_audio.write_videofile(
-                    output_path,
-                    codec="libx264",
-                    audio_codec=_AUDIO_CODEC,
-                    audio_bitrate=_AUDIO_BITRATE,
-                    audio_fps=_AUDIO_FPS,
-                    fps=_VIDEO_FPS,
-                    logger="bar",
-                )
+        except Exception:
+            # Clean up any partial/0KB output so a retry regenerates it
+            if os.path.exists(output_path):
+                try:
+                    os.remove(output_path)
+                except OSError:
+                    pass
+            raise
         finally:
-            if concat_video_clip is not None:
-                concat_video_clip.close()
-            if audio_clip_obj is not None:
-                audio_clip_obj.close()
             for tmp in (looped_path, concat_file):
                 if os.path.exists(tmp):
                     try:
@@ -364,3 +392,45 @@ class AudioOverlayMixin:
 
         logger.info(f"[Compositor] composite_anchor_video done: {output_path}")
         return output_path
+
+    @staticmethod
+    def _build_ass_force_style(style) -> str:
+        """Build an ASS force_style string from SubtitleStyle for ffmpeg subtitles."""
+        from core.config import resolve_font_path
+
+        parts = []
+        if style.font:
+            font_path = resolve_font_path(style.font)
+            if font_path and os.path.exists(font_path):
+                font_dir = os.path.dirname(font_path)
+                font_name = os.path.splitext(os.path.basename(font_path))[0]
+                # fontsdir must use forward slashes for ffmpeg filter
+                parts.append(f"FontName={font_name}")
+                parts.append(f"FontFile={font_path.replace(chr(92), '/')}")
+        if style.fontsize:
+            parts.append(f"FontSize={style.fontsize}")
+        if style.color:
+            parts.append(f"PrimaryColour={_rgb_to_ass(style.color)}")
+        if style.stroke_color:
+            parts.append(f"OutlineColour={_rgb_to_ass(style.stroke_color)}")
+        if style.stroke_width:
+            parts.append(f"Outline={style.stroke_width}")
+        # Position → Alignment (1-9 grid)
+        pos = style.position
+        if isinstance(pos, (list, tuple)) and len(pos) >= 2:
+            h, v = str(pos[0]).lower(), str(pos[1]).lower()
+            align = 2  # default bottom-center
+            if "top" in v:
+                align = 8 if h == "center" else (7 if "left" in h else 9)
+            elif "bottom" in v:
+                align = 2 if h == "center" else (1 if "left" in h else 3)
+            elif h == "center":
+                align = 5
+            parts.append(f"Alignment={align}")
+        if style.bg_color:
+            r, g, b, a = style.bg_color
+            ass_alpha = f"&H{int(a):02X}{b:02X}{g:02X}{r:02X}&"
+            # BackColour expects &HAABBGGRR
+            parts.append(f"BackColour={ass_alpha}")
+            parts.append("BorderStyle=4")  # 4 = background box
+        return ",".join(parts)
