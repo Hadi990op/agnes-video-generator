@@ -1,7 +1,0 @@
-INFO:     Started server process [10872]
-INFO:     Waiting for application startup.
-2026-08-25 12:42:37,153 [INFO] core.api.error_collector: [ErrorCollector] Workspace root set to C:\Users\Salman\Desktop\agens\agnes-video-generator\.working_dir
-2026-08-25 12:42:38,484 [INFO] core.audio.voices: [Voices] Loaded catalog: 154 voices across 13 languages
-2026-08-25 12:42:38,524 [INFO] __main__: [Startup] Voice catalog loaded
-INFO:     Application startup complete.
-INFO:     Uvicorn running on http://0.0.0.0:8765 (Press CTRL+C to quit)
