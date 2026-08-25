@@ -141,6 +141,9 @@ export function submitAnchor(form: FormData) {
 export function submitPoetry(form: FormData) {
   return fetch('/api/tasks/poetry', { method: 'POST', body: form }).then((r) => r.json())
 }
+export function submitInfluencer(form: FormData) {
+  return fetch('/api/tasks/influencer', { method: 'POST', body: form }).then((r) => r.json())
+}
 export function submitImage(form: FormData) {
   return fetch('/api/image/generate', { method: 'POST', body: form }).then((r) => r.json())
 }
