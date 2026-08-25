@@ -738,7 +738,8 @@ async def create_influencer_task(
         character_image_path = image_path
 
     # Build configs
-    audio_config = AudioConfig(enabled=enable_narration, voice=voice_role, speed=voice_speed)
+    speed_pct = int((voice_speed - 1.0) * 100)
+    audio_config = AudioConfig(enabled=enable_narration, voice=voice_role, rate=f"{speed_pct:+d}%")
     subtitle_config = SubtitleConfig(enabled=enable_subtitle)
 
     state = InfluencerVideoTask(

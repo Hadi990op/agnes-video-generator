@@ -73,7 +73,6 @@ class CharacterStepsMixin:
             "A professional young influencer, front-facing portrait, "
             "clear face, natural lighting, photorealistic"
         )
-        size = f"{self._state.video_width}x{self._state.video_height}"
 
         await self._emit(
             "character_gen", "running",
@@ -83,7 +82,7 @@ class CharacterStepsMixin:
         try:
             img_output = await self.image_generator.generate_single_image(
                 prompt=prompt,
-                size=size,
+                size="1024x1024",
             )
             front_path = os.path.join(char_dir, "front_face.jpg")
             img_output.save(front_path)
@@ -121,7 +120,7 @@ class CharacterStepsMixin:
             ),
         }
 
-        size = f"{self._state.video_width}x{self._state.video_height}"
+        size = "1024x1024"
 
         for angle_name, angle_prompt in angles.items():
             # Skip if already generated
@@ -153,8 +152,7 @@ class CharacterStepsMixin:
         try:
             description = await asyncio.to_thread(
                 self.screenwriter.get_character_appearance,
-                story=self._character.description or self._character.name,
-                language="en",
+                self._character.description or self._character.name,
             )
             self._character.appearance_text = description
             logger.info("[Influencer] Extracted appearance: %s...", description[:80])

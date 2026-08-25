@@ -212,8 +212,9 @@ class InfluencerPipeline(
     # ── Reference images step ─────────────────────────────────────
 
     async def _step_reference_images(self) -> None:
-        """Generate multi-angle character references."""
-        await self._step_character_identity()
+        """Phase 1 already generates character identity + multi-angle refs.
+        This step is a no-op placeholder for the pipeline template."""
+        pass
 
     # ── Audio step (locked voice) ─────────────────────────────────
 

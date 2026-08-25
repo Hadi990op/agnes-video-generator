@@ -66,7 +66,7 @@ class InfluencerFrameStepsMixin:
             img_output = await self.image_generator.generate_single_image(
                 prompt=prompt,
                 reference_image_paths=refs,
-                size=f"{self._state.video_width}x{self._state.video_height}",
+                size="1024x1024",
             )
             img_output.save(end_frame_path)
 
