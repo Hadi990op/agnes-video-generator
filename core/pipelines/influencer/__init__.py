@@ -338,8 +338,6 @@ class InfluencerPipeline(
             output_path=output_path,
             subtitle_style=state.subtitle_config.style if state.subtitle_config.enabled else None,
             subtitle_styles_path=state.subtitle_styles_path or None,
-            video_width=state.video_width,
-            video_height=state.video_height,
         )
 
         logger.info("[Influencer] Final video: %s", output_path)
