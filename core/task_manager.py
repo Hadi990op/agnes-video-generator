@@ -17,6 +17,8 @@ from models.task import (
     AnyTaskState,
     BaseTaskState,
     CreativeVideoTask,
+    InfluencerSceneTask,
+    InfluencerVideoTask,
     ManuscriptParagraph,
     ManuscriptVideoTask,
     SceneTask,
@@ -111,6 +113,13 @@ class TaskManager:
                     for s in (data.get("scenes") or self._state.scenes)
                 ]
 
+            # 对 InfluencerVideoTask 确保 scenes 字段正确反序列化为 InfluencerSceneTask
+            if isinstance(self._state, InfluencerVideoTask):
+                self._state.scenes = [
+                    InfluencerSceneTask(**s) if isinstance(s, dict) else s
+                    for s in (data.get("scenes") or self._state.scenes)
+                ]
+
             logger.debug(
                 f"[TaskManager] Loaded task {self.task_id}: "
                 f"type={self._state.task_type}, status={self._state.status}"
@@ -149,9 +158,9 @@ class TaskManager:
             setattr(self._state, step_name, status)
             self._save()
 
-    def update_scene(self, scene: SceneTask):
-        """更新某个场景的状态并持久化（仅 CreativeVideoTask）。"""
-        if self._state and isinstance(self._state, CreativeVideoTask):
+    def update_scene(self, scene):
+        """更新某个场景的状态并持久化（CreativeVideoTask / InfluencerVideoTask）。"""
+        if self._state and isinstance(self._state, (CreativeVideoTask, InfluencerVideoTask)):
             for i, s in enumerate(self._state.scenes):
                 if s.index == scene.index:
                     self._state.scenes[i] = scene
@@ -165,10 +174,16 @@ class TaskManager:
                 if hasattr(self._state, key):
                     # Convert serialized dict lists back to model instances
                     if key == "scenes" and isinstance(value, list):
-                        value = [
-                            SceneTask(**s) if isinstance(s, dict) else s
-                            for s in value
-                        ]
+                        if isinstance(self._state, InfluencerVideoTask):
+                            value = [
+                                InfluencerSceneTask(**s) if isinstance(s, dict) else s
+                                for s in value
+                            ]
+                        else:
+                            value = [
+                                SceneTask(**s) if isinstance(s, dict) else s
+                                for s in value
+                            ]
                     elif key == "paragraphs" and isinstance(value, list):
                         value = [
                             ManuscriptParagraph(**p) if isinstance(p, dict) else p
