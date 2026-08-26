@@ -546,7 +546,14 @@ class AgnesVideoAPI:
             # 优化 2：入参处先归一化参考图（尺寸统一 + 体积压缩），再 resolve。
             # URL/data: 透传、失败回退原图，安全无回归。
             norm = await asyncio.to_thread(normalize_reference_path, p, width, height)
-            resolved_refs.append(await self._resolve_image_ref(norm))
+            if os.path.exists(norm):
+                # Video model reliably decodes inline base64 data URIs.
+                # Hosted image URLs intermittently fail with
+                # "Cannot read 'image' (this model does not support image input)",
+                # so for video i2v we always pass base64 of local files.
+                resolved_refs.append(self._path_to_b64(norm))
+            else:
+                resolved_refs.append(await self._resolve_image_ref(norm))
         n_refs = len(resolved_refs)
 
         if n_refs == 0:
