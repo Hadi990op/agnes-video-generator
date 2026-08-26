@@ -263,7 +263,7 @@ class ConcatMixin:
 
     @staticmethod
     def _get_duration(path: str) -> float:
-        """用 ffprobe 获取媒体文件时长（秒）。"""
+        """用 ffprobe 获取媒体文件时长（秒）；ffprobe 不可用时回退 ffmpeg -i。"""
         try:
             r = subprocess.run(
                 ["ffprobe", "-v", "error", "-show_entries", "format=duration",
@@ -271,9 +271,26 @@ class ConcatMixin:
                 stdin=subprocess.DEVNULL,
                 capture_output=True, text=True, timeout=15,
             )
-            return float(r.stdout.strip())
+            d = float(r.stdout.strip())
+            if d > 0:
+                return d
         except Exception:
-            return 0.0
+            pass
+        # Fallback: parse `ffmpeg -i` Duration line (works when only ffmpeg is on PATH)
+        try:
+            r = subprocess.run(
+                ["ffmpeg", "-i", path],
+                stdin=subprocess.DEVNULL,
+                capture_output=True, text=True, timeout=15,
+            )
+            import re
+            m = re.search(r"Duration:\s*(\d+):(\d+):(\d+\.\d+)", r.stderr)
+            if m:
+                h, mm, ss = int(m.group(1)), int(m.group(2)), float(m.group(3))
+                return h * 3600 + mm * 60 + ss
+        except Exception:
+            pass
+        return 0.0
 
     @staticmethod
     def _run_ffmpeg(cmd: list, desc: str = "") -> None:
