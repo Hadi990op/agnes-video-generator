@@ -278,13 +278,9 @@ class AudioOverlayMixin:
         os.makedirs(os.path.dirname(output_path) or ".", exist_ok=True)
 
         # Step 1: Get clip duration
-        probe = subprocess.run(
-            ["ffprobe", "-v", "error", "-show_entries", "format=duration",
-             "-of", "csv=p=0", clip_path],
-            stdin=subprocess.DEVNULL,
-            capture_output=True, text=True, timeout=15,
-        )
-        clip_duration = float(probe.stdout.strip() or 5.0)
+        # NOTE: use _get_duration (ffprobe with ffmpeg fallback) — the deployed
+        # container only has ffmpeg on PATH (imageio-ffmpeg), no ffprobe.
+        clip_duration = VideoConcatenator._get_duration(clip_path)
         if clip_duration <= 0:
             clip_duration = 5.0
 
