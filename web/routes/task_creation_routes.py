@@ -22,6 +22,7 @@ from models.task import (
     InfluencerVideoTask,
     ManualConfig,
     ManuscriptVideoTask,
+    MovieVideoTask,
     PoetryVideoTask,
     SimpleVideoTask,
     SubtitleConfig,
@@ -606,6 +607,89 @@ async def create_anchor_task(
     deps.mark_task_queued(tm)
     app_state.launch_background_task(deps.run_pipeline_with_concurrency(pipeline, state, tm))
     logger.info(f"[Anchor] Task created: {task_id}, script_len={len(script_text)} (queued)")
+    return {"ok": True, "task_id": task_id, "dir_name": dir_name}
+
+
+# ═══════════════════════════════════════════════════
+# v7.0 AI 电影制作（类型 8）
+# ═══════════════════════════════════════════════════
+
+@router.post("/api/tasks/movie")
+async def create_movie_task(
+    script_text: str = Form(...),
+    visual_style_preset: str = Form("cinematic photorealistic"),
+    max_scenes: int = Form(0),
+    max_shots: int = Form(0),
+    video_width: int = Form(768),
+    video_height: int = Form(1152),
+    audio_enabled: bool = Form(True),
+    audio_voice: str = Form("zh-CN-XiaoxiaoNeural"),
+    audio_rate: str = Form("+0%"),
+    audio_lang: str = Form(""),
+    subtitle_enabled: bool = Form(True),
+    subtitle_style_mode: str = Form("fixed"),
+    subtitle_style_hints: str = Form(""),
+    subtitle_font: str = Form("STHeitiMedium.ttc"),
+    subtitle_color: str = Form("white"),
+    subtitle_fontsize: int = Form(42),
+    subtitle_position: str = Form("bottom"),
+    subtitle_stroke_color: str = Form("black"),
+    subtitle_stroke_width: int = Form(2),
+    subtitle_bg_color: str = Form("black@0.5"),
+    execution_mode: str = Form("auto"),
+    pause_points: str = Form(""),
+):
+    """创建 AI 电影制作任务（类型 8 / v7.0）。
+
+    将剧本/故事转化为结构化制作计划（制作圣经 + 分镜/镜头拆解），
+    用 Agnes 最佳模型生成角色/场景 canon 参考图与各镜头视频，拼接为长片。
+    """
+    api_key = get_api_key()
+    if not api_key:
+        raise HTTPException(status_code=400, detail=API_KEY_MISSING_MSG)
+
+    if not script_text.strip():
+        raise HTTPException(status_code=400, detail="电影剧本不能为空")
+    if len(script_text) > 200000:
+        raise HTTPException(status_code=422, detail="电影剧本最多 200000 字符")
+
+    task_id = uuid.uuid4().hex[:12]
+    name = f"movie_{task_id}"
+    dir_name = f"{datetime.now().strftime('%Y%m%d_%H%M%S')}_{task_id}"
+
+    audio_config = AudioConfig(
+        enabled=audio_enabled,
+        voice=audio_voice,
+        rate=audio_rate,
+    )
+    subtitle_config = _build_subtitle_config(
+        subtitle_enabled, subtitle_style_mode, subtitle_style_hints,
+        subtitle_font, subtitle_color, subtitle_fontsize, subtitle_position,
+        subtitle_stroke_color, subtitle_stroke_width, subtitle_bg_color,
+    )
+
+    state = MovieVideoTask(
+        task_id=task_id,
+        creative_name=name,
+        script_text=script_text.strip(),
+        visual_style_preset=visual_style_preset,
+        max_scenes=max(0, max_scenes),
+        max_shots=max(0, max_shots),
+        video_width=video_width,
+        video_height=video_height,
+        audio_config=audio_config,
+        subtitle_config=subtitle_config,
+        manual_config=_build_manual_config(execution_mode, pause_points),
+    )
+
+    pipeline = deps.create_pipeline_for_type(TaskType.MOVIE, api_key, task_id, dir_name)
+    app_state.active_pipelines[task_id] = pipeline
+
+    tm = TaskManager(task_id, dir_name=dir_name)
+    tm.create(state)
+    deps.mark_task_queued(tm)
+    app_state.launch_background_task(deps.run_pipeline_with_concurrency(pipeline, state, tm))
+    logger.info(f"[Movie] Task created: {task_id}, script_len={len(script_text)} (queued)")
     return {"ok": True, "task_id": task_id, "dir_name": dir_name}
 
 

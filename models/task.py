@@ -38,6 +38,7 @@ class TaskType(str, Enum):
     IMAGE = "image"
     POETRY = "poetry"
     INFLUENCER = "influencer"
+    MOVIE = "movie"
 
 
 class VideoMode(str, Enum):
@@ -162,6 +163,8 @@ class SceneTask(BaseModel):
     final_clip: str = ""
     # v3.x 新增：每个场景独立时长
     duration: int = 5
+    # v7.0 电影模式：每镜头参考图（角色/场景 canon 图路径列表，i2v 一致性锚点）
+    ref_images: List[str] = Field(default_factory=list)
 
 
 # ═══════════════════════════════════════════════════
@@ -528,11 +531,59 @@ class InfluencerVideoTask(BaseTaskState):
     final_video_file: str = ""
 
 
-# ═══════════════════════════════════════════════════
+class MovieVideoTask(BaseTaskState):
+    """AI 电影制作智能体任务（类型 8 / v7.0）。
+
+    将任意剧本/故事/小说/商业脚本转化为结构化、具备连续性的电影级制作计划，
+    再用 Agnes 最佳模型（视频 agnes-video-2.5-flash / 图像 agnes-image-2.1-flash /
+    文本 agnes-2.0-flash）生成分镜视频并拼接为长片。
+
+    流水线（继承 MultiScenePipeline 模板）：
+      _build_scenes        → 剧本分析 → 制作圣经 → 分镜/镜头拆解 → 生成镜头计划
+      _build_reference_images → 生成角色/场景/道具 canon 参考图（一致性锚点）
+      _generate_videos     → 逐镜头 i2v（复用 canon 参考图）
+      _generate_audio      → 逐镜头对话 TTS（EdgeTTS）
+      _generate_subtitles  → 字幕
+      _composite_final     → 拼接为完整影片 + 音频 + 字幕
+    """
+
+    task_type: Literal[TaskType.MOVIE] = TaskType.MOVIE
+
+    # ── 用户输入 ──────────────────────────────────────────────────
+    script_text: str = ""
+    visual_style_preset: str = "cinematic photorealistic"  # 主视觉风格（MASTER STYLE）
+    max_scenes: int = 0   # 0 = 不限；>0 时仅生成前 N 个场景（配合续传）
+    max_shots: int = 0    # 0 = 不限；>0 时仅生成前 N 个镜头
+
+    # ── 制作圣经 / 连续性数据库（§73 状态化记忆）──
+    production_bible: dict = Field(default_factory=dict)   # 角色/场景/道具/风格/摄影/灯光圣经
+    character_refs: dict = Field(default_factory=dict)    # 角色名 -> canon 参考图路径列表
+    location_refs: dict = Field(default_factory=dict)     # 场景名 -> canon 参考图路径列表
+    shot_plan: List[dict] = Field(default_factory=list)   # 完整镜头计划（用于 cap + resume）
+
+    # ── 通用场景列表（MultiScenePipeline 模板依赖）──
+    scenes: List[SceneTask] = Field(default_factory=list)
+
+    # ── 产物 ──────────────────────────────────────────────────────
+    combined_audio: str = ""
+    combined_subtitle: str = ""
+    subtitle_styles_path: str = ""
+    final_video_path: str = ""
+
+    # ── 步骤状态（复用 MultiScenePipeline 标准步骤名，便于暂停检查点）──
+    step_build_scenes: StepStatus = StepStatus.PENDING
+    step_reference_images: StepStatus = StepStatus.PENDING
+    step_video_generation: StepStatus = StepStatus.PENDING
+    step_audio: StepStatus = StepStatus.PENDING
+    step_subtitle: StepStatus = StepStatus.PENDING
+    step_concatenation: StepStatus = StepStatus.PENDING
+
+
+# ═══════════════════════════════════════
 # 联合类型 + 反序列化工厂
 # ═══════════════════════════════════════════════════
 
-AnyTaskState = Union[SimpleVideoTask, CreativeVideoTask, ManuscriptVideoTask, AnchorVideoTask, PoetryVideoTask, SimpleImageTask, InfluencerVideoTask]
+AnyTaskState = Union[SimpleVideoTask, CreativeVideoTask, ManuscriptVideoTask, AnchorVideoTask, PoetryVideoTask, SimpleImageTask, InfluencerVideoTask, MovieVideoTask]
 
 # 用于 TaskManager.load()：根据 task_type 字段选择正确的模型类
 _TASK_TYPE_MAP: dict[str, type[BaseTaskState]] = {
@@ -543,6 +594,7 @@ _TASK_TYPE_MAP: dict[str, type[BaseTaskState]] = {
     TaskType.POETRY: PoetryVideoTask,
     TaskType.IMAGE: SimpleImageTask,
     TaskType.INFLUENCER: InfluencerVideoTask,
+    TaskType.MOVIE: MovieVideoTask,
 }
 
 
@@ -642,7 +694,20 @@ class CreateInfluencerTaskRequest(BaseModel):
     subtitle_config: Optional[SubtitleConfig] = None
 
 
-# ═══════════════════════════════════════════════════
+class CreateMovieTaskRequest(BaseModel):
+    """创建 AI 电影制作任务的请求体（v7.0）"""
+
+    script_text: str
+    visual_style_preset: str = "cinematic photorealistic"
+    max_scenes: int = 0
+    max_shots: int = 0
+    video_width: int = 768
+    video_height: int = 1152
+    audio_config: Optional[AudioConfig] = None
+    subtitle_config: Optional[SubtitleConfig] = None
+
+
+# ═══════════════════════════════════════
 # 响应模型
 # ═══════════════════════════════════════════════════
 

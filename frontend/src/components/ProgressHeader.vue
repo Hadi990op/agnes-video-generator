@@ -20,6 +20,8 @@ const typeLabelKey: Record<string, string> = {
   manuscript: 'typeManuscript',
   anchor: 'typeAnchor',
   poetry: 'typePoetry',
+  influencer: 'typeInfluencer',
+  movie: 'typeMovie',
   image: 'typeImage',
 }
 

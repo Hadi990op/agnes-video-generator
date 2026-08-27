@@ -687,6 +687,12 @@ DEFAULT_TEXT_MODEL = "agnes-2.0-flash"
 DEFAULT_IMAGE_MODEL = "agnes-image-2.1-flash"
 DEFAULT_VIDEO_MODEL = "agnes-video-v2.0"
 
+# v7.0 电影模式强制使用的「最佳」模型（无视全局设置）。
+# 视频 2.5-flash 为质量/吞吐最佳平衡档；如需极限画质可改为 agnes-video-2.5（限速 ~1/min）。
+BEST_TEXT_MODEL = "agnes-2.0-flash"
+BEST_IMAGE_MODEL = "agnes-image-2.1-flash"
+BEST_VIDEO_MODEL = "agnes-video-2.5-flash"
+
 DEFAULT_MODELS = {
     "text": DEFAULT_TEXT_MODEL,
     "image": DEFAULT_IMAGE_MODEL,

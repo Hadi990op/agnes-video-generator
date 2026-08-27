@@ -9,6 +9,7 @@ import ManuscriptForm from './forms/ManuscriptForm.vue'
 import AnchorForm from './forms/AnchorForm.vue'
 import PoetryForm from './forms/PoetryForm.vue'
 import InfluencerForm from './forms/InfluencerForm.vue'
+import MovieForm from './forms/MovieForm.vue'
 
 const { trackEvent } = useGa()
 
@@ -19,6 +20,7 @@ const taskTypes = [
   { key: 'anchor', icon: '🎙️', label: 'ttAnchor' },
   { key: 'poetry', icon: '📜', label: 'ttPoetry' },
   { key: 'influencer', icon: '🌟', label: 'ttInfluencer' },
+  { key: 'movie', icon: '🎬', label: 'ttMovie' },
 ]
 
 // v6.0/6.1 手动模式：暂停点选项（按任务类型）
@@ -67,6 +69,14 @@ const pausePointOptions: Record<string, { key: string; label: string }[]> = {
     { key: 'subtitle', label: 'cpSubtitle' },
     { key: 'final', label: 'cpFinal' },
   ],
+  movie: [
+    { key: 'scenes', label: 'cpScenes' },
+    { key: 'references', label: 'cpReferences' },
+    { key: 'videos', label: 'cpVideos' },
+    { key: 'audio', label: 'cpAudio' },
+    { key: 'subtitle', label: 'cpSubtitle' },
+    { key: 'final', label: 'cpFinal' },
+  ],
 }
 
 // 手动模式支持的任务类型（simple/simple_image 不支持暂停，PRD §4.3）
@@ -82,6 +92,7 @@ const defaultPausePoints: Record<string, string[]> = {
   poetry: ['scenes', 'videos', 'subtitle'],
   anchor: ['scenes', 'videos'],
   influencer: ['character', 'script', 'videos', 'subtitle'],
+  movie: ['scenes', 'references', 'videos', 'subtitle'],
 }
 
 function switchTaskType(type: string) {
@@ -176,5 +187,6 @@ function selectExecMode(mode: 'auto' | 'manual') {
     <AnchorForm v-else-if="appState.currentTaskType === 'anchor'" />
     <PoetryForm v-else-if="appState.currentTaskType === 'poetry'" />
     <InfluencerForm v-else-if="appState.currentTaskType === 'influencer'" />
+    <MovieForm v-else-if="appState.currentTaskType === 'movie'" />
   </div>
 </template>

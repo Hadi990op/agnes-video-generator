@@ -8,12 +8,13 @@ from __future__ import annotations
 import asyncio
 import logging
 
-from core.config import get_selected_models
+from core.config import BEST_IMAGE_MODEL, BEST_TEXT_MODEL, BEST_VIDEO_MODEL, get_selected_models
 from core.pipelines import (
     AnchorPipeline,
     BasePipeline,
     CreativeVideoPipeline,
     ManuscriptVideoPipeline,
+    MovieVideoPipeline,
     PipelineShutdown,
     PoetryVideoPipeline,
     SimpleVideoPipeline,
@@ -91,6 +92,17 @@ def create_pipeline_for_type(
             chat_model=text_model,
             image_model=image_model,
             video_model=video_model,
+            shutdown_event=shutdown_event,
+        )
+    elif task_type == TaskType.MOVIE:
+        # v7.0 电影模式：强制使用「最佳」模型，无视全局设置
+        return MovieVideoPipeline(
+            api_key=api_key,
+            task_id=task_id,
+            dir_name=dir_name,
+            chat_model=BEST_TEXT_MODEL,
+            image_model=BEST_IMAGE_MODEL,
+            video_model=BEST_VIDEO_MODEL,
             shutdown_event=shutdown_event,
         )
     else:
