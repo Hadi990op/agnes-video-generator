@@ -701,10 +701,11 @@ class CreateMovieTaskRequest(BaseModel):
     visual_style_preset: str = "cinematic photorealistic"
     max_scenes: int = 0
     max_shots: int = 0
-    video_width: int = 768
-    video_height: int = 1152
-    audio_config: Optional[AudioConfig] = None
-    subtitle_config: Optional[SubtitleConfig] = None
+    video_width: int = 1920
+    video_height: int = 1080
+    # 电影模式：音频/字幕由视频模型自身产出，默认关闭本地 TTS 与字幕叠加
+    audio_config: AudioConfig = Field(default_factory=lambda: AudioConfig(enabled=False))
+    subtitle_config: SubtitleConfig = Field(default_factory=lambda: SubtitleConfig(enabled=False))
 
 
 # ═══════════════════════════════════════

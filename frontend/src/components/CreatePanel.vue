@@ -73,8 +73,6 @@ const pausePointOptions: Record<string, { key: string; label: string }[]> = {
     { key: 'scenes', label: 'cpScenes' },
     { key: 'references', label: 'cpReferences' },
     { key: 'videos', label: 'cpVideos' },
-    { key: 'audio', label: 'cpAudio' },
-    { key: 'subtitle', label: 'cpSubtitle' },
     { key: 'final', label: 'cpFinal' },
   ],
 }
@@ -92,7 +90,7 @@ const defaultPausePoints: Record<string, string[]> = {
   poetry: ['scenes', 'videos', 'subtitle'],
   anchor: ['scenes', 'videos'],
   influencer: ['character', 'script', 'videos', 'subtitle'],
-  movie: ['scenes', 'references', 'videos', 'subtitle'],
+  movie: ['scenes', 'references', 'videos'],
 }
 
 function switchTaskType(type: string) {

@@ -5,17 +5,12 @@ import { appState } from '@/store'
 import { useGa } from '@/composables/useGa'
 import { useNavigation } from '@/composables/useNavigation'
 import { useToast } from '@/composables/useToast'
-import { useVoice } from '@/composables/useVoice'
 import * as api from '@/api'
 import WatermarkToggle from '@/components/shared/WatermarkToggle.vue'
-import SubtitleConfig from '@/components/shared/SubtitleConfig.vue'
 
 const { trackEvent } = useGa()
 const { goProgress } = useNavigation()
 const { showToast } = useToast()
-const { voiceSelections } = useVoice()
-
-const subtitleRef = ref<InstanceType<typeof SubtitleConfig>>()
 
 const form = reactive({
   scriptText: '',
@@ -49,25 +44,6 @@ async function submitMovie() {
   const res = parseResolution(form.resolution)
   fd.append('video_width', String(res.width))
   fd.append('video_height', String(res.height))
-
-  // Voice (dialogue TTS)
-  fd.append('voice_role', voiceSelections.a)
-  fd.append('voice_speed', '1.0')
-
-  // Subtitle
-  const sc = subtitleRef.value
-  if (sc) {
-    fd.append('enable_subtitle', String(sc.subtitleEnabled))
-    fd.append('enable_narration', String(sc.audioEnabled))
-    fd.append('subtitle_style_mode', sc.styleMode)
-    fd.append('subtitle_font', sc.style.font)
-    fd.append('subtitle_color', sc.style.color)
-    fd.append('subtitle_fontsize', String(sc.style.fontsize))
-    fd.append('subtitle_position', sc.style.position)
-    fd.append('subtitle_stroke_color', sc.style.stroke_color)
-    fd.append('subtitle_stroke_width', String(sc.style.stroke_width))
-    fd.append('subtitle_bg_color', sc.style.bg_color)
-  }
 
   try {
     const d = await api.submitMovie(fd)
@@ -129,11 +105,9 @@ async function submitMovie() {
           <option value="1080x1920">{{ t('resPortrait') }}</option>
           <option value="1024x1024">{{ t('resSquare') }}</option>
         </select>
-        <p class="text-xs text-muted mt-1">{{ t('movieOptional') }}</p>
+        <p class="text-xs text-muted mt-1">{{ t('movieAudioModelNote') }}</p>
       </div>
     </div>
-
-    <SubtitleConfig ref="subtitleRef" task="a" :with-style="true" />
 
     <WatermarkToggle />
 

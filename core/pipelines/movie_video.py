@@ -225,6 +225,18 @@ class MovieVideoPipeline(MultiScenePipeline):
         await self._emit("reference_images", "completed", "canon 参考图生成完成", 0.30)
 
     # ------------------------------------------------------------------
+    # 音频 / 字幕：电影模式由视频模型自身产出音画，禁用本地 TTS 与字幕叠加
+    # ------------------------------------------------------------------
+
+    async def _generate_audio(self):
+        logger.info("[Movie] audio: model-native audio kept, skipping TTS")
+        return None
+
+    async def _generate_subtitles(self, sub_maker=None):
+        logger.info("[Movie] subtitles disabled for movie mode")
+        return
+
+    # ------------------------------------------------------------------
     # 阶段六：拼接为完整影片
     # ------------------------------------------------------------------
 
