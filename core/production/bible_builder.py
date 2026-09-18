@@ -159,7 +159,7 @@ class ProductionBibleBuilder:
     @staticmethod
     async def _json(chat, system: str, user: str, max_tokens: int = 4096):
         try:
-            return await chat.chat_json(system, user, max_tokens=max_tokens)
+            return chat.chat_json(system, user, max_tokens=max_tokens)
         except Exception as e:  # noqa: BLE001
             logger.warning("[BibleBuilder] chat_json failed (%s); returning empty", e)
             return {}
