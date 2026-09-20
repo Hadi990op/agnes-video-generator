@@ -1,0 +1,40 @@
+{
+  "logline": "A quiet reunion in a rainy coffee shop.",
+  "premise": "Two former friends meet again after years apart.",
+  "theme": "forgiveness",
+  "visual_style": "cinematic photorealistic, muted blue-grey palette, soft window light",
+  "cinematography": "static tripod shots, 35mm lens, shallow depth of field",
+  "lighting": "soft natural daylight through rain-streaked windows",
+  "color_script": "cool blues with warm accents on characters",
+  "audio_plan": "rain ambience, quiet room tone, intimate dialogue",
+  "music_plan": "sparse solo piano motif",
+  "vfx_plan": "rain on window glass",
+  "timeline": "One continuous afternoon in the coffee shop.",
+  "characters": [
+    {
+      "name": "LINA",
+      "role": "protagonist",
+      "description": "a woman in her 30s, dark raincoat, tired eyes",
+      "personality": "guarded but hopeful"
+    }
+  ],
+  "locations": [
+    {"name": "COFFEE SHOP", "description": "a small cozy coffee shop, rain outside, warm interior"}
+  ],
+  "props": [
+    {"name": "coffee cup", "description": "a white ceramic cup, half empty"}
+  ],
+  "scenes": [
+    {
+      "id": "s1",
+      "act": "1",
+      "summary": "Lina sits alone as rain falls outside.",
+      "location": "COFFEE SHOP",
+      "time_of_day": "day",
+      "weather": "rain",
+      "characters": ["LINA"],
+      "emotional_beat": "lonely anticipation",
+      "dialogue_summary": "Lina whispers to herself."
+    }
+  ]
+}

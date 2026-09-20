@@ -200,6 +200,10 @@ _CHAT_FIXTURES = [
     ("subtitle_styles", "", "subtitle_styles"),
     ("subtitle_style_designer", "", "subtitle_styles"),
     ("诗词分镜导演", "<poem>", "poetry_scenes"),
+    # movie 模式（ProductionBibleBuilder）
+    ("film production planner and script supervisor", "", "movie_bible"),
+    ("storyboard artist and assistant editor", "", "movie_shots"),
+    ("continuity supervisor", "", "movie_continuity"),
 ]
 
 

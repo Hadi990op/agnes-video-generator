@@ -6,6 +6,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import json
 import logging
 from typing import List
@@ -159,7 +160,9 @@ class ProductionBibleBuilder:
     @staticmethod
     async def _json(chat, system: str, user: str, max_tokens: int = 4096):
         try:
-            return chat.chat_json(system, user, max_tokens=max_tokens)
+            # chat_json 内部是同步 requests.post（重试 3 次，最长可达数分钟），
+            # 必须放线程池，否则会阻塞整个 asyncio 事件循环（电影模式曾因此假死）。
+            return await asyncio.to_thread(chat.chat_json, system, user, max_tokens=max_tokens)
         except Exception as e:  # noqa: BLE001
             logger.warning("[BibleBuilder] chat_json failed (%s); returning empty", e)
             return {}

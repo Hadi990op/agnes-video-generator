@@ -1,0 +1,44 @@
+[
+  {
+    "id": "shot_1",
+    "scene_id": "s1",
+    "duration": 6,
+    "characters": ["LINA"],
+    "location": "COFFEE SHOP",
+    "action": "Lina sits alone at a window table, watching rain slide down the glass.",
+    "emotion": "melancholy",
+    "dialogue": "",
+    "camera": "medium close-up, slow push-in",
+    "lighting": "soft window light",
+    "continuity_in": "Lina seated, cup on table",
+    "continuity_out": "Lina looks up toward the door"
+  },
+  {
+    "id": "shot_2",
+    "scene_id": "s1",
+    "duration": 5,
+    "characters": ["LINA"],
+    "location": "COFFEE SHOP",
+    "action": "Lina speaks quietly to herself.",
+    "emotion": "resigned",
+    "dialogue": "I never thought I'd see you again.",
+    "camera": "close-up, static",
+    "lighting": "soft window light",
+    "continuity_in": "Lina seated, looking toward door",
+    "continuity_out": "Lina sips her coffee"
+  },
+  {
+    "id": "shot_3",
+    "scene_id": "s1",
+    "duration": 5,
+    "characters": ["LINA"],
+    "location": "COFFEE SHOP",
+    "action": "Rain streaks the window as Lina holds her warm cup.",
+    "emotion": "wistful",
+    "dialogue": "",
+    "camera": "wide shot through window, static",
+    "lighting": "soft window light",
+    "continuity_in": "Lina sipping coffee",
+    "continuity_out": "Lina turns back to the window"
+  }
+]

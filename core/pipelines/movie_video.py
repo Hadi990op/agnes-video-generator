@@ -91,7 +91,16 @@ class MovieVideoPipeline(MultiScenePipeline):
             bible = await builder.analyze_script(
                 self._state.script_text, self._state.visual_style_preset
             )
+            if not (bible.get("scenes") or bible.get("characters")):
+                raise RuntimeError(
+                    "[Movie] 剧本分析失败：LLM 未返回有效的制作圣经，"
+                    "请检查 API Key / 文本模型是否可用"
+                )
             shots = await builder.build_shot_breakdown(bible)
+            if not shots:
+                raise RuntimeError(
+                    "[Movie] 镜头拆解失败：LLM 未返回任何镜头，无法生成电影"
+                )
             try:
                 issues = await builder.validate_continuity(bible, shots)
                 bible["continuity_issues"] = issues
@@ -183,7 +192,8 @@ class MovieVideoPipeline(MultiScenePipeline):
                 try:
                     out = await self.image_generator.generate_single_image(prompt=prompt, size=size)
                     p = os.path.join(refs_dir, f"char_{_sanitize(name)}_{view.replace(' ', '_')}.png")
-                    out.save(p)
+                    # out.save 在 url 模式下做同步下载，放线程池避免阻塞事件循环
+                    await asyncio.to_thread(out.save, p)
                     imgs.append(p)
                 except Exception as e:
                     logger.warning("[Movie] character ref failed %s/%s: %s", name, view, e)
@@ -200,7 +210,8 @@ class MovieVideoPipeline(MultiScenePipeline):
             try:
                 out = await self.image_generator.generate_single_image(prompt=prompt, size=size)
                 p = os.path.join(refs_dir, f"loc_{_sanitize(name)}.png")
-                out.save(p)
+                # out.save 在 url 模式下做同步下载，放线程池避免阻塞事件循环
+                await asyncio.to_thread(out.save, p)
                 loc_refs[name] = [p]
             except Exception as e:
                 logger.warning("[Movie] location ref failed %s: %s", name, e)

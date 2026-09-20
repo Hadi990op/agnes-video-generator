@@ -281,7 +281,8 @@ class MultiScenePipeline(BasePipeline):
             """等待单个视频完成并保存。"""
             self._check_shutdown()
             video_output = await self._wait_for_video_with_retry(video_id, idx)
-            video_output.save(video_path)
+            # url 模式下 save() 做同步下载，放线程池避免阻塞事件循环
+            await asyncio.to_thread(video_output.save, video_path)
             self._state.scenes[idx].video_file = video_path
 
         await self._emit(
@@ -291,7 +292,20 @@ class MultiScenePipeline(BasePipeline):
         )
 
         wait_tasks = [_wait_scene(idx, vid, path) for idx, vid, path in pending]
-        await asyncio.gather(*wait_tasks, return_exceptions=True)
+        wait_results = await asyncio.gather(*wait_tasks, return_exceptions=True)
+        # 收集失败项：不再静默吞掉（曾导致"没有可拼接的镜头视频"这类
+        # 到合成阶段才暴露、且无从定位的错误）
+        failures = [
+            (pending[i][0], r) for i, r in enumerate(wait_results)
+            if isinstance(r, Exception)
+        ]
+        for idx, exc in failures:
+            logger.error("[MultiScene] Scene %d video generation failed: %s", idx, exc)
+        if failures:
+            raise RuntimeError(
+                f"[MultiScene] {len(failures)}/{len(wait_results)} 个场景视频生成失败："
+                f"{failures[0][1]}"
+            )
 
         self.task_manager.update_state(scenes=[s.model_dump() for s in self._state.scenes])
 
