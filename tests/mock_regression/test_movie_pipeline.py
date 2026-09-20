@@ -66,8 +66,8 @@ class TestMovieVideoPipeline:
         assert os.path.exists(os.path.join(temp_workdir, "production_bible.json"))
         assert os.path.exists(os.path.join(temp_workdir, "shot_plan.json"))
 
-        # 4. 场景全部生成
-        assert len(movie_state.scenes) == 3  # max_shots=3
+        # 4. 场景全部生成（fixture movie_shots.json 有 2 个镜头）
+        assert len(movie_state.scenes) == 2
         for scene in movie_state.scenes:
             assert scene.video_file and os.path.exists(scene.video_file)
 
@@ -76,14 +76,14 @@ class TestMovieVideoPipeline:
 
     async def test_movie_max_shots_cap(self, temp_workdir, movie_state):
         """max_shots cap：只生成前 N 个镜头。"""
-        movie_state.max_shots = 2
+        movie_state.max_shots = 1
         pipeline = await self._make_pipeline(temp_workdir, movie_state)
         await pipeline.run(movie_state)
 
-        # cap 生效：生成 2 个镜头（原始计划 3 个）
-        assert len(movie_state.scenes) == 2
-        # 但 shot_plan 保留完整 3 镜（用于续传）
-        assert len(movie_state.shot_plan) == 3
+        # cap 生效：生成 1 个镜头（原始计划 2 个）
+        assert len(movie_state.scenes) == 1
+        # 但 shot_plan 保留完整 2 镜（用于续传）
+        assert len(movie_state.shot_plan) == 2
 
     async def test_movie_llm_failure_raises_early(self, temp_workdir, movie_state):
         """LLM 返回空 bible → 应尽早失败，而不是合成阶段 '没有可拼接的镜头视频'。"""
