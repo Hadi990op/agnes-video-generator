@@ -18,6 +18,7 @@ from models.task import (
     ManuscriptVideoTask,
     AnchorVideoTask,
     PoetryVideoTask,
+    MovieVideoTask,
     VideoMode,
 )
 
@@ -592,3 +593,41 @@ class TestPipelineResume(BasePipelineTest):
 
 if __name__ == "__main__":
     pytest.main([__file__, "-v", "--tb=short"])
+
+
+# ══════════════════════════════════════════════════════════════════════
+# Movie Pipeline (v7.0, type 8)
+# ══════════════════════════════════════════════════════════════════════
+
+class TestMovieVideoPipeline(BasePipelineTest):
+
+    _SCRIPT_TEXT = (
+        "Scene 1: A cat sits on a windowsill, gazing at the garden.\n\n"
+        "Scene 2: The cat jumps down into the garden and sniffs the flowers."
+    )
+
+    async def _make_state(self, **kwargs):
+        return MovieVideoTask(
+            task_type="movie",
+            creative_name=kwargs.get("creative_name", "mock_movie"),
+            script_text=kwargs.get("script_text", self._SCRIPT_TEXT),
+            visual_style_preset=kwargs.get("visual_style_preset", "cinematic photorealistic"),
+            video_width=kwargs.get("video_width", 768),
+            video_height=kwargs.get("video_height", 1152),
+            audio_config=kwargs.get("audio_config", AudioConfig(enabled=False)),
+            subtitle_config=kwargs.get("subtitle_config", SubtitleConfig(enabled=False)),
+        )
+
+    @pytest.mark.asyncio
+    async def test_movie_basic(self, temp_workdir):
+        """电影模式 — 基础全流程（production bible + shots + 视频）。"""
+        from core.pipelines.movie_video import MovieVideoPipeline
+        state = await self._make_state()
+        await self._run_and_verify(MovieVideoPipeline, state, temp_workdir)
+
+    @pytest.mark.asyncio
+    async def test_movie_max_shots_cap(self, temp_workdir):
+        """电影模式 — max_shots=1 cap（只生成第一个镜头）。"""
+        from core.pipelines.movie_video import MovieVideoPipeline
+        state = await self._make_state(max_shots=1)
+        await self._run_and_verify(MovieVideoPipeline, state, temp_workdir)

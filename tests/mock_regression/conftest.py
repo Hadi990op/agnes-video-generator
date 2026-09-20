@@ -40,6 +40,7 @@ def mock_video_api(monkeypatch):
         "core.pipelines.manuscript_video.AgnesVideoAPI",
         "core.pipelines.anchor_video.AgnesVideoAPI",
         "core.pipelines.poetry_video.AgnesVideoAPI",
+        "core.pipelines.movie_video.AgnesVideoAPI",
     ]
     for p in paths:
         monkeypatch.setattr(p, MockAgnesVideoAPI)
@@ -52,6 +53,7 @@ def mock_image_api(monkeypatch):
         "core.api.agnes_image.AgnesImageAPI",
         "core.pipelines.creative.pipeline.AgnesImageAPI",
         "core.pipelines.anchor_video.AgnesImageAPI",
+        "core.pipelines.movie_video.AgnesImageAPI",
     ]
     for p in paths:
         monkeypatch.setattr(p, MockAgnesImageAPI)
@@ -63,6 +65,7 @@ def mock_chat_api(monkeypatch):
     paths = [
         "core.api.agnes_chat.AgnesChatAPI",
         "core.screenwriter.AgnesChatAPI",
+        "core.pipelines.movie_video.AgnesChatAPI",
     ]
     for p in paths:
         monkeypatch.setattr(p, MockAgnesChatAPI)
