@@ -207,6 +207,43 @@ class AgnesVideoAPI:
         else:
             return 961   # 480p tier
 
+    @staticmethod
+    def _map_size_to_resolution(width: int, height: int) -> tuple:
+        """将 (width, height) 映射为 Agnes API 的 (resolution, ratio)。
+
+        Agnes video API 不接受 width/height 字段（会返回 400
+        "width is a forbidden field"），只接受 resolution + ratio：
+        - resolution: "1080p" | "720p" | "480p"
+        - ratio: "16:9" | "4:3" | "1:1" | "3:4" | "9:16"
+
+        1080p 仅支持 16:9。映射规则：
+        - 短边 > 720  → 1080p
+        - 短边 > 480  → 720p
+        - 其他        → 480p
+        """
+        short = max(width, height)
+        if short > 1280:
+            resolution = "1080p"
+        elif short > 704:
+            resolution = "720p"
+        else:
+            resolution = "480p"
+
+        if width == height:
+            ratio = "1:1"
+        elif width > height:
+            # 横屏
+            ratio = "16:9" if width >= height * (9 / 5.5) else "4:3"
+        else:
+            # 竖屏
+            ratio = "9:16" if height >= width * (9 / 5.5) else "3:4"
+
+        # 1080p 只支持 16:9
+        if resolution == "1080p":
+            ratio = "16:9"
+
+        return resolution, ratio
+
     def _get_frame_config(self, duration: Optional[int] = None,
                           width: int = 1152, height: int = 768) -> tuple:
         d = duration or self.default_duration
@@ -341,6 +378,7 @@ class AgnesVideoAPI:
 
     async def _submit_with_retry(self, payload: dict, mode_desc: str) -> str:
         frame_reductions_left = 2  # allow up to 2 frame-count reductions on 400
+        schema_switches_left = 2   # allow size-schema switches (resolution ↔ width/height)
         attempt = 0
         rotations = 0
         ring = get_key_ring()
@@ -445,6 +483,44 @@ class AgnesVideoAPI:
                     frame_reductions_left -= 1
                     continue
 
+                # HTTP 400 with "forbidden field" (width/height/resolution/ratio)
+                # → 尝试切换分辨率 schema（resolution+ratio ↔ width+height）后重试
+                if (resp.status_code == 400
+                        and "forbidden field" in error_text
+                        and schema_switches_left > 0):
+                    if "resolution" in payload:
+                        payload["resolution"] = None
+                        payload["ratio"] = None
+                        payload.pop("resolution")
+                        payload.pop("ratio")
+                        payload["width"] = self._last_width
+                        payload["height"] = self._last_height
+                        schema_desc = "width/height"
+                    else:
+                        res, ratio = self._map_size_to_resolution(
+                            self._last_width, self._last_height)
+                        payload.pop("width", None)
+                        payload.pop("height", None)
+                        payload["resolution"] = res
+                        payload["ratio"] = ratio
+                        schema_desc = f"resolution={res}/ratio={ratio}"
+                    logger.warning(
+                        f"[AgnesVideo] 400 forbidden field on {mode_desc}, "
+                        f"switching size schema to {schema_desc} and retrying..."
+                    )
+                    collect_error(
+                        "video", "submit_video",
+                        prompt=payload.get("prompt", ""),
+                        error_type="SizeSchemaForbidden",
+                        error_message=f"HTTP 400: forbidden field, switching schema to {schema_desc}",
+                        status_code=400,
+                        response_body=resp.text,
+                        retry_count=attempt + 1,
+                        extra={"mode": mode_desc},
+                    )
+                    schema_switches_left -= 1
+                    continue
+
                 logger.error(f"[AgnesVideo] HTTP {resp.status_code}: {error_text}")
                 collect_error(
                     "video", "submit_video",
@@ -526,12 +602,16 @@ class AgnesVideoAPI:
         **kwargs,
     ) -> str:
         num_frames, frame_rate = self._get_frame_config(duration, width, height)
+        resolution, ratio = self._map_size_to_resolution(width, height)
+        # schema fallback 需要 width/height（避免硬编码，submit_video 存到实例）
+        self._last_width = width
+        self._last_height = height
 
         payload: dict = {
             "model": self.model,
             "prompt": prompt,
-            "width": width,
-            "height": height,
+            "resolution": resolution,
+            "ratio": ratio,
             "num_frames": num_frames,
             "frame_rate": frame_rate,
         }
