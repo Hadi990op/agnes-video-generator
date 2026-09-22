@@ -6,6 +6,7 @@ import json
 import logging
 import mimetypes
 import os
+import re
 import time
 from typing import List, Optional
 
@@ -76,6 +77,23 @@ class AgnesVideoAPI:
         h = dict(self._base_headers)
         h["Authorization"] = f"Bearer {key}"
         return h
+
+    def _is_25_model(self) -> bool:
+        """agnes-video-2.5 / 2.5-flash 使用全新的请求参数集。"""
+        return "2.5" in (self.model or "")
+
+    @staticmethod
+    def _map_to_aspect_ratio(width: int, height: int) -> str:
+        """将 (width, height) 映射为 2.5 系列支持的 aspect_ratio。"""
+        ratios = {
+            "21:9": 21 / 9, "16:9": 16 / 9, "4:3": 4 / 3,
+            "1:1": 1.0, "3:4": 3 / 4, "9:16": 9 / 16,
+        }
+        try:
+            target = width / height
+        except (TypeError, ZeroDivisionError):
+            return "16:9"
+        return min(ratios, key=lambda k: abs(ratios[k] - target))
 
     def _path_to_b64(self, path: str) -> str:
         with open(path, "rb") as f:
@@ -265,6 +283,12 @@ class AgnesVideoAPI:
                 best = (nf, fr)
         return best or DURATION_PRESETS[5]
 
+    def _poll_url(self, video_id: str) -> str:
+        url = f"{get_agnes_api_root()}/agnesapi?video_id={video_id}"
+        if self._is_25_model():
+            url += f"&model_name={self.model}"
+        return url
+
     async def _poll_task(self, video_id: str, interval: int = 60,
                           max_poll_duration: int = 1800,
                           max_consecutive_failures: int = 10,
@@ -308,7 +332,7 @@ class AgnesVideoAPI:
                     resp = await asyncio.wait_for(
                         asyncio.to_thread(
                             requests.get,
-                            f"{get_agnes_api_root()}/agnesapi?video_id={video_id}",
+                            self._poll_url(video_id),
                             headers=self._auth_headers(),
                             timeout=15,
                         ),
@@ -483,10 +507,25 @@ class AgnesVideoAPI:
                     frame_reductions_left -= 1
                     continue
 
-                # HTTP 400 with "forbidden field" (width/height/resolution/ratio)
+                # HTTP 400 with forbidden/not-allowed size fields (width/height/resolution/ratio)
                 # → 尝试切换分辨率 schema（resolution+ratio ↔ width+height）后重试
+                # Generic: any field reported as "not an allowed request field"
+                # → drop that field and retry once
+                if resp.status_code == 400 and "not an allowed request field" in error_text:
+                    m = re.search(r'"param":"(\w+)"', resp.text)
+                    bad = m.group(1) if m else None
+                    if bad and bad in payload:
+                        payload.pop(bad, None)
+                        logger.warning(
+                            f"[AgnesVideo] field '{bad}' rejected, removed from payload, retrying..."
+                        )
+                        continue
+                _size_field_rejected = any(
+                    f in error_text for f in
+                    ("forbidden field", "not an allowed request field")
+                )
                 if (resp.status_code == 400
-                        and "forbidden field" in error_text
+                        and _size_field_rejected
                         and schema_switches_left > 0):
                     if "resolution" in payload:
                         payload["resolution"] = None
@@ -607,19 +646,36 @@ class AgnesVideoAPI:
         self._last_width = width
         self._last_height = height
 
-        payload: dict = {
-            "model": self.model,
-            "prompt": prompt,
-            "resolution": resolution,
-            "ratio": ratio,
-            "num_frames": num_frames,
-            "frame_rate": frame_rate,
-        }
-
-        if seed is not None:
-            payload["seed"] = seed
-        if negative_prompt:
-            payload["negative_prompt"] = negative_prompt
+        if self._is_25_model():
+            # agnes-video-2.5 / 2.5-flash 使用全新参数集：
+            # mode=text|keyframe|reference, size="720P", aspect_ratio,
+            # seconds("4"-"12"), first_frame/last_frame, images[]
+            aspect = self._map_to_aspect_ratio(width, height)
+            sec = max(4, min(12, int(duration or self.default_duration)))
+            payload: dict = {
+                "model": self.model,
+                "prompt": prompt,
+                "seconds": str(sec),
+                "size": "720P",
+                "aspect_ratio": aspect,
+            }
+            if seed is not None:
+                payload["seed"] = seed
+        else:
+            # Agnes API 只接受 resolution/ratio/duration，不再接受 num_frames/frame_rate
+            payload: dict = {
+                "model": self.model,
+                "prompt": prompt,
+                "resolution": resolution,
+                "ratio": ratio,
+            }
+            # duration: 仅部分部署接受；被拒时 _submit_with_retry 自动剔除并重试
+            if duration is not None:
+                payload["duration"] = duration
+            if seed is not None:
+                payload["seed"] = seed
+            if negative_prompt:
+                payload["negative_prompt"] = negative_prompt
 
         resolved_refs = []
         for p in reference_image_paths:
@@ -636,17 +692,38 @@ class AgnesVideoAPI:
                 resolved_refs.append(await self._resolve_image_ref(norm))
         n_refs = len(resolved_refs)
 
-        if n_refs == 0:
+        if self._is_25_model():
+            # 2.5 系列必须上传 hosted URL（不接受 base64），mode 为 text/keyframe/reference
+            urls = []
+            for p in reference_image_paths:
+                try:
+                    url = await self._upload_image_to_url(p) if os.path.exists(p) else p
+                    if url:
+                        urls.append(url)
+                except Exception as e:
+                    logger.warning("[AgnesVideo] 2.5 ref upload failed: %s", e)
+            if not urls:
+                payload["mode"] = "text"
+                mode_desc = "text-to-video"
+            elif len(urls) == 1:
+                payload["mode"] = "reference"
+                payload["images"] = urls
+                mode_desc = "reference i2v"
+            else:
+                payload["mode"] = "keyframe"
+                payload["first_frame"] = urls[0]
+                payload["last_frame"] = urls[-1]
+                mode_desc = f"keyframes ({len(urls)} frames)"
+        elif n_refs == 0:
             mode_desc = "text-to-video"
         elif n_refs == 1:
             payload["image"] = resolved_refs[0]
             payload["mode"] = "ti2vid"
             mode_desc = "image-to-video"
         else:
-            payload["extra_body"] = {
-                "image": resolved_refs,
-                "mode": "keyframes",
-            }
+            payload["image"] = resolved_refs[0]
+            payload["end_image"] = resolved_refs[-1]
+            payload["mode"] = "keyframes"
             mode_desc = f"keyframes ({n_refs} frames)"
 
         logger.info(f"[AgnesVideo] {mode_desc}: {prompt[:80]}...")
