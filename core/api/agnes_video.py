@@ -57,12 +57,15 @@ class AgnesVideoAPI:
         default_duration: int = 5,
         max_retries: int = 30,
         retry_base_delay: float = 30.0,
+        max_queue_full_waits: int = 60,  # 60 × 2min = 最多等 2 小时队列缓解
+
     ):
         self.api_key = api_key
         self.model = model
         self.default_duration = default_duration
         self.max_retries = max_retries
         self.retry_base_delay = retry_base_delay
+        self.max_queue_full_waits = max_queue_full_waits
         self.shutdown_event = None
         # 基础 headers（不含 Authorization）：每次请求前经 _auth_headers() 注入当前 Key
         self._base_headers = {
@@ -404,6 +407,7 @@ class AgnesVideoAPI:
         frame_reductions_left = 2  # allow up to 2 frame-count reductions on 400
         schema_switches_left = 2   # allow size-schema switches (resolution ↔ width/height)
         attempt = 0
+        queue_full_waits = 0
         rotations = 0
         ring = get_key_ring()
         max_rotations = len(ring) * self.max_retries
@@ -459,6 +463,33 @@ class AgnesVideoAPI:
                     )
                     await asyncio.sleep(delay)
                     attempt += 1
+                    continue
+
+                # video_queue_full (503) 是最常见 transient 错误：队列几分钟内就会缓解，
+                # 不消耗 attempt 预算，用专用 patience 循环处理（每 2 分钟一次，最长 2 小时）。
+                if resp.status_code == 503 and "video_queue_full" in resp.text:
+                    logger.warning(
+                        f"[AgnesVideo] video queue full on {mode_desc}, "
+                        f"waiting for queue to drain (patience %d/%d, not counted in retries)...",
+                        queue_full_waits, self.max_queue_full_waits,
+                    )
+                    collect_error(
+                        "video", "submit_video",
+                        prompt=payload.get("prompt", ""),
+                        error_type="VideoQueueFull",
+                        error_message=f"HTTP 503: video_queue_full (patience {queue_full_waits}/{self.max_queue_full_waits})",
+                        status_code=503,
+                        response_body=resp.text,
+                        retry_count=queue_full_waits,
+                        extra={"mode": mode_desc},
+                    )
+                    if queue_full_waits >= self.max_queue_full_waits:
+                        raise RuntimeError(
+                            f"[AgnesVideo] video queue full for over "
+                            f"{self.max_queue_full_waits * 2} minutes, giving up"
+                        )
+                    queue_full_waits += 1
+                    await asyncio.sleep(120)  # 队列通常几分钟内缓解
                     continue
 
                 if resp.status_code >= 500:
