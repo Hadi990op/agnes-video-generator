@@ -11,12 +11,21 @@ import json
 import logging
 from typing import List
 
+from core.production.cinematography import (
+    CINEMATOGRAPHY_SYSTEM,
+    DIRECTOR_PLANNING_SYSTEM,
+    lookup_visual_style,
+    style_catalog_prompt,
+)
+
 logger = logging.getLogger(__name__)
 
 
 _SYSTEM_ANALYZE = """You are a senior film production planner and script supervisor.
 You receive a screenplay / story / novel adaptation / commercial / animation / documentary script.
 Your job is to analyze it into a structured production bible BEFORE any video is generated.
+
+""" + CINEMATOGRAPHY_SYSTEM + """
 
 Return ONLY a single JSON object (no markdown, no commentary) with this exact schema:
 {
@@ -54,11 +63,15 @@ Rules:
 - Keep character names consistent everywhere.
 - Every scene's "location" must reference a location defined in "locations".
 - "visual_style" / "cinematography" / "lighting" are reused by EVERY shot prompt.
+- "cinematography" must be CONCRETE: name lens choices, movement vocabulary, and
+  lighting approaches from the grammar above — not generic phrases like "nice camera work".
 """
 
 _SYSTEM_SHOTS = """You are a storyboard artist and assistant editor.
 Given a production bible and its story-level scenes, break the script into concrete SHOTS.
 Each shot is a single continuous camera take (max ~20s).
+
+""" + DIRECTOR_PLANNING_SYSTEM + """
 
 Return ONLY a JSON array (no markdown) of shot objects with this schema:
 [
@@ -83,6 +96,11 @@ Rules:
 - Each shot must logically follow the previous (use continuity_in/out).
 - Do NOT exceed 20s per shot; split longer beats.
 - Keep character/prop/location names identical to the bible.
+- The "camera" field MUST use precise cinematography vocabulary:
+  shot size + angle + movement (e.g. "medium close-up, eye-level, slow dolly in").
+  Follow the storyboard checklist: vary shot sizes between adjacent shots, use
+  establishing shots for new locations, use close-ups for emotional peaks,
+  inserts for key props.
 """
 
 _SYSTEM_VALIDATE = """You are a continuity supervisor.
@@ -105,8 +123,11 @@ class ProductionBibleBuilder:
         self.chat = chat_api
 
     async def analyze_script(self, script: str, style_preset: str) -> dict:
+        style_desc = lookup_visual_style(style_preset)
         user = (
-            f"MASTER VISUAL STYLE PRESET requested by user: {style_preset}\n\n"
+            f"MASTER VISUAL STYLE PRESET requested by user: {style_preset}\n"
+            f"(concrete interpretation: {style_desc})\n\n"
+            f"{style_catalog_prompt()}\n\n"
             f"=== SCRIPT / STORY ===\n{script}\n=== END SCRIPT ==="
         )
         data = await self._json(self.chat, _SYSTEM_ANALYZE, user, max_tokens=8192)
@@ -115,6 +136,9 @@ class ProductionBibleBuilder:
         data.setdefault("props", [])
         data.setdefault("scenes", [])
         data.setdefault("visual_style", style_preset)
+        # 把风格的具体摄影解释写进圣经（每次 shot prompt 复用）
+        if style_desc and style_desc != style_preset:
+            data["visual_style"] = f"{style_preset}. {style_desc}"
         return data
 
     async def build_shot_breakdown(self, bible: dict) -> List[dict]:
@@ -143,7 +167,7 @@ class ProductionBibleBuilder:
                 s["duration"] = max(4, min(20, int(s["duration"])))
             except Exception:
                 s["duration"] = 8
-        return shots
+        return self._enforce_shot_variation(shots)
 
     async def validate_continuity(self, bible: dict, shots: List[dict]) -> List[str]:
         user = (
@@ -156,6 +180,45 @@ class ProductionBibleBuilder:
         if not isinstance(issues, list):
             issues = []
         return [str(x) for x in issues]
+
+    @staticmethod
+    def _enforce_shot_variation(shots: List[dict]) -> List[dict]:
+        """导演规则守门员：相邻镜头的景别/角度至少一项不同。
+
+LLM 偶尔会连续输出相同景别（视觉疲劳）。该函数不改写 LLM 的
+创意选择，只对「连续 2 次完全相同的 camera 描述」做机械式修正：
+交替使用 OTS / 角度变化，保证 shot variation。
+"""
+        if not shots:
+            return shots
+
+        def _size_rank(camera: str) -> int:
+            """0=最远(extreme wide) … 6=最近(extreme close-up)"""
+            c = (camera or "").lower()
+            ladder = [
+                ("extreme wide", 0), ("extreme-wide", 0),
+                ("wide", 1), ("full", 2), ("medium close", 4),
+                ("medium", 3), ("close", 5), ("ecu", 6),
+            ]
+            for token, rank in ladder:
+                if token in c:
+                    return rank
+            return 3  # 默认 medium
+
+        for i in range(1, len(shots)):
+            prev = (shots[i - 1].get("camera") or "").strip().lower()
+            cur = shots[i].get("camera") or ""
+            if not prev or not cur:
+                continue
+            if prev == cur.strip().lower():
+                # 连续雷同：交替使用 OTS / 角度变化，保证 shot variation
+                angle = "over-the-shoulder" if i % 2 else "high angle"
+                shots[i]["camera"] = (
+                    f"{cur}, {angle}"
+                    if angle not in cur.lower()
+                    else cur
+                )
+        return shots
 
     @staticmethod
     async def _json(chat, system: str, user: str, max_tokens: int = 4096):
@@ -190,8 +253,8 @@ def compose_shot_prompt(shot: dict, bible: dict, style_preset: str) -> str:
         f"[LOCATION]\n{loc}",
         f"[ACTION & EMOTION]\n{shot.get('action','')} | emotion: {shot.get('emotion','')}",
         f"[CAMERA]\n{shot.get('camera','')}",
-        f"[CINEMATOGRAPHY]\n{cine}" if cine else "",
-        f"[LIGHTING]\n{lighting}" if lighting else "",
+        f"[CINEMATOGRAPHY]\n{cine}",
+        f"[LIGHTING]\n{lighting}",
         f"[CONTINUITY]\nIn: {shot.get('continuity_in','')}\nOut: {shot.get('continuity_out','')}",
         f"[NEGATIVE CONSTRAINTS]\n{neg}",
     ]

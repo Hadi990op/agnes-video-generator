@@ -224,6 +224,7 @@ class MultiScenePipeline(BasePipeline):
         """
         scenes = self._state.scenes
         total = len(scenes)
+        failed_submits: list = []  # 提交失败场景的补漏重试列表
 
         # Phase 1: 并行提交所有视频
         async def _submit_scene(idx: int, scene) -> tuple:
@@ -246,13 +247,24 @@ class MultiScenePipeline(BasePipeline):
             ref_images = self._get_scene_ref_images(scene, idx)
             duration = self._get_scene_duration(scene, idx)
 
-            video_id = await self.video_api.submit_video(
-                prompt=prompt,
-                reference_image_paths=ref_images,
-                duration=duration,
-                width=self._state.video_width,
-                height=self._state.video_height,
-            )
+            try:
+                video_id = await self.video_api.submit_video(
+                    prompt=prompt,
+                    reference_image_paths=ref_images,
+                    duration=duration,
+                    width=self._state.video_width,
+                    height=self._state.video_height,
+                )
+            except Exception as e:
+                # 提交失败（如 503 队列满/瞬时网络错误）：不立刻炸掉整个任务，
+                # 记录到补漏列表，稍后统一重试。
+                logger.error(
+                    "[MultiScene] Scene %d submit failed (queued for retry): %s", idx, e
+                )
+                failed_submits.append(
+                    {"idx": idx, "prompt": prompt, "duration": duration}
+                )
+                return None
             scene.video_id = video_id
             self._save_task_json(scene_dir, {"video_id": video_id})
             return (idx, video_id, video_path)
@@ -269,6 +281,50 @@ class MultiScenePipeline(BasePipeline):
                 raise result
             if result is not None:
                 pending.append(result)
+
+        # 补漏阶段：串行重试之前提交失败的场景（如 503 队列满）。
+        # 队列拥挤通常几分钟内缓解，这里以最多 30 轮 × 2 分钟间隔重试。
+        if failed_submits:
+            logger.warning(
+                "[MultiScene] %d scene(s) failed to submit, retrying...", len(failed_submits)
+            )
+            for round_no in range(30):
+                still_failed = []
+                for item in failed_submits:
+                    idx = item["idx"]
+                    scene = scenes[idx]
+                    scene_dir = os.path.join(self.working_dir, f"scene_{idx}")
+                    video_path = os.path.join(scene_dir, "video.mp4")
+                    prompt = self._get_scene_video_prompt(scene, idx)
+                    ref_images = self._get_scene_ref_images(scene, idx)
+                    duration = self._get_scene_duration(scene, idx)
+                    try:
+                        video_id = await self.video_api.submit_video(
+                            prompt=prompt,
+                            reference_image_paths=ref_images,
+                            duration=duration,
+                            width=self._state.video_width,
+                            height=self._state.video_height,
+                        )
+                        scene.video_id = video_id
+                        self._save_task_json(scene_dir, {"video_id": video_id})
+                        pending.append((idx, video_id, video_path))
+                        logger.info("[MultiScene] Scene %d retry submit OK: %s", idx, video_id)
+                    except Exception as e:
+                        logger.warning(
+                            "[MultiScene] Scene %d retry round %d failed: %s",
+                            idx, round_no + 1, e,
+                        )
+                        still_failed.append(item)
+                if not still_failed:
+                    break
+                failed_submits = still_failed
+                await asyncio.sleep(120)
+            if failed_submits:
+                raise RuntimeError(
+                    f"[MultiScene] {len(failed_submits)} scene(s) failed to submit "
+                    f"after retries: {failed_submits[0]['idx']}"
+                )
 
         self.task_manager.update_state(scenes=[s.model_dump() for s in scenes])
 

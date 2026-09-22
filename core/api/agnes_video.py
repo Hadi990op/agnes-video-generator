@@ -55,7 +55,7 @@ class AgnesVideoAPI:
         api_key: str,
         model: str = "agnes-video-v2.0",
         default_duration: int = 5,
-        max_retries: int = 5,
+        max_retries: int = 30,
         retry_base_delay: float = 30.0,
     ):
         self.api_key = api_key
@@ -462,7 +462,7 @@ class AgnesVideoAPI:
                     continue
 
                 if resp.status_code >= 500:
-                    delay = self.retry_base_delay * (attempt + 1)
+                    delay = min(self.retry_base_delay * (attempt + 1), 300)
                     logger.warning(
                         f"[AgnesVideo] {resp.status_code} server error on {mode_desc}, "
                         f"retry {attempt + 1}/{self.max_retries} in {delay:.0f}s..."
