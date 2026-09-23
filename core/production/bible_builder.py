@@ -131,6 +131,12 @@ class ProductionBibleBuilder:
             f"=== SCRIPT / STORY ===\n{script}\n=== END SCRIPT ==="
         )
         data = await self._json(self.chat, _SYSTEM_ANALYZE, user, max_tokens=8192)
+
+        # Guard: truncated/malformed LLM output -> retry once (long scripts)
+        if not (data.get("scenes") or data.get("characters")):
+            logger.warning("[BibleBuilder] analyze returned empty; retrying once")
+            data = await self._json(self.chat, _SYSTEM_ANALYZE, user, max_tokens=8192)
+
         data.setdefault("characters", [])
         data.setdefault("locations", [])
         data.setdefault("props", [])
@@ -142,15 +148,69 @@ class ProductionBibleBuilder:
         return data
 
     async def build_shot_breakdown(self, bible: dict) -> List[dict]:
-        user = (
-            f"=== PRODUCTION BIBLE ===\n{json.dumps(bible, ensure_ascii=False)}\n"
-            f"=== END BIBLE ===\nBreak into shots now."
-        )
-        shots = await self._json(self.chat, _SYSTEM_SHOTS, user, max_tokens=8192)
-        if isinstance(shots, dict):
-            shots = shots.get("shots", [])
-        if not isinstance(shots, list):
-            shots = []
+        """Per-scene shot breakdown.
+
+        Long scripts get token-truncated when the whole bible is sent at once
+        (WINGBORN test: 14 scenes -> only 8 shots of the last scene).
+        Instead, break shots per story-level scene with a slim bible context.
+        """
+        scenes = bible.get("scenes") or []
+        if not scenes:
+            # Fallback: no scene info -> whole-bible breakdown (old behavior)
+            user = (
+                f"=== PRODUCTION BIBLE ===\n{json.dumps(bible, ensure_ascii=False)}\n"
+                f"=== END BIBLE ===\n"
+                f"Break into shots now."
+            )
+            shots = await self._json(self.chat, _SYSTEM_SHOTS, user, max_tokens=8192)
+            if isinstance(shots, dict):
+                shots = shots.get("shots", [])
+            if not isinstance(shots, list):
+                shots = []
+            return self._enforce_shot_variation(self._finalize_shots(shots))
+
+        # Slim bible context (style/characters/locations) to keep input small
+        slim_bible = {
+            "visual_style": bible.get("visual_style", ""),
+            "cinematography": bible.get("cinematography", ""),
+            "lighting": bible.get("lighting", ""),
+            "color_script": bible.get("color_script", ""),
+            "characters": [
+                {"name": c.get("name", ""),
+                 "description": c.get("description", ""),
+                 "personality": c.get("personality", "")}
+                for c in (bible.get("characters") or [])
+            ],
+            "locations": bible.get("locations", []),
+        }
+
+        all_shots: list = []
+        total = len(scenes)
+        for si, scene in enumerate(scenes):
+            scene_id = scene.get("id", f"s{si + 1}")
+            user = (
+                f"=== PRODUCTION BIBLE (context) ===\n"
+                f"{json.dumps(slim_bible, ensure_ascii=False)}\n"
+                f"=== SCENE TO SHOOT (scene {si + 1}/{total}) ===\n"
+                f"{json.dumps(scene, ensure_ascii=False)}\n"
+                f"Break THIS scene into shots now. Use scene_id \"{scene_id}\" "
+                f"for every shot."
+            )
+            part = await self._json(self.chat, _SYSTEM_SHOTS, user, max_tokens=8192)
+            if isinstance(part, dict):
+                part = part.get("shots", [])
+            if not isinstance(part, list):
+                part = []
+            logger.info(
+                "[BibleBuilder] scene %s -> %d shots", scene_id, len(part)
+            )
+            all_shots.extend(part)
+
+        return self._enforce_shot_variation(self._finalize_shots(all_shots))
+
+    @staticmethod
+    def _finalize_shots(shots: List[dict]) -> List[dict]:
+        """Normalize LLM output: defaults + duration clamp + sequential ids."""
         for i, s in enumerate(shots):
             s.setdefault("id", f"shot_{i+1}")
             s.setdefault("duration", 8)
@@ -167,7 +227,7 @@ class ProductionBibleBuilder:
                 s["duration"] = max(4, min(20, int(s["duration"])))
             except Exception:
                 s["duration"] = 8
-        return self._enforce_shot_variation(shots)
+        return shots
 
     async def validate_continuity(self, bible: dict, shots: List[dict]) -> List[str]:
         user = (
